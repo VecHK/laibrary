@@ -1,0 +1,6 @@
+/myrepository/
+/volumes/
+node_modules/
+.DS_Store
+*.log
+packages/server/storage/

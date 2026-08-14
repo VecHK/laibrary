@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./volumes/postgres_data:/var/lib/postgresql
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin-web
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    volumes:
+      - ./volumes/pgadmin_data:/var/lib/pgadmin
+
+  laibrary:
+    image: node:24-alpine
+    container_name: laibrary-server
+    restart: always
+    working_dir: /app
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://root:root@postgres:5432/root
+      HTTP_API_PORT: "44998"
+    ports:
+      - "44998:44998"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev"
