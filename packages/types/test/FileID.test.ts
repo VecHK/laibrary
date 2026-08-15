@@ -4,11 +4,11 @@ import { constructFileID, isFileIDShape, name2number, parseFileID } from '../src
 describe('FileID', () => {
   it('构造与解析', () => {
     const fid = constructFileID(123, 'png')
-    expect(fid).toBe('123.png')
+    expect(fid).toBe('fid_123.png')
     expect(parseFileID(fid)).toEqual([123, 'png'])
 
     const bare = constructFileID(456)
-    expect(bare).toBe('456')
+    expect(bare).toBe('fid_456')
     expect(parseFileID(bare)).toEqual([456, null])
   })
 
@@ -19,9 +19,10 @@ describe('FileID', () => {
   })
 
   it('isFileIDShape', () => {
-    expect(isFileIDShape('123.png')).toBe(true)
-    expect(isFileIDShape('123')).toBe(true)
-    expect(isFileIDShape('abc.png')).toBe(false)
+    expect(isFileIDShape('fid_123.png')).toBe(true)
+    expect(isFileIDShape('fid_123')).toBe(true)
+    expect(isFileIDShape('123.png')).toBe(false)
+    expect(isFileIDShape('fid_abc.png')).toBe(false)
     expect(isFileIDShape(123)).toBe(false)
   })
 

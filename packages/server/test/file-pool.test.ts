@@ -39,7 +39,7 @@ describe('file-pool', () => {
   it('分片路径', async () => {
     const pool = await initFilePool(path.join(tmp_dir, 'files'))
     const fid = constructFileID(2001, 'png')
-    expect(pool.getFilePath(fid)).toContain(path.join('files', '2000', '2001.png'))
+    expect(pool.getFilePath(fid)).toContain(path.join('files', '2000', 'fid_2001.png'))
   })
 
   it('splitPoint', () => {
@@ -56,6 +56,6 @@ describe('file-pool', () => {
     await pool.saveFile(constructFileID(3001, 'jpg'), Buffer.from('c'))
 
     const blobs = await pool.collectBlobFiles()
-    expect(blobs.map(b => b.file_id).sort()).toEqual(['1.png', '2.pdf', '3001.jpg'])
+    expect(blobs.map(b => b.file_id).sort()).toEqual(['fid_1.png', 'fid_2.pdf', 'fid_3001.jpg'])
   })
 })

@@ -13,7 +13,7 @@ import { sql } from 'drizzle-orm'
 
 export const items = pgTable('items', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
-  role: text('role').notNull().default('item'),
+  role: text('role').notNull().default('custom'),
   title: text('title').notNull().default(''),
   attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}),
   tags: bigint('tags', { mode: 'number' }).array().notNull().default(sql`'{}'`),

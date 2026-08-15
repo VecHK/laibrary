@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import type { FileID } from './FileID'
+import { __FILE_ID_PREFIX__ } from './FileID'
 import type { DatabaseFieldDef, Role, RoleAttributes } from './roles'
 
 export const zFileID = z.string().regex(
-  /^\d+(\.[a-zA-Z0-9]+)?$/,
+  new RegExp(`^${__FILE_ID_PREFIX__}\\d+(\\.[a-zA-Z0-9]+)?$`),
   '非法的 FileID',
 ).transform(v => v as FileID)
 
@@ -47,8 +48,9 @@ export const zAnyAttributes: z.ZodType<Record<string, unknown>> = z.record(
 )
 
 export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]>> = {
-  item: zAnyAttributes,
+  custom: zAnyAttributes,
   tag: zAnyAttributes,
+  textline: zAnyAttributes,
   file: zFileAttributes,
   image: zImageAttributes,
   database: zDatabaseAttributes,
@@ -64,7 +66,7 @@ export function buildRowValidator(fields: DatabaseFieldDef[]): z.ZodType<Record<
   return z.object(shape).passthrough()
 }
 
-export const zRole = z.enum(['item', 'tag', 'file', 'image', 'database'])
+export const zRole = z.enum(['custom', 'tag', 'textline', 'file', 'image', 'database'])
 
 export const zItemID = z.number().int().positive()
 

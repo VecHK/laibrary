@@ -1,0 +1,1 @@
+ALTER TABLE "items" ALTER COLUMN "role" SET DEFAULT 'custom';

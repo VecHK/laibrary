@@ -42,18 +42,18 @@ export async function generateThumbForImage(
 
   await updateItem(db, id, {
     attributes: { ...attrs, cover_src: thumb_fid } as never,
-  })
+  }, blob)
 
   return { file_id: thumb_fid }
 }
 
 export function ActionRoute(db: DB, blob: FilePool): ActionTable {
   return {
-    addItem: (form) => createItem(db, form),
+    addItem: (form) => createItem(db, form, blob),
     getItem: ({ id }) => getItem(db, id),
     getItems: (ids) => getItems(db, ids),
     updateItem: async ({ id, data }) => {
-      await updateItem(db, id, data)
+      await updateItem(db, id, data, blob)
       return { message: 'done' as const }
     },
     deleteItem: async ({ id }) => {

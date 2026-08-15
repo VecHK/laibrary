@@ -7,6 +7,7 @@ export default tseslint.config(
       'node_modules/',
       'myrepository/',
       'volumes/',
+      '**/dist/',
       'packages/server/drizzle/',
       'packages/server/storage/',
     ],

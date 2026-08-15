@@ -1,5 +1,7 @@
 export type FileID = string & { __FILE_ID__: never }
 
+export const __FILE_ID_PREFIX__ = 'fid_'
+
 function validFileNumber(file_number: number): string | null {
   if (!Number.isSafeInteger(file_number)) {
     return 'file_number 需要是合法的整数'
@@ -40,20 +42,24 @@ export function constructFileID(num: number, format: string = ''): FileID {
     throw Error(`并不接受你所提供的format: ${format}`)
   } else {
     if (format.length) {
-      return `${num}.${format}` as FileID
+      return `${__FILE_ID_PREFIX__}${num}.${format}` as FileID
     } else {
-      return `${num}` as FileID
+      return `${__FILE_ID_PREFIX__}${num}` as FileID
     }
   }
 }
 
 export function parseFileID(fid: FileID): readonly [number, string | null] {
-  const dot_idx = fid.indexOf('.')
+  if (!fid.startsWith(__FILE_ID_PREFIX__)) {
+    throw Error(`非法的 FileID: ${fid}`)
+  }
+  const body = fid.slice(__FILE_ID_PREFIX__.length)
+  const dot_idx = body.indexOf('.')
   if (dot_idx === -1) {
-    return [name2number(fid), null]
+    return [name2number(body), null]
   } else {
-    const num_part = fid.slice(0, dot_idx)
-    const format = fid.slice(dot_idx + 1)
+    const num_part = body.slice(0, dot_idx)
+    const format = body.slice(dot_idx + 1)
     if (!isValidFileFormat(format)) {
       throw Error(`非法的 FileID: ${fid}`)
     }
@@ -64,6 +70,6 @@ export function parseFileID(fid: FileID): readonly [number, string | null] {
 export function isFileIDShape(value: unknown): value is FileID {
   return (
     (typeof value === 'string') &&
-    /^\d+(\.[a-zA-Z0-9]+)?$/.test(value)
+    new RegExp(`^${__FILE_ID_PREFIX__}\\d+(\\.[a-zA-Z0-9]+)?$`).test(value)
   )
 }

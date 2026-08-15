@@ -1,31 +1,74 @@
 import fs from 'fs/promises'
-import { inArray } from 'drizzle-orm'
-import { isFileIDShape, Role } from '@laibrary/types'
+import { isFileIDShape, FileID } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items } from '../db/schema'
 import type { FilePool } from './file-pool'
 
-export const FileReferenceKeys: Partial<Record<Role, ReadonlyArray<string>>> = {
-  file: ['src'],
-  image: ['src', 'cover_src'],
+export function scanFileRefs(value: unknown, found: FileID[] = []): FileID[] {
+  if (typeof value === 'string') {
+    if (isFileIDShape(value)) {
+      found.push(value)
+    }
+  } else if (Array.isArray(value)) {
+    for (const v of value) {
+      scanFileRefs(v, found)
+    }
+  } else if ((value !== null) && (typeof value === 'object')) {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      scanFileRefs(v, found)
+    }
+  }
+  return found
+}
+
+export type FileRefEntry = {
+  path: string
+  fid: FileID
+}
+
+export function scanFileRefEntries(
+  value: unknown,
+  path: string = '',
+  found: FileRefEntry[] = [],
+): FileRefEntry[] {
+  if (typeof value === 'string') {
+    if (isFileIDShape(value)) {
+      found.push({ path, fid: value })
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((v, idx) => {
+      scanFileRefEntries(v, `${path}[${idx}]`, found)
+    })
+  } else if ((value !== null) && (typeof value === 'object')) {
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      scanFileRefEntries(v, path.length ? `${path}.${key}` : key, found)
+    }
+  }
+  return found
+}
+
+export async function checkFileRefsExist(
+  file_pool: FilePool,
+  attributes: Record<string, unknown>,
+): Promise<void> {
+  const entries = scanFileRefEntries(attributes)
+  for (const { path, fid } of entries) {
+    if (!(await file_pool.fileExists(fid))) {
+      const field_path = path.length ? `attributes.${path}` : 'attributes'
+      throw new Error(`${field_path} 引用的文件不存在: ${fid}`)
+    }
+  }
 }
 
 export async function collectReferencedFileIds(db: DB): Promise<Set<string>> {
-  const file_roles = Object.keys(FileReferenceKeys) as Role[]
-
   const rows = await db
-    .select({ role: items.role, attributes: items.attributes })
+    .select({ attributes: items.attributes })
     .from(items)
-    .where(inArray(items.role, file_roles))
 
   const refs = new Set<string>()
   for (const row of rows) {
-    const keys = FileReferenceKeys[row.role as keyof typeof FileReferenceKeys] ?? []
-    for (const key of keys) {
-      const value = row.attributes[key]
-      if (isFileIDShape(value)) {
-        refs.add(value)
-      }
+    for (const fid of scanFileRefs(row.attributes)) {
+      refs.add(fid)
     }
   }
   return refs

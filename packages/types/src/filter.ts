@@ -23,10 +23,13 @@ export interface FilterGroup {
   rules: FilterRule[]
 }
 
-export type ItemSortBy = 'id' | 'create_date' | 'update_date'
+export type ItemSortBy = 'id' | 'create_date' | 'update_date' | 'order_index'
+
+export type SortField = { name: string; type: 'string' | 'number' }
 
 export interface ListingParams {
   sort_by?: ItemSortBy
+  sort_field?: SortField
   after_id?: ItemID
   desc?: boolean
   limit: number

@@ -7,7 +7,7 @@ import {
 describe('role attributes 校验', () => {
   it('file 校验必填字段', () => {
     const ok = zFileAttributes.safeParse({
-      src: '1.pdf',
+      src: 'fid_1.pdf',
       filename: 'a.pdf',
       mime: 'application/pdf',
       size: 10,
@@ -23,7 +23,7 @@ describe('role attributes 校验', () => {
 
   it('image 继承 file 字段', () => {
     const ok = zImageAttributes.safeParse({
-      src: '2.png',
+      src: 'fid_2.png',
       filename: 'a.png',
       mime: 'image/png',
       size: 10,
@@ -33,7 +33,7 @@ describe('role attributes 校验', () => {
     expect(ok.success).toBe(true)
 
     const missing_dims = zImageAttributes.safeParse({
-      src: '2.png',
+      src: 'fid_2.png',
       filename: 'a.png',
       mime: 'image/png',
       size: 10,
@@ -58,8 +58,9 @@ describe('role attributes 校验', () => {
 
   it('checkAttributes 按 role 分发', () => {
     expect(() => checkAttributes('file', {})).toThrow()
-    expect(() => checkAttributes('item', {})).not.toThrow()
+    expect(() => checkAttributes('custom', {})).not.toThrow()
     expect(() => checkAttributes('tag', { any: 'thing' })).not.toThrow()
+    expect(() => checkAttributes('textline', {})).not.toThrow()
   })
 })
 

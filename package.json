@@ -4,10 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @laibrary/server",
+    "web": "npm run dev -w @laibrary/web",
     "test": "npm run test -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
     "db:generate": "npm run db:generate -w @laibrary/server",

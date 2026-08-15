@@ -2,6 +2,7 @@ import {
   and, asc, desc, eq, ilike, inArray, isNull, max, not, or,
   sql, type SQL,
 } from 'drizzle-orm'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import {
   AddItemForm, FilterGroup, FilterRule, Item,
   ItemID, ListingParams, Role, UpdateItemForm,
@@ -10,6 +11,8 @@ import {
 import type { DB } from '../db/client'
 import { items, type ItemRow } from '../db/schema'
 import { findItemRow, getItemRow, toWireItem } from './wire'
+import type { FilePool } from '../blob/file-pool'
+import { checkFileRefsExist } from '../blob/gc'
 
 function unique(list: number[]): number[] {
   return [...new Set(list)]
@@ -60,7 +63,7 @@ async function findAncestorIds(db: DB, start_id: ItemID, limit = 1000): Promise<
   return ancestors
 }
 
-export async function createItem(db: DB, form: AddItemForm): Promise<Item> {
+export async function createItem(db: DB, form: AddItemForm, file_pool: FilePool): Promise<Item> {
   const role = form.role
   let attributes: Record<string, unknown> = (
     checkAttributes(role, form.attributes ?? {}) as unknown as Record<string, unknown>
@@ -75,6 +78,8 @@ export async function createItem(db: DB, form: AddItemForm): Promise<Item> {
   if (row_validator !== null) {
     attributes = row_validator.parse(attributes)
   }
+
+  await checkFileRefsExist(file_pool, attributes)
 
   const order_index = (
     form.order_index !== undefined
@@ -119,6 +124,7 @@ export async function updateItem(
   db: DB,
   id: ItemID,
   data: UpdateItemForm,
+  file_pool: FilePool,
 ): Promise<Item> {
   const prev = await getItemRow(db, id)
 
@@ -147,6 +153,8 @@ export async function updateItem(
   if (row_validator !== null) {
     new_attributes = row_validator.parse(new_attributes)
   }
+
+  await checkFileRefsExist(file_pool, new_attributes)
 
   const new_rows = await db
     .update(items)
@@ -280,24 +288,56 @@ const SORT_COLUMNS = {
   id: items.id,
   create_date: items.create_date,
   update_date: items.update_date,
+  order_index: items.order_index,
 } as const
 
 export async function listItems(db: DB, params: ListingParams): Promise<Item[]> {
   const sort_by = params.sort_by ?? 'id'
   const desc_order = Boolean(params.desc)
-  const sort_col = SORT_COLUMNS[sort_by]
+  const sort_field = params.sort_field
 
   const filter_cond = buildFilterCondition(params.filter_rules, params.filter_groups)
 
   const where_conds: (SQL | undefined)[] = [filter_cond]
 
-  if (params.after_id !== undefined) {
-    const after_row = await getItemRow(db, params.after_id)
-    const after_sort_value = after_row[sort_by]
-    const cmp = desc_order ? '<' : '>'
-    where_conds.push(
-      sql`(${sort_col}, ${items.id}) ${sql.raw(cmp)} (${after_sort_value}, ${params.after_id})`,
-    )
+  let sort_expr: SQL | PgColumn
+  let order_clause: SQL
+
+  if (sort_field !== undefined) {
+    const field_base = (
+      sort_field.type === 'number'
+    ) ? sql`(${items.attributes}->>${sort_field.name})::numeric`
+      : sql`${items.attributes}->>${sort_field.name}`
+
+    sort_expr = field_base
+    order_clause = sql`${field_base} ${sql.raw(desc_order ? 'DESC' : 'ASC')} NULLS LAST`
+
+    if (params.after_id !== undefined) {
+      const after_row = await getItemRow(db, params.after_id)
+      const after_val = after_row.attributes[sort_field.name]
+      if (
+        !(sort_field.type === 'number' ? (typeof after_val === 'number') : (typeof after_val === 'string'))
+      ) {
+        return []
+      }
+      const cmp = desc_order ? '<' : '>'
+      where_conds.push(
+        sql`(${sort_expr}, ${items.id}) ${sql.raw(cmp)} (${after_val}, ${params.after_id})`,
+      )
+    }
+  } else {
+    const sort_col = SORT_COLUMNS[sort_by]
+    sort_expr = sort_col
+    order_clause = desc_order ? desc(sort_col) : asc(sort_col)
+
+    if (params.after_id !== undefined) {
+      const after_row = await getItemRow(db, params.after_id)
+      const after_sort_value = after_row[sort_by]
+      const cmp = desc_order ? '<' : '>'
+      where_conds.push(
+        sql`(${sort_expr}, ${items.id}) ${sql.raw(cmp)} (${after_sort_value}, ${params.after_id})`,
+      )
+    }
   }
 
   const conds = where_conds.filter((c): c is SQL => c !== undefined)
@@ -314,11 +354,7 @@ export async function listItems(db: DB, params: ListingParams): Promise<Item[]> 
     }
   }
 
-  const order_conds = desc_order
-    ? [desc(sort_col), desc(items.id)]
-    : [asc(sort_col), asc(items.id)]
-
-  query.orderBy(...order_conds)
+  query.orderBy(order_clause, desc_order ? desc(items.id) : asc(items.id))
 
   if (params.limit !== 0) {
     query.limit(params.limit)

@@ -1,6 +1,6 @@
 import type { FileID } from './FileID'
 
-export type Role = 'item' | 'tag' | 'file' | 'image' | 'database'
+export type Role = 'custom' | 'tag' | 'textline' | 'file' | 'image' | 'database'
 
 export type ItemID = number
 
@@ -28,14 +28,13 @@ export interface DatabaseAttributes {
 }
 
 export interface RoleAttributes {
-  item: Record<string, unknown>
+  custom: Record<string, unknown>
   tag: Record<string, unknown>
+  textline: Record<string, unknown>
   file: FileAttributes
   image: ImageAttributes
   database: DatabaseAttributes
 }
-
-export type RowAttributes = Record<string, string | number | unknown>
 
 export interface ItemBase {
   id: ItemID

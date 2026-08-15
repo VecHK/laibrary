@@ -1,13 +1,19 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { prepareTestDb, truncateItems } from './helpers'
+import { closeDb, prepareTestDb, prepareTestFilePool, truncateItems } from './helpers'
 import { deleteTag, getTagByTitle, newTag, searchTag, updateTag } from '../src/repo/tags'
-import { createItem, getItem, listItems } from '../src/repo/items'
+import { createItem, deleteItem, getItem, listItems } from '../src/repo/items'
 import type { DB } from '../src/db/client'
+import type { FilePool } from '../src/blob/file-pool'
 
 let db: DB
+let pool: FilePool
+let cleanup_pool: () => Promise<void>
 
 beforeAll(async () => {
   db = await prepareTestDb()
+  const prepared = await prepareTestFilePool()
+  pool = prepared.pool
+  cleanup_pool = prepared.cleanup
 })
 
 beforeEach(async () => {
@@ -15,7 +21,8 @@ beforeEach(async () => {
 })
 
 afterAll(async () => {
-  await (db as unknown as { $client: { end(): Promise<void> } }).$client.end()
+  await cleanup_pool()
+  await closeDb(db)
 })
 
 describe('tag', () => {
@@ -55,8 +62,8 @@ describe('tag', () => {
 
   it('deleteTag 清扫所有引用它的 item', async () => {
     const tag = await newTag(db, '要删的')
-    const item_a = await createItem(db, { role: 'item', tags: [tag.id] })
-    const item_b = await createItem(db, { role: 'item', tags: [tag.id] })
+    const item_a = await createItem(db, { role: 'custom', tags: [tag.id] }, pool)
+    const item_b = await createItem(db, { role: 'custom', tags: [tag.id] }, pool)
 
     await deleteTag(db, tag.id)
 
@@ -68,9 +75,8 @@ describe('tag', () => {
 
   it('deleteItem 删除 tag 时同样清扫引用', async () => {
     const tag = await newTag(db, '清扫测试')
-    const item_a = await createItem(db, { role: 'item', tags: [tag.id] })
+    const item_a = await createItem(db, { role: 'custom', tags: [tag.id] }, pool)
 
-    const { deleteItem } = await import('../src/repo/items')
     await deleteItem(db, tag.id)
 
     const a = await getItem(db, item_a.id)
@@ -79,8 +85,8 @@ describe('tag', () => {
 
   it('has_tag 过滤', async () => {
     const tag = await newTag(db, '过滤测试')
-    const with_tag = await createItem(db, { role: 'item', tags: [tag.id] })
-    await createItem(db, { role: 'item' })
+    const with_tag = await createItem(db, { role: 'custom', tags: [tag.id] }, pool)
+    await createItem(db, { role: 'custom' }, pool)
 
     const found = await listItems(db, {
       limit: 0,

@@ -4,7 +4,24 @@ export type ActionName = keyof ActionTable
 export type ActionPayload<N extends ActionName> = Parameters<ActionTable[N]>[0]
 export type ActionResult<N extends ActionName> = Awaited<ReturnType<ActionTable[N]>>
 
-export interface RpcClient {
+export const ActionNames = [
+  'addItem',
+  'getItem',
+  'getItems',
+  'updateItem',
+  'deleteItem',
+  'listing',
+  'newTag',
+  'updateTag',
+  'deleteTag',
+  'searchTag',
+  'getTagByTitle',
+  'generateThumb',
+] as const satisfies ReadonlyArray<ActionName>
+
+export type RpcClient = {
+  [N in ActionName]: (payload: ActionPayload<N>) => Promise<ActionResult<N>>
+} & {
   call<N extends ActionName>(action: N, payload: ActionPayload<N>): Promise<ActionResult<N>>
   request(action: string, payload: unknown): Promise<unknown>
 }
@@ -40,10 +57,18 @@ export function createRpcClient(
     return body
   }
 
-  return {
-    call: (action, payload) => {
-      return request(action, payload) as Promise<ActionResult<typeof action>>
-    },
+  const client = {
     request,
+    call: (action: never, payload: never) => {
+      return request(action, payload)
+    },
+  } as RpcClient
+
+  for (const action of ActionNames) {
+    ;(client as Record<string, unknown>)[action] = (
+      (payload: unknown) => request(action, payload)
+    )
   }
+
+  return client
 }
