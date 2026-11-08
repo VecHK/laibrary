@@ -50,14 +50,23 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const cycleSort = (field: DatabaseFieldDef) => {
-    setSort(prev => cycleSortState(prev, field.name, field.type))
+    const sort_type = field.type === 'number' ? 'number' : 'string'
+    setSort(prev => cycleSortState(prev, field.name, sort_type))
   }
 
   const addRow = () => {
+    const unity_field = fields.find(field => field.type === 'unity_name')
+    let unity_name: string | undefined
+    if (unity_field !== undefined) {
+      const value = window.prompt(`请输入 ${unity_field.name}（全局唯一）`)
+      if (value === null || value.trim().length === 0) return
+      unity_name = value.trim()
+    }
     getRpc().addItem({
-      role: 'custom',
+      role: 'page',
       title: '',
       parent_id: item.id,
+      unity_name,
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
@@ -103,6 +112,10 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const commitCell = (row: Item, field: DatabaseFieldDef, raw: string) => {
+    if (field.type === 'unity_name') {
+      ctx.showError('unity_name 创建后不可修改')
+      return
+    }
     if (field.type === 'number') {
       const num = Number(raw)
       if (raw.trim().length !== 0 && Number.isNaN(num)) {
@@ -191,8 +204,11 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                 )}
               </td>
               {fields.map(field => {
-                const value = (row.attributes as Record<string, unknown>)[field.name]
+                const value = field.type === 'unity_name'
+                  ? row.unity_name
+                  : (row.attributes as Record<string, unknown>)[field.name]
                 const is_editing = (
+                  field.type !== 'unity_name' &&
                   editing_cell !== null &&
                   editing_cell.row_id === row.id &&
                   editing_cell.field === field.name
@@ -201,7 +217,11 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                   <td
                     key={field.name}
                     className="cell"
-                    onClick={() => setEditingCell({ row_id: row.id, field: field.name })}
+                    onClick={() => {
+                      if (field.type !== 'unity_name') {
+                        setEditingCell({ row_id: row.id, field: field.name })
+                      }
+                    }}
                   >
                     {is_editing ? (
                       <input

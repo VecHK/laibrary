@@ -1,46 +1,46 @@
 import { describe, expect, it } from 'vitest'
+import type { Item } from '@laibrary/types'
 import { resolveModule } from '../src/modules/registry'
 import { pageModule } from '../src/modules/page'
-import { mangaModule } from '../src/modules/manga'
+import { entityModule } from '../src/modules/entity'
 import { imageModule } from '../src/modules/image'
 import { databaseModule } from '../src/modules/database'
+import { getKindModule, hasKindModule } from '../src/lib/kind-registry'
 
-function makeItem(overrides: Partial<import('@laibrary/types').Item> & { id: number }) {
+function makeItem(overrides: Partial<Item> & { id: number }): Item {
   return {
-    role: 'custom' as const,
+    role: 'page',
+    kind: null,
+    unity_name: null,
     title: '',
     attributes: {},
     tags: [],
     parent_id: null,
     order_index: 0,
+    blob: null,
+    target_id: null,
     create_date: '',
     update_date: '',
     ...overrides,
   }
 }
 
-const resolver = (tag_name: string): number | undefined => {
-  return tag_name === 'sys/type/manga' ? 99 : undefined
-}
-
 describe('resolveModule', () => {
-  it('固定 role 模块直接命中', () => {
-    expect(resolveModule(makeItem({ id: 1, role: 'image' }), resolver)).toBe(imageModule)
-    expect(resolveModule(makeItem({ id: 2, role: 'database' }), resolver)).toBe(databaseModule)
+  it('role 模块直接命中（entity 是 role 模块）', () => {
+    expect(resolveModule(makeItem({ id: 1, role: 'image' }))).toBe(imageModule)
+    expect(resolveModule(makeItem({ id: 2, role: 'database' }))).toBe(databaseModule)
+    expect(resolveModule(makeItem({ id: 3, role: 'page' }))).toBe(pageModule)
+    expect(resolveModule(makeItem({ id: 4, role: 'entity', kind: 'manga' }))).toBe(entityModule)
   })
 
-  it('custom 按 sys/type tag 命中 manga 模块', () => {
-    const item = makeItem({ id: 3, role: 'custom', tags: [99] })
-    expect(resolveModule(item, resolver)).toBe(mangaModule)
+  it('kind registry 解析 manga，未知 kind 不命中', () => {
+    expect(getKindModule('manga')?.kind).toBe('manga')
+    expect(hasKindModule('manga')).toBe(true)
+    expect(hasKindModule('unknown')).toBe(false)
+    expect(hasKindModule(null)).toBe(false)
   })
 
-  it('custom 无类型 tag 走缺省页面模块', () => {
-    const item = makeItem({ id: 4, role: 'custom', tags: [123] })
-    expect(resolveModule(item, resolver)).toBe(pageModule)
-  })
-
-  it('类型 tag 未注册时走缺省页面模块', () => {
-    const item = makeItem({ id: 5, role: 'custom', tags: [999] })
-    expect(resolveModule(item, () => undefined)).toBe(pageModule)
+  it('未知 kind 仍走 entity 模块（由 entity 显示 fallback）', () => {
+    expect(resolveModule(makeItem({ id: 5, role: 'entity', kind: 'unknown' }))).toBe(entityModule)
   })
 })

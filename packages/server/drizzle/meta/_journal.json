@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1786720045569,
-      "tag": "0000_purple_vermin",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1786726308353,
-      "tag": "0001_rainy_polaris",
+      "when": 1794175719487,
+      "tag": "0000_v2_init",
       "breakpoints": true
     }
   ]

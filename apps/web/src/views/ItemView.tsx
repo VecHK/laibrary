@@ -55,7 +55,7 @@ function TagBar({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       <input
         className="tag-input"
         value={input_value}
-        placeholder="+ 标签(sys/type/manga)"
+        placeholder="+ 标签"
         onChange={ev => setInputValue(ev.target.value)}
         onKeyDown={ev => {
           if (ev.key === 'Enter') {
@@ -119,7 +119,7 @@ export function ItemView({
     <div className="item-view">
       <div className="breadcrumb">
         <button className="link-button" onClick={back}>⬅ 返回</button>
-        <span className="breadcrumb-role">{item.role}</span>
+        <span className="breadcrumb-role">{item.role}{item.kind ? ` · ${item.kind}` : ''}</span>
       </div>
       <div className="item-content">
         {module.Presenter.full(item, ctx)}

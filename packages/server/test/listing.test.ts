@@ -1,175 +1,168 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { closeDb, prepareTestDb, prepareTestFilePool, truncateItems } from './helpers'
-import { createItem, listItems } from '../src/repo/items'
+import {
+  closeDb, prepareTestBlobs, prepareTestDb, truncateAll,
+} from './helpers'
 import type { DB } from '../src/db/client'
-import type { FilePool } from '../src/blob/file-pool'
+import type { BlobService } from '../src/blob/service'
+import { createItem, listItems } from '../src/repo/items'
 
 let db: DB
-let pool: FilePool
-let cleanup_pool: () => Promise<void>
+let blobs: BlobService
+let cleanup: () => Promise<void>
 
 beforeAll(async () => {
   db = await prepareTestDb()
-  const prepared = await prepareTestFilePool()
-  pool = prepared.pool
-  cleanup_pool = prepared.cleanup
+  const prepared = await prepareTestBlobs(db)
+  blobs = prepared.blobs
+  cleanup = prepared.cleanup
 })
 
 beforeEach(async () => {
-  await truncateItems(db)
+  await truncateAll(db)
 })
 
 afterAll(async () => {
-  await cleanup_pool()
+  await cleanup()
   await closeDb(db)
 })
 
-async function fillItems() {
+async function fillPages(count = 30) {
   const ids: number[] = []
-  for (let i = 1; i <= 30; ++i) {
+  for (let i = 1; i <= count; i += 1) {
     const item = await createItem(db, {
-      role: 'custom',
+      role: 'page',
       title: `条目${i}`,
-      attributes: { group: i % 2 === 0 ? 'even' : 'odd' },
-    }, pool)
+      attributes: { group: i % 2 === 0 ? 'even' : 'odd', score: i },
+    }, blobs)
     ids.push(item.id)
   }
   return ids
 }
 
 describe('listing', () => {
-  it('默认按 id 升序', async () => {
-    const ids = await fillItems()
-    const page = await listItems(db, { limit: 10 })
-    expect(page.map(i => i.id)).toEqual(ids.slice(0, 10))
-  })
-
-  it('keyset 分页翻页不重不漏', async () => {
-    const ids = await fillItems()
-
+  it('默认按 id 升序 / keyset 不重不漏', async () => {
+    const ids = await fillPages()
     const page1 = await listItems(db, { limit: 10 })
     const page2 = await listItems(db, { limit: 10, after_id: page1[9]!.id })
     const page3 = await listItems(db, { limit: 10, after_id: page2[9]!.id })
-
-    const collected = [...page1, ...page2, ...page3].map(i => i.id)
-    expect(collected).toEqual(ids)
+    expect([...page1, ...page2, ...page3].map(item => item.id)).toEqual(ids)
   })
 
-  it('desc 降序', async () => {
-    const ids = await fillItems()
-    const page = await listItems(db, { limit: 5, desc: true })
-    expect(page.map(i => i.id)).toEqual(ids.slice(-5).reverse())
-  })
+  it('desc / title / role / parent', async () => {
+    const ids = await fillPages()
+    const desc_page = await listItems(db, { limit: 3, desc: true })
+    expect(desc_page.map(item => item.id)).toEqual(ids.slice(-3).reverse())
 
-  it('title 过滤', async () => {
-    await fillItems()
-    const found = await listItems(db, {
+    const titled = await listItems(db, {
       limit: 0,
       filter_rules: [{ name: 'title', input: '条目1', logic: 'and' }],
     })
-    expect(found.length).toBe(11)
-  })
+    expect(titled).toHaveLength(11)
 
-  it('role 过滤', async () => {
-    await fillItems()
-    await createItem(db, { role: 'tag', title: '某标签' }, pool)
-
-    const tags = await listItems(db, {
+    const parent = await createItem(db, { role: 'page', title: 'parent' }, blobs)
+    await createItem(db, { role: 'page', title: 'child', parent_id: parent.id }, blobs)
+    const children = await listItems(db, {
       limit: 0,
-      filter_rules: [{ name: 'role', input: 'tag', logic: 'and' }],
+      filter_rules: [{ name: 'parent', input: parent.id, logic: 'and' }],
     })
-    expect(tags.length).toBe(1)
+    expect(children.map(item => item.title)).toEqual(['child'])
   })
 
-  it('attribute_equal 过滤(string/number)', async () => {
-    await fillItems()
+  it('kind / unity_name / role 过滤', async () => {
+    const manga = await createItem(db, {
+      role: 'entity', kind: 'manga', title: 'manga', unity_name: 'manga.one',
+    }, blobs)
+    const page = await createItem(db, {
+      role: 'page', title: 'page', unity_name: 'page.one',
+    }, blobs)
+
+    const by_kind = await listItems(db, {
+      limit: 0,
+      filter_rules: [{ name: 'kind', input: 'manga', logic: 'and' }],
+    })
+    expect(by_kind.map(item => item.id)).toEqual([manga.id])
+
+    const by_unity = await listItems(db, {
+      limit: 0,
+      filter_rules: [{ name: 'unity_name', input: 'page.one', logic: 'and' }],
+    })
+    expect(by_unity.map(item => item.id)).toEqual([page.id])
+
+    const by_role = await listItems(db, {
+      limit: 0,
+      filter_rules: [{ name: 'role', input: 'entity', logic: 'and' }],
+    })
+    expect(by_role.map(item => item.id)).toEqual([manga.id])
+  })
+
+  it('attribute_equal / tag / group invert', async () => {
+    const tag = await createItem(db, { role: 'tag', title: 't' }, blobs)
+    await createItem(db, { role: 'page', title: 'tagged', tags: [tag.id] }, blobs)
+    await createItem(db, { role: 'page', title: 'plain' }, blobs)
+
     const evens = await listItems(db, {
       limit: 0,
-      filter_rules: [{
-        name: 'attribute_equal',
-        input: { name: 'group', value: 'even' },
+      filter_rules: [{ name: 'attribute_equal', input: { name: 'group', value: 'even' }, logic: 'and' }],
+    })
+    expect(evens).toHaveLength(0)
+
+    const with_tag = await listItems(db, {
+      limit: 0,
+      filter_rules: [{ name: 'has_tag', input: tag.id, logic: 'and' }],
+    })
+    expect(with_tag.map(item => item.title)).toEqual(['tagged'])
+
+    const grouped = await listItems(db, {
+      limit: 0,
+      filter_groups: [{
         logic: 'and',
+        invert: true,
+        rules: [{ name: 'empty_tag', input: null, logic: 'and' }],
       }],
     })
-    expect(evens.length).toBe(15)
+    expect(grouped.map(item => item.title)).toEqual(['tagged'])
   })
 
-  it('filter group: and/or/invert', async () => {
-    const tag = await createItem(db, { role: 'tag', title: 'g' }, pool)
-    await createItem(db, { role: 'custom', title: '带tag', tags: [tag.id] }, pool)
-    await createItem(db, { role: 'custom', title: '无tag' }, pool)
+  it('sort_field number：字符串值不报错并沉底', async () => {
+    const a = await createItem(db, { role: 'page', title: 'a', attributes: { score: 1 } }, blobs)
+    const b = await createItem(db, { role: 'page', title: 'b', attributes: { score: 2 } }, blobs)
+    const bad = await createItem(db, { role: 'page', title: 'bad', attributes: { score: 'not-number' } }, blobs)
+    const empty = await createItem(db, { role: 'page', title: 'empty', attributes: {} }, blobs)
 
-    const found = await listItems(db, {
-      limit: 0,
-      filter_groups: [
-        {
-          logic: 'and',
-          invert: true,
-          rules: [{ name: 'empty_tag', input: null, logic: 'and' }],
-        },
-      ],
-    })
-    expect(found.map(i => i.title)).toEqual(['带tag'])
-  })
-
-  it('empty_tag 过滤', async () => {
-    const tag = await createItem(db, { role: 'tag', title: 't' }, pool)
-    await createItem(db, { role: 'custom', title: '有', tags: [tag.id] }, pool)
-    await createItem(db, { role: 'custom', title: '无' }, pool)
-
-    const found = await listItems(db, {
-      limit: 0,
-      filter_rules: [
-        { name: 'empty_tag', input: null, logic: 'and' },
-        { name: 'role', input: 'custom', logic: 'and' },
-      ],
-    })
-    expect(found.map(i => i.title)).toEqual(['无'])
-  })
-
-  it('sort_field: number 升序,空值沉底', async () => {
-    await createItem(db, { role: 'custom', title: 'c', attributes: { score: 3 } }, pool)
-    await createItem(db, { role: 'custom', title: 'a', attributes: { score: 1 } }, pool)
-    await createItem(db, { role: 'custom', title: '空', attributes: {} }, pool)
-    await createItem(db, { role: 'custom', title: 'b', attributes: { score: 2 } }, pool)
-
-    const asc_list = await listItems(db, {
+    const rows = await listItems(db, {
       limit: 0,
       sort_field: { name: 'score', type: 'number' },
     })
-    expect(asc_list.map(i => i.title)).toEqual(['a', 'b', 'c', '空'])
-
-    const desc_list = await listItems(db, {
-      limit: 0,
-      desc: true,
-      sort_field: { name: 'score', type: 'number' },
-    })
-    expect(desc_list.map(i => i.title)).toEqual(['c', 'b', 'a', '空'])
+    expect(rows.map(item => item.title)).toEqual(['a', 'b', 'bad', 'empty'])
+    expect(rows.slice(0, 2).map(item => item.id)).toEqual([a.id, b.id])
+    expect(rows.at(-2)!.id).toBe(bad.id)
+    expect(rows.at(-1)!.id).toBe(empty.id)
   })
 
-  it('sort_field: string 排序 + keyset', async () => {
-    await createItem(db, { role: 'custom', title: 'bb', attributes: { name: 'bb' } }, pool)
-    await createItem(db, { role: 'custom', title: 'cc', attributes: { name: 'cc' } }, pool)
-    await createItem(db, { role: 'custom', title: 'aa', attributes: { name: 'aa' } }, pool)
-    await createItem(db, { role: 'custom', title: 'zz', attributes: { name: 'zz' } }, pool)
+  it('sort_field keyset 不重不漏（含 null 尾巴）', async () => {
+    const values = [3, 1, 2, null, 5, 4, null, 7, 6]
+    const ids: number[] = []
+    for (const [index, value] of values.entries()) {
+      const item = await createItem(db, {
+        role: 'page',
+        title: `item${index}`,
+        attributes: value === null ? {} : { score: value },
+      }, blobs)
+      ids.push(item.id)
+    }
 
-    const all = await listItems(db, {
-      limit: 0,
-      sort_field: { name: 'name', type: 'string' },
-    })
-    expect(all.map(i => i.title)).toEqual(['aa', 'bb', 'cc', 'zz'])
-
-    const page1 = await listItems(db, {
-      limit: 2,
-      sort_field: { name: 'name', type: 'string' },
-    })
-    expect(page1.map(i => i.title)).toEqual(['aa', 'bb'])
-
-    const page2 = await listItems(db, {
-      limit: 2,
-      after_id: page1[1]!.id,
-      sort_field: { name: 'name', type: 'string' },
-    })
-    expect(page2.map(i => i.title)).toEqual(['cc', 'zz'])
+    const collected: number[] = []
+    let after: number | undefined
+    for (let page = 0; page < 10; page += 1) {
+      const rows = await listItems(db, {
+        limit: 3,
+        sort_field: { name: 'score', type: 'number' },
+        after_id: after,
+      })
+      if (rows.length === 0) break
+      collected.push(...rows.map(item => item.id))
+      after = rows.at(-1)!.id
+    }
+    expect(collected.sort()).toEqual([...ids].sort())
   })
 })

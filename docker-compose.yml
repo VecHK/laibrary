@@ -1,8 +1,8 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:18
     container_name: postgres-db
-    restart: always
+    restart: no
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
@@ -15,7 +15,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin-web
-    restart: always
+    restart: no
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: root
@@ -30,13 +30,14 @@ services:
   laibrary:
     image: node:24-alpine
     container_name: laibrary-server
-    restart: always
+    restart: no
     working_dir: /app
     depends_on:
       - postgres
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://root:root@postgres:5432/root
-      HTTP_API_PORT: "44998"
     ports:
       - "44998:44998"
     volumes:

@@ -1,120 +1,111 @@
 # 03 · 仓储层规格
 
-> 原则锚点:P1(一切皆 Item)、P5(强校验)、P6(高性能)。
-> 位置:`packages/server/src/repo/`(items.ts / tags.ts / wire.ts)。全异步;不持任何内存状态(无池、无 diff)。
+> 位置：`packages/server/src/repo/`。全异步；写操作由 API action 层包事务。
+> 术语见 [../glossary.md](../glossary.md)。
 
 ## 1. 通用约定
 
-- **wire 映射**(`wire.ts`):`toWireItem(row)` 把 DB 行映射为 API Item——日期转 ISO 字符串,`attributes` 按 role 断言为判别联合形状。`getItemRow` 不存在时抛 `item(id=N) not found`
-- **校验顺序是契约**:role zod → parent 存在性 → database 行 schema → 文件引用 → 写入。任一步失败即中止,错误消息见各函数
-- createItem/updateItem 需要 `FilePool`(写时校验用);tags 函数不需要
+- `DbLike = DB | Tx`；repo 函数接受普通连接或事务。
+- `toWireItem(row, blob)` 把 DB 行映射为 API Item：日期 ISO，attributes 按 role 断言，blob 转 BlobMeta。
+- `getItemRow` 不存在时抛 `item(id=N) not found`（404）。
+- `updateItem`/`deleteItem` 使用 `SELECT ... FOR UPDATE`；`updateItem` 只改可写字段。
+- 不可变字段：role、kind、unity_name、blob_id。
+- AppError code：`VALIDATION/BAD_REQUEST/NOT_FOUND/CONFLICT/PAYLOAD_TOO_LARGE/STORAGE_ERROR/INTERNAL`。
 
-## 2. items 函数
+## 2. createItem
 
-### createItem(db, form, file_pool) → Promise<Item>
+校验顺序：
 
-| 步 | 校验/行为 | 错误 |
-|---|---|---|
-| 1 | `checkAttributes(form.role, attributes)`(zod 按 role) | ZodError(400) |
-| 2 | parent_id 非 null 时须存在 | `item(id=N) not found` |
-| 3 | parent 是 database → `buildRowValidator(parent.schema)` 校验行字段(允许缺字段/多余 key) | ZodError(400) |
-| 4 | `checkFileRefsExist` | `attributes.<路径> 引用的文件不存在: <fid>` |
-| 5 | order_index:调用方未指定且挂父 → 兄弟 max+1;未指定且根 → 0 | — |
-| 6 | tags 去重(`unique`) | — |
-| 7 | INSERT RETURNING → wire | — |
+1. role 合法；entity 必须有 kind，其他 role 不允许 kind。
+2. unity_name 格式；`sys.` 保留前缀拒绝（除非内部 allow_system）。
+3. parent 存在，且 parent role ∈ {page, entity, database}。
+4. role attributes zod。
+5. 若 parent 是 database：按 schema 校验行；schema 含 unity_name 字段时要求提供；rows 允许缺字段/多余 key。
+6. file/image：blob 存在；image 必须是图片且有尺寸；其他 role 不允许 blob_id。
+7. itemlink：必须 target_id；target 存在；创建时不可能自指。
+8. tags：每个 id 必须是 role=tag；去重。
+9. textline：解析 title 中 `[[item:ID]]`，目标必须存在。
+10. order_index：未指定则同父 max+1。
+11. INSERT；返回 wire（含 blob）。
 
-### getItem(db, id) / getItems(db, ids)
+唯一冲突（unity_name/tag title）→ 409；FK 冲突 → 409。
 
-- getItems 按输入 id 顺序返回;任一不存在抛 `item(id=N) not found`;空数组返回 `[]`
+## 3. updateItem
 
-### updateItem(db, id, data, file_pool) → Promise<Item>
+可写字段：title、attributes、tags、parent_id、order_index、target_id。
+不可写：role、kind、unity_name、blob_id（请求 schema 直接拒绝）。
 
-| 步 | 行为 | 错误 |
-|---|---|---|
-| 1 | 取旧行 | `item(id=N) not found` |
-| 2 | 新 role = data.role ?? 旧 role;若 data.attributes 提供,按**新 role** 校验 | ZodError |
-| 3 | parent 变更:目标须存在;**不得指向自己**;新 parent 不得在自身后代中(沿父链上溯,深度上限 1000) | `parent 不能指向自己` / `不能移动到自己的后代之下` / `父链深度超出限制,数据可能存在环` |
-| 4 | 最终 parent 是 database → 行 schema 校验(基于最终 attributes) | ZodError |
-| 5 | `checkFileRefsExist`(最终 attributes) | 同 createItem |
-| 6 | UPDATE(未提供的字段保持原值;update_date = now()) | — |
+- 先 `FOR UPDATE` 取旧行；系统 unity_name（`sys.`）拒绝修改。
+- attributes 提供时按 role 重新校验。
+- parent 变更：目标存在；不得指向自己；不得移入自己的后代；目标 role 必须可容纳子项。
+- 若最终 parent 是 database：按 schema 校验最终 attributes 和 unity_name 要求。
+- itemlink：target_id 可改，必须存在且非自己；其他 role 不允许 target_id。
+- tags 提供时校验。
+- textline：title/attributes 变更时重新校验 inline token（拒绝自指）。
+- UPDATE 所有可写字段 + update_date；返回 wire。
 
-注:环检测遍历父链时,若发现数据中已存在环(超出深度上限)同样报错——防御损坏数据。
+## 4. deleteItem
 
-### deleteItem(db, id) → Promise<void>
+1. `FOR UPDATE` 取行；`sys.` 系统项拒绝。
+2. 有子项 → 409。
+3. role=tag：清扫所有引用者 tags 数组（同事务）。
+4. DELETE；image 的 thumbnails 由 FK 级联；blob 不立即删。
+5. 目标被 itemlink 引用时不级联，允许悬空。
 
-| 步 | 行为 | 错误 |
-|---|---|---|
-| 1 | 取行 | `item(id=N) not found` |
-| 2 | 存在子项则拒绝 | `item(id=N) 存在子项,不能删除` |
-| 3 | 若 role='tag',清扫:`UPDATE items SET tags = array_remove(tags, N) WHERE N = ANY(tags)` | — |
-| 4 | DELETE | — |
+## 5. listing
 
-### listItems(db, params) → Promise<Item[]>
+参数见 [04-api.md](04-api.md)。
 
-参数 `ListingParams`:
+### 排序
 
-```
-sort_by?:   'id' | 'create_date' | 'update_date' | 'order_index'   (缺省 'id')
-sort_field?: { name: string; type: 'string' | 'number' }            (按 attributes 字段排序)
-after_id?:  ItemID        (keyset 游标)
-desc?:      boolean
-limit:      number        (0 = 不限)
-filter_rules?: FilterRule[]
-filter_groups?: FilterGroup[]
-```
+- `sort_by`：id/create_date/update_date/order_index（列均非空）。
+- `sort_field`：按 attributes 字段：
+  - number：`CASE WHEN jsonb_typeof(attributes -> name)='number' THEN (attributes ->> name)::numeric END`；非数字/缺失 → NULL；`NULLS LAST`。
+  - string：`attributes ->> name`；NULLS LAST。
+- 决胜键恒为 id；desc 时 id desc。
 
-**排序表达式**:
+### keyset
 
-| 模式 | 表达式 | 空值 |
-|---|---|---|
-| sort_by 列 | 直接列 | 列均 NOT NULL |
-| sort_field number | `(attributes->>'name')::numeric` | NULLS LAST(升降序一致,空值沉底) |
-| sort_field string | `attributes->>'name'` | NULLS LAST |
+游标值用**同一个 SQL 表达式**从 after 行读取（不是 JS attributes），避免类型/文本化错位。
 
-决胜键恒为 id;ORDER BY `<排序表达式> [ASC\|DESC] NULLS LAST, id`。
+- after 值为非 NULL：
+  - asc：`expr > v OR (expr = v AND id > after) OR expr IS NULL`
+  - desc：`expr < v OR (expr = v AND id < after) OR expr IS NULL`
+- after 值为 NULL：
+  - asc：`expr IS NULL AND id > after`
+  - desc：`expr IS NULL AND id < after`
 
-**keyset 分页**:游标条件为元组比较 `(<排序表达式>, id) > (<after 行的排序值>, after_id)`(降序 `<`);排序值从 after 行读取。**已知限制**:sort_field 模式下 after 行的该字段为 null/缺失/类型不符时返回 `[]`(分页终止)——v1 约定,DB 视图实际以 limit 0 全量拉取。
+### 过滤
 
-## 3. 过滤 DSL
+`role`、`kind`、`unity_name`、`title`（ILIKE）、`has_tag`、`empty_tag`、`parent`、`attribute_equal`。
+每条 rule 有 logic（and/or）与可选 invert；`filter_groups` 组间 and/or + invert。
+公共 listing 默认排除 `unity_name LIKE 'sys.%'`。
+`limit=0` 表示不限；服务端上限 10000；根/广场应使用分页。
 
-### FilterRule(6 种)
+## 6. tags
 
-| name | input | SQL 映射 |
-|---|---|---|
-| role | Role \| Role[] | `=` 或 `IN` |
-| title | string | `ilike '%input%'` |
-| has_tag | ItemID | `tags @> ARRAY[input]::bigint[]` |
-| empty_tag | null | `coalesce(array_length(tags,1),0) = 0` |
-| parent | ItemID \| null | `=` 或 `IS NULL` |
-| attribute_equal | { name, value(string\|number\|boolean) } | `attributes->name = <jsonb 等值>` |
+- `newTag`：空名拒绝；`INSERT ... ON CONFLICT (lower(title)) WHERE role='tag' DO UPDATE`；get-or-create。
+- `updateTag`：必须 role=tag；空名/重名拒绝；FOR UPDATE。
+- `deleteTag`：role=tag；有子项拒绝；清扫引用 + 删除（同事务）。
+- `searchTag`：ILIKE，limit 0 不限（上限 1000）。
+- `getTagByTitle`：大小写不敏感精确查。
 
-每条 rule 带 `logic: 'and'|'or'`(组内组合)与可选 `invert`(对单条取反)。
+## 7. unity_name
 
-### FilterGroup 语义(与旧实现一致)
+- `getItemByUnityName` 返回 Item | null；包括系统项。
+- 创建时全局唯一；更新不可改。
+- database 的 unity_name 字段由 create/update 的行校验调用方要求；实际值存 item 列。
 
-- 组内:logic='and' → 全真;'or' → 任一真;rule.invert 先于组逻辑应用
-- 组间:group.invert 对组结果取反;所有 'and' 组必须全真;所有 'or' 组取 OR 后并入 AND
-- `filter_rules` 等价于一个 `{logic:'and', invert:false}` 的组
+## 8. 事务与并发
 
-## 4. tags 函数
+- API action 层对 add/update/delete、tag 写、配置更新包事务。
+- item 行锁防同一 item 并发丢失更新；tag 删除与引用赋值同事务。
+- v2 POC 单实例、单写者假设；树移动没有全局 advisory lock；多写者/高并发仍需后续硬化（见 DESIGN 待做）。
 
-| 函数 | 行为 | 错误 |
-|---|---|---|
-| newTag(db, title, attributes) | 空名拒绝;`INSERT ... ON CONFLICT (lower(title)) WHERE role='tag' DO UPDATE SET update_date=now()`,再按 title 读回 —— **get-or-create 原子**,重名(不分大小写)返回已有 | `不能设置空 tag 名` |
-| updateTag(db, id, {title?, attributes?}) | role 检查;空名拒绝;重名检查(`lower(title)=lower(new) AND id<>self`);UPDATE | `item(id=N) 并不是 tag` / `不能设置空 tag 名` / `重复的 tag 名: X` |
-| deleteTag(db, id) | role 检查;有子项拒绝;清扫 tags 数组;DELETE | 同上 + `tag(id=N) 存在子项,不能删除` |
-| searchTag(db, name, limit=30) | `role='tag' AND title ilike '%name%' ORDER BY title`,limit 0 = 不限 | — |
-| getTagByTitle(db, title) | `role='tag' AND lower(title)=lower(input)` LIMIT 1 → Item \| null | — |
+## 9. 已知边界
 
-## 5. 辅助函数
-
-| 函数 | 行为 |
-|---|---|
-| findDatabaseValidator(db, parent_id) | parent 是 database → 解析其 schema 并构造行校验器;否则 null |
-| findAncestorIds(db, id, limit=1000) | 沿父链上溯返回祖先 id 列表 |
-| buildFilterCondition(rules, groups) | DSL → 单个 SQL 条件(无规则返回 undefined) |
-
-## 6. 事务性现状
-
-- v1 所有仓储操作均为**单条 SQL**(个别为多条独立 SQL,如 deleteTag 的清扫+删除),不使用显式事务
-- 已知窗口:deleteTag 两步之间并发写入可能产生短暂不一致——v1 单写者假设下可接受;多用户/协作时需引入事务(见 06 路线图)
+- `sort_field` 的键值类型与 SQL 表达式必须一致；number 排序中的字符串按 NULL 处理。
+- 并发更新排序字段时分页可能漂移（keyset 固有）。
+- `limit=0` 全量仍有上限；超大父节点需分页。
+- itemlink 目标删除后允许悬空；渲染器兜底。
+- 当前没有 links 表/反链。

@@ -1,114 +1,133 @@
-# 02 · FileID 与文件机制规格
+# 02 · 文件与缩略图规格
 
-> 原则锚点:P3(类型进运行时)、P5(结构化数据 + 强校验)、P6(高性能)。
-> 关键决策:二进制 blob **长期存放磁盘,不进 PostgreSQL**;数据库只存结构化元数据与引用。
+> 关键决策：文件是 Item；二进制是内容寻址的 blob；缩略图是派生表，不是 Item。
+> 不再有 `fid_`、`latest.json`、序号分配器、全表 JSON 深扫。
 
 ## 1. 三层结构
 
-```
-┌ 第1层 blob 池(磁盘,哑存储)───────────────────────────────┐
-│  filepool_path/<分片>/fid_<序号>.<ext>                    │
-│  latest.json(序号计数器,原子写)                           │
-└───────────────────────────────────────────────────────────┘
-┌ 第2层 FileID(值类型,存在于 attributes 内)────────────────┐
-│  "fid_123.png" = 前缀 + 序号 + 格式                       │
-└───────────────────────────────────────────────────────────┘
-┌ 第3层 file/image item(数据库行)──────────────────────────┐
-│  { role:'file', attributes:{ src:'fid_123.png', ... } }  │
-└───────────────────────────────────────────────────────────┘
+```text
+file/image Item  ──blob_id──>  blobs(hash, size, mime, width, height)
+                                    │
+                                    └──> 磁盘 <BLOB_PATH>/ab/cd/<sha256>
+thumbnails(image_id, size) ──blob_id──> blobs
 ```
 
-## 2. FileID 语法
+- **Item**：文件/图片的语义与元数据（filename、树位置、tags）。
+- **Blob**：不可变字节；身份 = SHA-256。
+- **Thumbnail**：从 image 派生；不进入 Item 树。
 
+## 2. BlobID 与 BlobMeta
+
+- `BlobID`：64 位小写 hex（SHA-256）。
+- `BlobMeta = { id, size, mime, width, height }`；图片有 width/height，其他为 null。
+- 没有扩展名进入 ID；MIME/文件名是元数据。
+
+## 3. blobs 表
+
+```sql
+CREATE TABLE blobs (
+  id          text PRIMARY KEY,       -- sha256 hex
+  size        bigint NOT NULL,
+  mime        text NOT NULL,
+  width       integer,
+  height      integer,
+  create_date timestamptz NOT NULL DEFAULT now()
+);
 ```
-FileID  := "fid_" <number> ["." <format>]
-number  := \d+            (非负安全整数)
-format  := [a-zA-Z0-9]+   (可空;空 = 无扩展名)
+
+索引：`create_date`（供 GC）。
+
+## 4. 磁盘布局
+
+```text
+BLOB_PATH/<hash[0:2]>/<hash[2:4]>/<hash>
 ```
 
-- 正则(`@laibrary/types` 中的 `isFileIDShape` 与 `zFileID` 共用):`^fid_\d+(\.[a-zA-Z0-9]+)?$`
-- `fid_` 前缀是系统认领的命名空间:**类型进运行时**——TS 的 branded type `FileID` 在 JSONB 里拥有自己的语法,任何嵌套深度都能被可靠识别
-- 曾用 `fid:`(冒号),因 Windows 文件名不允许冒号改为下划线
+- 两级 hex 扇出 = 65,536 目录；1000 万文件平均约 152 个/目录。
+- 无扩展名；MIME 在 DB。
+- 原图、附件、缩略图都进同一个池；内容相同即去重。
 
-### 函数(`@laibrary/types/src/FileID.ts`)
+## 5. 上传
 
-| 函数 | 签名 | 行为 |
-|---|---|---|
-| constructFileID | `(num: number, format?: string) => FileID` | 校验序号(非负安全整数)与格式(字母数字)后拼装,非法抛错 |
-| parseFileID | `(fid: FileID) => [number, string \| null]` | 剥前缀解析序号与格式,非法抛错 |
-| name2number | `(name: string) => number` | 解析纯数字序号 |
-| isFileIDShape | `(value: unknown) => value is FileID` | 形状判定(GC/写时校验依赖) |
+`POST /blob`（multipart 字段 `file`）：
 
-## 3. blob 池
+1. 写临时文件（`STORAGE_PATH/uploadtemp`）。
+2. 计算 SHA-256；图片用 sharp 读 width/height（EXIF 方向归一）。
+3. 若 blobs 已有该 id：删临时文件，返回已有 blob（`reused: true`）。
+4. 否则：fsync → rename 到 hash 路径 → `/blob/:id` 可读 → 插 blobs 行。
+5. 返回 `{ blob: BlobMeta, reused }`。
 
-- 位置:`config.filepool_path`(默认 `<server>/storage/files`)
-- 分片:序号按 `__FILE_POOL_SPLIT_INTERVAL__ = 2000` 分片,`splitPoint(interval, n) = floor(n / interval) * interval`;路径 = `<filepool>/<splitPoint>/fid_<n>.<ext>`
-- 序号:`latest.json` 记录最新已分配序号;`requestFileNumber()` 自增并以 vait Sequence **串行化写入保证原子性**
+失败/崩溃：先文件后行，可能留下孤儿文件；GC/审计处理。临时目录在 API 启动时清理。
 
-### FilePool 接口(`src/blob/file-pool.ts`)
+## 6. 创建 file/image Item
 
-| 方法 | 行为 |
-|---|---|
-| requestFileNumber(): Promise<number> | 分配新序号,原子落盘 latest.json |
-| getFilePath(fid) / fileBasePath(fid) | 路径计算 |
-| saveFile(fid, buf) | 建目录后写入 |
-| loadFile(fid) | 读取 Buffer |
-| deleteFile(fid) | 存在则删除 |
-| fileExists(fid) | 存在性检查 |
-| collectBlobFiles() | 递归扫全部 blob,返回 `[{ file_id, path, mtime_ms }]`(跳过 latest.json) |
+- `addItem` 必须带 `blob_id`（file/image）；服务端校验 blobs 存在。
+- image 还要求 blob 的 MIME 以 `image/` 开头且 width/height 非空。
+- attributes 只存 `filename`；尺寸/MIME/size 从 blob 得到。
+- `blob_id` **创建后不可变**；替换内容 = 新 blob + 新 Item。
+- 自定义内容需要多个文件 → 子 file/image Item；不允许把 blob 字符串塞进 attributes。
 
-## 4. 写时校验(P5)
+## 7. 读取
 
-**任何 role、任何嵌套深度的 attributes 里出现的 `fid_` 字符串都是文件引用**;写入时若引用不存在则拒绝。这使 custom 可以自由持有 FileID(如 3D 漫画贴图),而坏引用根本进不了库。
+`GET/HEAD /blob/:id`：
 
-### 函数(`src/blob/gc.ts`)
+- MIME/size 来自 blobs；`Content-Length`、`ETag: "<hash>"`。
+- `Cache-Control: public, max-age=31536000, immutable`。
+- 支持单区间 `Range`；`Accept-Ranges: bytes`。
+- 404 当 blob 行/文件不存在。
+- 无公共 DELETE/替换路由；删除交给 GC。
 
-| 函数 | 行为 |
-|---|---|
-| scanFileRefs(value): FileID[] | 递归遍历 JSONB 收集全部 `fid_` 字符串 |
-| scanFileRefEntries(value, path): [{path, fid}] | 同上,带字段路径(用于错误消息) |
-| checkFileRefsExist(file_pool, attributes): Promise<void> | 逐个 `fileExists`;失败抛错,消息形如 `attributes.textures.front 引用的文件不存在: fid_999.png` |
+## 8. GC
 
-### 适用入口
+`npm run clean`：
 
-| 入口 | 校验时机 |
-|---|---|
-| createItem | role zod 校验 → database 行校验 → **文件引用校验** → INSERT |
-| updateItem | 同上(按最终 attributes 校验) |
-| newTag / updateTag | 不校验(v1 约定:tag attributes 不放 FileID) |
+1. 从 `items.blob_id` + `thumbnails.blob_id` 收集引用。
+2. 找 `create_date < now - grace` 且无引用的 blobs。
+3. 分批（默认 1000）删行 + 删文件。
+4. 宽限期默认 24h（`sys.config.gc_grace_hours`）。
 
-### 设计要点
+不做全表 JSON 扫描。孤儿文件（无行）不会被自动发现；后续审计脚本处理。删除 image 级联 thumbnails；blob 在无引用后由 GC 回收。
 
-- 上传先落盘、后建 item,故"引用已存在的 blob"在正常流程下必成立
-- 校验 = 每次写入对每个 fid 做一次 stat,开销可忽略
+## 9. 缩略图
 
-## 5. GC(clean 命令)
+### 9.1 表
 
-**引用发现**:全表深扫——`SELECT attributes FROM items` 全部行,递归收集 `fid_` 字符串,得引用集合。无引用注册表、无 ownership 表,一条统一规则,与 role 完全解耦。
+```sql
+CREATE TABLE thumbnails (
+  image_id    bigint NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  size        smallint NOT NULL CHECK (size IN (96,384,800,1440)),
+  blob_id     text NOT NULL REFERENCES blobs(id),
+  width       integer NOT NULL,
+  height      integer NOT NULL,
+  create_date timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (image_id, size)
+);
+```
 
-**清理算法**(`cleanUnreferencedFiles(db, pool, grace_ms = 24h, now)`):
+- 不是 Item；没有 listing/search/树入口，隐藏是结构性的。
+- image 删除级联；thumb blob 由 GC 回收。
+- 行只在生成成功后写入；不存在 pending 状态。
 
-1. `refs = collectReferencedFileIds(db)`(全表深扫)
-2. `blobs = pool.collectBlobFiles()`(磁盘扫描)
-3. 对每个 blob:若 `file_id ∉ refs` 且 `now - mtime_ms > grace_ms`,删除
-4. 返回 `{ scanned, deleted }`
+### 9.2 访问
 
-**宽限期 24h**:保护"刚上传完 blob、客户端还没来得及建 item"的竞态。手动命令触发(非守护进程)。
+```text
+GET /thumb/:image_id?size=96|384|800|1440
+```
 
-**语义**:保守方向——误判只会多留一个孤儿,绝不误删被引用的文件;引用与磁盘存在性交集后,业务字符串(如恰好长得像 FileID)不会造成数据损失。
+1. 校验 image role/尺寸。
+2. 行存在 → 直接返回 blob。
+3. 不存在 → 读 image.blob → sharp `rotate → flatten(白底) → resize(size,size,{fit:'inside',withoutEnlargement:true}) → avif(quality 40, effort 4)` → 新 blob → 插入行 → 返回。
+4. 单实例用进程内 per-key promise 去重；多实例允许重复生成（hash 去重）。
+5. 响应：`image/avif`、ETag=thumb hash、immutable cache。
 
-## 6. 缩略图(generateThumb)
+尺寸是最大边；不放大；漫画阅读器用原图，不用 1440 当阅读源。
 
-- 入参:image item 的 id(而非裸 FileID)
-- 流程:校验 role='image' → 读 `src` → sharp(`rotate → flatten → resize(300, null, withoutEnlargement) → avif(quality 40, effort 8)`,cache 关闭)→ 申请新 FileID(`fid_<n>.avif`)→ 落盘 → 更新该 item 的 `cover_src` → 返回 `{ file_id }`
-- 失败语义:非 image role / 缺 src / src 文件不存在均抛错
-- 展示约定:封面优先 `cover_src`,缺失则 `src`
+### 9.3 封面
 
-## 7. 文件路由(见 04 文档细节)
+- Item 不再有 cover 字段。
+- 漫画封面由第一张 image 的 384 thumb 提供；列表/entity inlineIcon 自行取第一张。
+- 如未来需要显式封面，使用 `cover_image_id`（ItemRef）而不是 blob cover。
 
-| 路由 | 行为 |
-|---|---|
-| POST /file | multipart 上传(字段名 file)→ 临时目录 → 新 FileID → 落盘 → 返回 FileID |
-| POST /file/:file_id | 替换 blob 内容(元数据由客户端更新约定) |
-| DELETE /file/:file_id | 删除 blob(显式删除;残留悬空引用由渲染器兜底) |
-| GET /readfile/:file_id | 流式读取 blob |
+## 10. 未来：文件柜
+
+文件柜是**外部目录/SMB 投影**，不复制成 blob；需要独立连接器/外部引用。不要复用 blobs 或 `blob_id`。

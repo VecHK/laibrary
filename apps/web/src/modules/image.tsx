@@ -1,21 +1,18 @@
-import { Item } from '@laibrary/types'
-import type { ItemModule } from './types'
-import { fileUrl } from './helpers'
-
-function imageSrcOf(item: Item): string | null {
-  const attrs = item.attributes as Record<string, unknown>
-  const src = (
-    (typeof attrs['cover_src'] === 'string' && attrs['cover_src'].length > 0)
-  ) ? attrs['cover_src'] : attrs['src']
-  return (typeof src === 'string' && src.length > 0) ? fileUrl(src) : null
-}
+import type { Item } from '@laibrary/types'
+import type { ItemModule, ViewerCtx } from './types'
+import { blobUrl, thumbUrl } from '../lib/blob'
+import { openItem } from '../lib/open-item'
 
 function ImageCard({ item }: { item: Item }) {
-  const src = imageSrcOf(item)
   return (
     <div className="card image-card">
-      {src !== null ? (
-        <img className="image-card-img" src={src} alt={item.title} loading="lazy" />
+      {item.blob !== null ? (
+        <img
+          className="image-card-img"
+          src={thumbUrl(item.id, 384)}
+          alt={item.title}
+          loading="lazy"
+        />
       ) : (
         <div className="card-icon">🖼️</div>
       )}
@@ -24,18 +21,32 @@ function ImageCard({ item }: { item: Item }) {
   )
 }
 
-function ImageFull({ item, ctx }: { item: Item; ctx: import('./types').ViewerCtx }) {
-  const src = imageSrcOf(item)
+function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+  return (
+    <div className="block-image" onClick={() => openItem(item, ctx)}>
+      {item.blob !== null ? (
+        <img src={thumbUrl(item.id, 384)} alt={item.title} loading="lazy" />
+      ) : (
+        <div className="empty-hint">图片缺失</div>
+      )}
+      <div className="block-caption">{item.title || '(图片)'}</div>
+    </div>
+  )
+}
+
+function ImageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+  const src = item.blob === null ? null : blobUrl(item.blob.id)
   return (
     <div className="image-full" onClick={() => ctx.navigate(item.parent_id ?? item.id)}>
       <div className="image-full-bar">
         <span className="image-full-title">{item.title}</span>
-        <button className="button" onClick={ev => {
-          ev.stopPropagation()
-          if (item.parent_id !== null) {
-            ctx.navigate(item.parent_id)
-          }
-        }}>返回</button>
+        <button
+          className="button"
+          onClick={ev => {
+            ev.stopPropagation()
+            if (item.parent_id !== null) ctx.navigate(item.parent_id)
+          }}
+        >返回</button>
       </div>
       {src !== null ? (
         <img className="image-full-img" src={src} alt={item.title} />
@@ -49,7 +60,8 @@ function ImageFull({ item, ctx }: { item: Item; ctx: import('./types').ViewerCtx
 export const imageModule: ItemModule = {
   role: 'image',
   Presenter: {
-    card: (item) => <ImageCard item={item} />,
+    card: item => <ImageCard item={item} />,
     full: (item, ctx) => <ImageFull item={item} ctx={ctx} />,
   },
+  Block: (item, ctx) => <ImageBlock item={item} ctx={ctx} />,
 }

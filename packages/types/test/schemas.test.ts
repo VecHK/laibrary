@@ -1,80 +1,82 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildRowValidator, checkAttributes, zDatabaseAttributes, zFileAttributes,
-  zImageAttributes,
+  zAddItemForm, zBlobID, zDatabaseAttributes, zUnityName,
+  buildRowValidator, checkAttributes,
 } from '../src/schemas'
+import { zActionPayloads } from '../src/action-schemas'
 
-describe('role attributes 校验', () => {
-  it('file 校验必填字段', () => {
-    const ok = zFileAttributes.safeParse({
-      src: 'fid_1.pdf',
-      filename: 'a.pdf',
-      mime: 'application/pdf',
-      size: 10,
-    })
-    expect(ok.success).toBe(true)
-
-    const bad = zFileAttributes.safeParse({
-      src: '1.pdf',
-      filename: 'a.pdf',
-    })
-    expect(bad.success).toBe(false)
+describe('role / kind / blob', () => {
+  it('page 不能有 kind，entity 必须有 kind', () => {
+    expect(zAddItemForm.safeParse({ role: 'page' }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'page', kind: 'manga' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'entity' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'entity', kind: 'manga' }).success).toBe(true)
   })
 
-  it('image 继承 file 字段', () => {
-    const ok = zImageAttributes.safeParse({
-      src: 'fid_2.png',
-      filename: 'a.png',
-      mime: 'image/png',
-      size: 10,
-      image_width: 100,
-      image_height: 100,
-    })
-    expect(ok.success).toBe(true)
-
-    const missing_dims = zImageAttributes.safeParse({
-      src: 'fid_2.png',
-      filename: 'a.png',
-      mime: 'image/png',
-      size: 10,
-    })
-    expect(missing_dims.success).toBe(false)
+  it('file/image 必须提供 blob_id，其他 role 不允许', () => {
+    const blob_id = 'a'.repeat(64)
+    expect(zAddItemForm.safeParse({ role: 'image', blob_id }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'image' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'file' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'page', blob_id }).success).toBe(false)
   })
 
-  it('database schema 字段名去重', () => {
-    const ok = zDatabaseAttributes.safeParse({
-      schema: [{ name: 'a', type: 'string' }],
-    })
-    expect(ok.success).toBe(true)
-
-    const dup = zDatabaseAttributes.safeParse({
-      schema: [
-        { name: 'a', type: 'string' },
-        { name: 'a', type: 'number' },
-      ],
-    })
-    expect(dup.success).toBe(false)
+  it('itemlink 必须提供 target_id', () => {
+    expect(zAddItemForm.safeParse({ role: 'itemlink', target_id: 1 }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'itemlink' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'page', target_id: 1 }).success).toBe(false)
   })
 
-  it('checkAttributes 按 role 分发', () => {
-    expect(() => checkAttributes('file', {})).toThrow()
-    expect(() => checkAttributes('custom', {})).not.toThrow()
-    expect(() => checkAttributes('tag', { any: 'thing' })).not.toThrow()
-    expect(() => checkAttributes('textline', {})).not.toThrow()
+  it('blob id / unity name / kind 格式', () => {
+    expect(zBlobID.safeParse('a'.repeat(64)).success).toBe(true)
+    expect(zBlobID.safeParse('A'.repeat(64)).success).toBe(false)
+    expect(zUnityName.safeParse('page.home').success).toBe(true)
+    expect(zUnityName.safeParse('Page.Home').success).toBe(false)
+    expect(zUnityName.safeParse('page home').success).toBe(false)
   })
 })
 
-describe('buildRowValidator', () => {
-  it('校验声明字段类型,允许缺字段与多余 key', () => {
+describe('database', () => {
+  it('字段名唯一，最多一个 unity_name', () => {
+    expect(zDatabaseAttributes.safeParse({
+      schema: [{ name: 'a', type: 'unity_name' }, { name: 'b', type: 'string' }],
+    }).success).toBe(true)
+    expect(zDatabaseAttributes.safeParse({
+      schema: [{ name: 'a', type: 'unity_name' }, { name: 'b', type: 'unity_name' }],
+    }).success).toBe(false)
+    expect(zDatabaseAttributes.safeParse({
+      schema: [{ name: 'a', type: 'string' }, { name: 'a', type: 'number' }],
+    }).success).toBe(false)
+  })
+
+  it('row validator 跳过 unity_name，允许缺字段和额外 key', () => {
     const validator = buildRowValidator([
+      { name: 'unity_name', type: 'unity_name' },
       { name: 'year', type: 'number' },
       { name: 'name', type: 'string' },
     ])
-
     expect(validator.safeParse({ year: 2024 }).success).toBe(true)
-    expect(validator.safeParse({ name: 'x', extra: 123 }).success).toBe(true)
-    expect(validator.safeParse({}).success).toBe(true)
+    expect(validator.safeParse({ year: null }).success).toBe(true)
+    expect(validator.safeParse({ unity_name: 'x', extra: 1 }).success).toBe(true)
     expect(validator.safeParse({ year: '2024' }).success).toBe(false)
-    expect(validator.safeParse({ name: 123 }).success).toBe(false)
+  })
+})
+
+describe('attributes and actions', () => {
+  it('file / image / page 校验', () => {
+    expect(() => checkAttributes('file', {})).toThrow()
+    expect(() => checkAttributes('file', { filename: 'a.pdf' })).not.toThrow()
+    expect(() => checkAttributes('page', {})).not.toThrow()
+  })
+
+  it('listing / config payload 校验', () => {
+    expect(zActionPayloads.listing.safeParse({ limit: 10 }).success).toBe(true)
+    expect(zActionPayloads.listing.safeParse({ limit: -1 }).success).toBe(false)
+    expect(zActionPayloads.updateConfig.safeParse({
+      key: 'sys.config.gc_grace_hours', value: 24,
+    }).success).toBe(true)
+    expect(zActionPayloads.updateConfig.safeParse({
+      key: 'Bad Key', value: 24,
+    }).success).toBe(false)
   })
 })

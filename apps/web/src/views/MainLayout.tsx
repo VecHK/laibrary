@@ -1,32 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Item } from '@laibrary/types'
+import type { Item } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { loadTags, tagsLoaded } from '../lib/tags'
 import type { ViewerCtx } from '../modules/types'
 import type { HashRoute } from '../lib/hash-router'
 import { ItemView } from './ItemView'
 import { PlazaView } from './PlazaView'
+import { SettingsView } from './SettingsView'
 
 export function MainLayout({
   route,
   ctx,
   refresh_key,
-  onOpenSettings,
 }: {
   route: HashRoute
   ctx: ViewerCtx
   refresh_key: number
-  onOpenSettings: () => void
 }) {
   const [root_items, setRootItems] = useState<Item[]>([])
+  const [tags_ready, setTagsReady] = useState(tagsLoaded())
 
   const loadRoots = useCallback(() => {
     getRpc().listing({
-      limit: 0,
+      limit: 200,
       sort_by: 'order_index',
       filter_rules: [
         { name: 'parent', input: null, logic: 'and' },
-        { name: 'role', input: ['custom', 'database'], logic: 'and' },
+        { name: 'role', input: ['page', 'database', 'entity'], logic: 'and' },
       ],
     }).then(setRootItems).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
@@ -35,14 +35,22 @@ export function MainLayout({
 
   useEffect(loadRoots, [loadRoots, refresh_key])
 
+  useEffect(() => {
+    if (!tagsLoaded()) {
+      loadTags().then(() => setTagsReady(true)).catch(err => {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+      })
+    } else {
+      setTagsReady(true)
+    }
+  }, [refresh_key])
+
   const createPage = () => {
-    getRpc().addItem({ role: 'custom', title: '新页面' })
+    getRpc().addItem({ role: 'page', title: '新页面' })
       .then(item => {
         ctx.refresh()
         ctx.navigate(item.id)
-      }).catch(err => {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-      })
+      }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
   }
 
   const createDatabase = () => {
@@ -50,24 +58,40 @@ export function MainLayout({
       role: 'database',
       title: '新数据库',
       attributes: { schema: [] },
-    })
-      .then(item => {
-        ctx.refresh()
-        ctx.navigate(item.id)
-      }).catch(err => {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-      })
+    }).then(item => {
+      ctx.refresh()
+      ctx.navigate(item.id)
+    }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+  }
+
+  const createManga = async () => {
+    let reading_direction = 'rtl'
+    try {
+      const config = await getRpc().getConfig(undefined)
+      const entry = config.entries.find(item => item.key === 'sys.config.manga_default_direction')
+      if (entry?.value === 'ltr' || entry?.value === 'rtl') {
+        reading_direction = entry.value
+      }
+    } catch {
+      // 配置读取失败时仍允许创建，使用默认 rtl。
+    }
+    getRpc().addItem({
+      role: 'entity',
+      kind: 'manga',
+      title: '新漫画',
+      attributes: { reading_direction },
+    }).then(item => {
+      ctx.refresh()
+      ctx.navigate(item.id)
+    }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
   }
 
   const createTag = () => {
     const title = window.prompt('tag 名')
     if (title && title.trim().length > 0) {
       getRpc().newTag({ title: title.trim() })
-        .then(() => {
-          loadTags().then(() => ctx.refresh()).catch(() => {})
-        }).catch(err => {
-          ctx.showError(err instanceof Error ? err.message : String(err))
-        })
+        .then(() => loadTags().then(() => ctx.refresh()))
+        .catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -89,28 +113,29 @@ export function MainLayout({
               className={route.name === 'item' && route.id === item.id ? 'side-button active' : 'side-button'}
               onClick={() => ctx.navigate(item.id)}
             >
-              {item.role === 'database' ? '🗄️' : '📄'} {item.title || '(无标题)'}
+              {item.role === 'database' ? '🗄️' : item.role === 'entity' ? '📖' : '📄'} {item.title || '(无标题)'}
             </button>
           ))}
         </div>
         <div className="sidebar-section sidebar-actions">
           <button className="side-button" onClick={createPage}>＋ 新页面</button>
           <button className="side-button" onClick={createDatabase}>＋ 新数据库</button>
+          <button className="side-button" onClick={createManga}>＋ 新漫画</button>
           <button className="side-button" onClick={createTag}>＋ 新标签</button>
-          <button className="side-button" onClick={onOpenSettings}>⚙ 连接设置</button>
+          <button className="side-button" onClick={() => ctx.navigate({ name: 'settings' })}>⚙ 设置</button>
         </div>
       </aside>
 
       <main className="main">
-        {!tagsLoaded() ? (
+        {!tags_ready ? (
           <div className="loading">加载中…</div>
-        ) : (
-          route.name === 'plaza' ? <PlazaView ctx={ctx} /> : (
-            route.name === 'item' ? (
-              <ItemView item_id={route.id} ctx={ctx} refresh_key={refresh_key} />
-            ) : null
-          )
-        )}
+        ) : route.name === 'settings' ? (
+          <SettingsView ctx={ctx} />
+        ) : route.name === 'plaza' ? (
+          <PlazaView ctx={ctx} />
+        ) : route.name === 'item' ? (
+          <ItemView item_id={route.id} ctx={ctx} refresh_key={refresh_key} />
+        ) : null}
       </main>
     </div>
   )

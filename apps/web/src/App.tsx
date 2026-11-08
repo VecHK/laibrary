@@ -60,10 +60,6 @@ export default function App() {
           route={route}
           ctx={ctx}
           refresh_key={refresh_key}
-          onOpenSettings={() => {
-            setConnected(false)
-            navigate({ name: 'settings' })
-          }}
         />
       ) : (
         <ConnectScreen onConnected={connect} />

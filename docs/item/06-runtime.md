@@ -1,83 +1,122 @@
 # 06 · 运行时规格
 
-> 位置:`packages/server/src/config.ts`、`app.ts`、`index.ts`、`cli/`。
+> 位置：`packages/server/src/config/`、`app.ts`、`index.ts`、`cli/`。
+> 配置分两层：bootstrap 在 `.env`，runtime 在 `sys.config` Item。
 
-## 1. 配置
+## 1. Bootstrap 配置
 
-`config.json`(server 包根目录):
+根目录 `.env`（不提交；`.env.example` 提交），OS env 优先于 `.env`；server 用 `process.loadEnvFile` 读取，不覆盖已有 env。
 
-```json
-{
-  "database_url": "postgres://root:root@127.0.0.1:5432/root",
-  "http_api_port": 44998,
-  "storage_path": "./storage",
-  "filepool_path": "./storage/files"
-}
-```
-
-| 字段 | 环境变量覆盖 | 说明 |
+| 变量 | 默认 | 说明 |
 |---|---|---|
-| database_url | `DATABASE_URL` | PG 连接串 |
-| http_api_port | `HTTP_API_PORT` | API 端口(默认 44998) |
-| storage_path | — | 相对 server 包目录解析;含上传临时目录 `<storage>/uploadtemp` |
-| filepool_path | — | blob 池根目录 |
+| `DATABASE_URL` | 必填 | PostgreSQL |
+| `HTTP_API_PORT` | 44998 | API 端口 |
+| `HOST` | 0.0.0.0 | 监听地址 |
+| `STORAGE_PATH` | ./storage | 上传临时目录根 |
+| `BLOB_PATH` | ./storage/blobs | blob 根 |
+| `LOG_LEVEL` | info | 日志级别（启动期） |
+| `MIGRATE_ON_START` | true | 启动自动迁移 |
 
-校验:database_url 缺失即启动失败;数字字段非法时回落默认值。
+`config.json` 已删除。路径相对仓库根解析（`REPO_ROOT` 由 `packages/server/src/config/bootstrap.ts` 计算）。密钥只放 env/secret，不进 Item。
 
-## 2. 启动流程(prepareApp)
+## 2. Runtime 配置
 
-```
-loadConfig()
-  → ensureDatabaseExists()          # 建库(缺失时)
-  → createDb() + migrate()          # 应用 drizzle 迁移
-  → initFilePool()                  # 初始化 blob 池与 latest.json
-  → (API 启动时) 清空 uploadtemp
-```
+`sys.config` database（unity_name=`sys.config`）：
 
-- 入口 `src/index.ts`:`prepareApp()` → `createApi()` → listen(http_api_port)
-- 热重载:`tsx watch src/index.ts`(`npm run dev`)
-
-## 3. CLI
-
-### clean(GC)
-
-```
-npm run clean        # 即: tsx src/cli/clean.ts
+```text
+sys.config (database)
+  └─ sys.config.gc_grace_hours        page  title/value/type
+  └─ sys.config.upload_max_bytes      page
+  └─ sys.config.manga_default_direction
+  └─ sys.config.ui_page_size
+  └─ sys.config.config_version
 ```
 
-执行:prepareApp → `cleanUnreferencedFiles(db, pool)` → 打印 `扫描 N 个 blob,删除 M 个孤儿文件(24h 宽限期)` → 退出。
+- ConfigService `ensure()`：查找/创建 system DB、seed 缺失默认行、修复 schema。
+- `load()`：读取子项、合并默认值、缓存。
+- `update()`：校验 key 前缀/类型；更新行；失效缓存。
+- `getConfig` / `updateConfig` action；设置页编辑。
+- 通用 item 写接口拒绝 `sys.` unity_name；公共 listing 排除 `sys.%`。
+- runtime **不接受 env 覆盖**；bootstrap 不进入 Item。
 
-## 4. 测试
+## 3. 启动流程
 
-- 框架:vitest(`npm test` 全仓;`npm run test -w @laibrary/server` 单包)
-- 测试库:`laibrary_test`(05 文档 §5);文件池用 mkdtemp 临时目录,不碰真实 storage
+```text
+loadRootEnv() + loadBootstrapConfig()
+→ ensureDatabaseExists
+→ createDb
+→ migrate（MIGRATE_ON_START）
+→ BlobStore.init()
+→ BlobService
+→ ConfigService.ensure() + load(true)
+→ ThumbnailService
+→ createApi()
+→ listen(HOST, HTTP_API_PORT)
+```
 
-### 覆盖矩阵(现状)
+`createApi` 构造 `/blob` multipart 中间件与 `/action` 路由；每次 upload 读取 runtime `upload_max_bytes`（硬上限 1GiB）。
 
-| 文件 | 覆盖 |
-|---|---|
-| items.test.ts | 创建/读取、role zod 校验、fid_ 写时校验(含嵌套)、tags 去重、order_index 自动追加与中点、环检测、删除拒绝、database 行校验、schema 重名 |
-| tags.test.ts | get-or-create 大小写不敏感、search、重命名与重名/空名拒绝、delete 清扫、deleteItem(tag) 清扫、has_tag |
-| listing.test.ts | id 升序/降序、keyset 翻页不重不漏、title/role/attribute_equal/empty_tag、group and/or/invert、sort_field number/string 与空值沉底、sort_field keyset |
-| gc.test.ts | scanFileRefs 嵌套发现、custom 深扫防误删、宽限期 |
-| file-pool.test.ts | 序号递增、save/load/exists/delete、分片路径、collectBlobFiles |
-| api.test.ts | RPC 端到端、get-or-create、未知 action 400、zod 400、坏 FileID 500、缩略图全链、database 校验、字段排序 |
+## 4. API 进程
 
-### 已知缺口(v1 接受)
+- Koa 3 + CORS + koa-body(multipart) + @koa/bodyparser(JSON 4mb)。
+- `/action` 统一 zod payload；AppError/ZodError 映射状态码；未知 action 400。
+- 无鉴权；仅可信局域网。
+- 单实例假设：缩略图生成用进程内 per-key promise；配置缓存单实例。
 
-- updateItem 的"部分字段更新"组合矩阵未全覆盖
-- 并发/事务窗口未测(单写者假设)
-- 网络层未测真实 multipart 边界(仅 supertest attach)
+## 5. CLI
 
-## 5. 路线图(v2 候选,细节)
+### clean（GC）
 
-| 项 | 说明 | 前置 |
-|---|---|---|
-| links 表 | tag 引用约定升级为结构化边(FK + 级联) | 多用户/协作需求出现 |
-| 数据驱动模块注册表 | `sys/type` → 模块映射存进 config item,不写代码加类型 | 前端生态 |
-| 鉴权/多用户/协作 | 权限系统;读写接口演进 | 基座稳定 |
-| 事务化 | deleteTag 等两步操作进事务 | 同上 |
-| 表达式索引 | 常用 attributes 字段(release_date 等)排序/过滤加速 | 数据量 |
-| id 精度 | bigserial 超 2^53 时对外改 string | 数据量 |
-| Gāng | docs/gang/;Judgement/DSL/Clerk | 基座验证完成 |
-| Electron | 桌面壳(纯客户端) | 前端功能完整 |
+```bash
+npm run clean
+```
+
+`prepareApp` → 读 `gc_grace_hours` → `cleanUnreferencedBlobs` → 批量删无引用 blob → 退出。
+
+### DB
+
+```bash
+npm run db:generate   # drizzle 生成迁移
+npm run db:migrate    # 应用迁移
+```
+
+## 6. 测试
+
+```bash
+npm test
+npm run test -w @laibrary/server
+npm run test -w @laibrary/types
+npm run test -w @laibrary/web
+```
+
+- server 测试需要 PostgreSQL；`TEST_DATABASE_URL` 默认 laibrary_test。
+- 测试 helper 重置 public + drizzle schema，再迁移。
+- 测试串行（共享测试库）。
+- web 测试为 pure functions/registry；无浏览器渲染测试。
+- 当前：server 38、types 11、web 11。
+
+## 7. Web
+
+```bash
+npm run web   # Vite 5173
+```
+
+- 连接页保存 API baseurl 到 localStorage。
+- hash 路由：`#/plaza`、`#/item/:id`、`#/settings`。
+- page block 编辑器、inline itemlink、entity/manga、设置页。
+- 构建：`npm run build -w @laibrary/web`。
+
+## 8. 部署（当前）
+
+- `docker compose up -d postgres`（postgres:18，数据在 `./volumes/postgres_data`）。
+- API 在宿主机 `npm run dev`；Web 在宿主机 `npm run web`；或由反代托管 dist。
+- 局域网直接访问；公网需要额外反代 + Cloudflare Access/token（未实现）。
+- 单用户、单实例；不要直接暴露 44998 到公网。
+
+## 9. 路线图（v2 之后）
+
+- 200 万漫画导入脚本、百万级压测、分页 UI。
+- 鉴权/token、多用户、Cloudflare Access 验证。
+- 文件柜/SMB、富文本、大纲/反链、database 高级视图。
+- 派生数据库、Gāng、Public Space、Electron。
+- 备份/恢复自动化、软删除。

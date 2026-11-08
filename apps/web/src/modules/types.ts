@@ -9,13 +9,13 @@ export interface ViewerCtx {
 }
 
 export interface ItemModule {
-  tag?: string
   role?: Role
+  kind?: string
   Presenter: {
     card: (item: Item, ctx: ViewerCtx) => ReactNode
     full: (item: Item, ctx: ViewerCtx) => ReactNode
   }
-  Editor?: {
-    inline?: (item: Item, ctx: ViewerCtx) => ReactNode
-  }
+  Block?: (item: Item, ctx: ViewerCtx) => ReactNode
+  inlineIcon?: (item: Item, ctx: ViewerCtx) => ReactNode
+  inlineMeta?: (item: Item, ctx: ViewerCtx) => ReactNode
 }

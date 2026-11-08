@@ -2,11 +2,11 @@ import { prepareApp } from './app'
 import { createApi } from './api'
 
 async function main() {
-  const { config, db, blob } = await prepareApp()
+  const { config, db, blobs, config_service, thumbnails } = await prepareApp()
+  const app = await createApi(config, db, blobs, config_service, thumbnails)
 
-  const app = createApi(config, db, blob)
-  app.listen(config.http_api_port, () => {
-    console.log(`Laibrary api listening on http://127.0.0.1:${config.http_api_port}`)
+  app.listen(config.http_api_port, config.host, () => {
+    console.log(`Laibrary api listening on http://${config.host}:${config.http_api_port}`)
   })
 }
 

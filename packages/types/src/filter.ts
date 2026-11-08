@@ -1,4 +1,4 @@
-import type { ItemID, Role } from './roles'
+import type { ItemID, Kind, Role, UnityName } from './roles'
 
 export type FilterRuleLogic = 'and' | 'or'
 
@@ -11,6 +11,8 @@ export type AttributeScalar = string | number | boolean
 
 export type FilterRule =
   | (RuleBase & { name: 'role'; input: Role | Role[] })
+  | (RuleBase & { name: 'kind'; input: Kind })
+  | (RuleBase & { name: 'unity_name'; input: UnityName })
   | (RuleBase & { name: 'title'; input: string })
   | (RuleBase & { name: 'has_tag'; input: ItemID })
   | (RuleBase & { name: 'empty_tag'; input: null })

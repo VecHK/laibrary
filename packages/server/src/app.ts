@@ -1,26 +1,43 @@
-import path from 'path'
+import path from 'node:path'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { loadConfig } from './config'
+import { loadBootstrapConfig, loadRootEnv, type BootstrapConfig } from './config/bootstrap'
 import { createDb, databaseNameOf, ensureDatabaseExists, type DB } from './db/client'
-import { initFilePool, type FilePool } from './blob/file-pool'
+import { BlobStore } from './blob/store'
+import { BlobService } from './blob/service'
+import { ConfigService } from './config/runtime'
+import { ThumbnailService } from './thumbnails/service'
 
 export type AppInstance = {
-  config: ReturnType<typeof loadConfig>
+  config: BootstrapConfig
   db: DB
-  blob: FilePool
+  blob_store: BlobStore
+  blobs: BlobService
+  config_service: ConfigService
+  thumbnails: ThumbnailService
 }
 
 export async function prepareApp(): Promise<AppInstance> {
-  const config = loadConfig()
+  loadRootEnv()
+  const config = loadBootstrapConfig()
 
   await ensureDatabaseExists(config.database_url, databaseNameOf(config.database_url))
 
   const db = createDb(config.database_url)
-  await migrate(db, {
-    migrationsFolder: path.join(import.meta.dirname, '../drizzle'),
-  })
+  if (config.migrate_on_start) {
+    await migrate(db, {
+      migrationsFolder: path.join(import.meta.dirname, '../drizzle'),
+    })
+  }
 
-  const blob = await initFilePool(config.filepool_path)
+  const blob_store = new BlobStore(config.blob_path)
+  await blob_store.init()
+  const blobs = new BlobService(db, blob_store)
 
-  return { config, db, blob }
+  const config_service = new ConfigService(db)
+  await config_service.ensure()
+  await config_service.load(true)
+
+  const thumbnails = new ThumbnailService(db, blobs)
+
+  return { config, db, blob_store, blobs, config_service, thumbnails }
 }

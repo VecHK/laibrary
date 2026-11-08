@@ -4,13 +4,19 @@ import pg from 'pg'
 const { Pool } = pg
 
 export type DB = ReturnType<typeof createDb>
+export type Tx = Parameters<Parameters<DB['transaction']>[0]>[0]
+export type DbLike = DB | Tx
 
-export function createDb(database_url: string) {
+export function createDb(database_url: string, max: number = 10) {
   const pool = new Pool({
     connectionString: database_url,
-    max: 10,
+    max,
   })
   return drizzle({ client: pool })
+}
+
+export function withTransaction<T>(db: DB, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(fn)
 }
 
 export async function ensureDatabaseExists(

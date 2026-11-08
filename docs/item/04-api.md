@@ -1,119 +1,157 @@
 # 04 · API 规格
 
-> 原则锚点:P7(前后端分离、RPC 全类型化)。
-> 位置:`packages/server/src/api/`。类型事实源:`@laibrary/types` 的 `ActionTable`(server 实现被其约束,client 用 `createRpcClient` 获得全类型直调)。
+> 类型事实源：`@laibrary/types` 的 `ActionTable`。客户端 `createRpcClient(base_url)` 获得全类型调用。
 
-## 1. RPC 协议
+## 1. RPC
 
-- 端点:`POST /action`
-- 请求体:`{ "action": string, "payload": any }`(JSON)
-- 响应:JSON;成功为 action 的返回值的 JSON 序列化
-- 错误:一律 `{ "message": string }`
+- 端点：`POST /action`
+- 请求：`{ "action": string, "payload": any }`
+- 成功：JSON 语义的 action 返回值
+- 错误：`{ message, code, issues? }`
+- 状态：
+  - 200 成功
+  - 400 未知 action / payload zod / 业务校验（VALIDATION/BAD_REQUEST）
+  - 404 不存在（NOT_FOUND）
+  - 409 冲突（CONFLICT）
+  - 413 上传过大（PAYLOAD_TOO_LARGE）
+  - 500 内部/存储（INTERNAL/STORAGE_ERROR）
 
-| 状态码 | 情形 |
-|---|---|
-| 200 | 成功 |
-| 400 | 未知 action / 请求体非法 / zod 校验失败 |
-| 500 | 业务错误(item 不存在、重复 tag 名、文件引用缺失、删除拒绝等) |
+未知 action 用 `Object.hasOwn` 白名单，不会命中对象原型。
 
-- CORS:`@koa/cors` 默认配置(开放,配合前后端分离与 NAS 场景;鉴权属未来议题)
-- 客户端:`createRpcClient(base_url)` 返回每个 action 的直调方法(全类型推导),失败时 throw `Error(message)`
+## 2. Item
 
-## 2. ActionTable 全量(12 个)
+```ts
+{
+  id, role, kind, unity_name, title, attributes, tags,
+  parent_id, order_index,
+  blob: { id, size, mime, width, height } | null,
+  target_id,
+  create_date, update_date
+}
+```
+
+- `file/image`：`blob` 必填；attributes 只有 `{ filename }`。
+- `entity`：kind 非空；page：kind null。
+- 无 `src`/`cover_src`/`image_width`/`image_height`。
+
+## 3. Actions（14）
 
 ### addItem
+```text
+{ role, kind?, unity_name?, title?, attributes?, tags?, parent_id?, order_index?, blob_id?, target_id? }
+→ Item
 ```
-payload: { role, title?, attributes?, tags?, parent_id?, order_index? }
-return:  Item
-```
-role 必填;校验链见 03 文档 createItem。
+约束见 [03-repository.md](03-repository.md)。role 创建后不可变。
 
 ### getItem / getItems
-```
-getItem:  { id: ItemID }          → Item
-getItems: ItemID[]                → Item[](按输入顺序)
+```text
+getItem: { id } → Item
+getItems: ItemID[] → Item[]（保持输入顺序）
 ```
 
 ### updateItem
-```
-{ id: ItemID, data: { role?, title?, attributes?, tags?, parent_id?, order_index? } }
+```text
+{ id, data: { title?, attributes?, tags?, parent_id?, order_index?, target_id? } }
 → { message: 'done' }
 ```
-data 提供哪些字段更新哪些;parent 变更做环检测。
+不可修改 role/kind/unity_name/blob_id。itemlink 可改 target_id。
 
 ### deleteItem
+```text
+{ id } → { message: 'done' }
 ```
-{ id: ItemID } → { message: 'done' }
-```
-有子项拒绝;role='tag' 时清扫引用。
+有子项 409；tag 清扫；image 级联 thumbnails；blob 留给 GC。
 
 ### listing
+```text
+{
+  sort_by?: 'id'|'create_date'|'update_date'|'order_index',
+  sort_field?: { name, type: 'string'|'number' },
+  after_id?, desc?, limit,
+  filter_rules?, filter_groups?
+} → Item[]
 ```
-payload: ListingParams(见 03 文档 §2)
-return:  Item[]
+`limit` 0–10000；0 表示不限（仍受服务端上限）。公共 listing 排除 `sys.%`。详见 03 文档。
+
+### getItemByUnityName
+```text
+{ unity_name } → Item | null
 ```
 
 ### newTag
+```text
+{ title, attributes? } → Item
 ```
-{ title: string, attributes?: Record<string, unknown> } → Item
-```
-get-or-create 原子;空名 500(重复名返回已有)。
+get-or-create，大小写不敏感；空名 400。
 
 ### updateTag
-```
+```text
 { id, data: { title?, attributes? } } → { message: 'done' }
 ```
+重名 409；空名 400。
 
 ### deleteTag
-```
+```text
 { id } → { message: 'done' }
 ```
+有子项 409；清扫引用。
 
 ### searchTag
+```text
+{ name, limit? } → Item[]
 ```
-{ name: string, limit?: number } → Item[]
-```
+limit 0 = 不限（上限 1000）。
 
 ### getTagByTitle
+```text
+{ title } → Item | null
 ```
-{ title: string } → Item | null
+
+### getConfig
+```text
+{} / undefined → { version, entries: [{ key, title, type, value }] }
 ```
+来自 `sys.config` database；包含默认值。
 
-### generateThumb
+### updateConfig
+```text
+{ key, value } → { message: 'done' }
 ```
-{ id: ItemID } → { file_id: FileID }
-```
-入参为 **image item id**(非 FileID);流程见 02 文档 §6;非 image / 缺 src / src 文件不存在均 500。
+key 必须 `sys.config.*`；类型由配置项类型校验；未知 key 404。
 
-## 3. 文件路由
+## 4. 文件路由
 
-注册于上传路由(koa-body multipart,置于 bodyParser 之前);服务启动时清空上传临时目录 `config.upload_temp_path`。
+### POST /blob
+multipart，字段 `file`；大小上限来自 runtime `sys.config.upload_max_bytes`。
+返回 `{ blob: BlobMeta, reused: boolean }`。
 
-### POST /file
-- multipart,字段名 `file`,单文件(`maxFiles: 1, multiples: false, maxFields: 1`)
-- 流程:落临时目录 → `requestFileNumber()` → 按原始文件名扩展名 `constructFileID(num, ext)` → 移到分片路径 → 返回 FileID(JSON 字符串)
-- 失败:500 `upload failure: ...`
+### GET / HEAD /blob/:blob_id
+- `blob_id` 64 位 hex。
+- 200 流；`Content-Type`、`Content-Length`、`ETag`、`Cache-Control: immutable`、`Accept-Ranges`。
+- `Range` 单区间 → 206；非法范围当前回退 200。
+- 404 不存在。
 
-### POST /file/:file_id
-- 替换 blob 内容:file_id 存在则覆盖,不存在 400 `file(id=X) not found`
-- **约定**:size/sha256 等元数据由客户端随后更新 item
+### GET /thumb/:image_id?size=96|384|800|1440
+- image role 校验；size 必须四档之一。
+- 惰性生成 AVIF；返回 `image/avif`、ETag、immutable cache。
+- image 非 image / 不存在：400/404。
 
-### DELETE /file/:file_id
-- 存在:删除,200 `{message:'done'}`;不存在:404 `file not found(file_id=X)`
-- 显式删除后悬空引用由渲染器兜底(02 文档)
+### 无
+`POST /file`、`POST /file/:id`、`DELETE /file/:id`、`GET /readfile/:id` 已移除。
 
-### GET /readfile/:file_id
-- 流式返回 blob;不存在 404
+## 5. CORS / 鉴权
 
-## 4. 错误消息对照(供客户端显示)
+- `@koa/cors` 默认开放，适配前后端分离与 NAS。
+- 当前无鉴权；只应在可信局域网使用。公网需交付层 Access/反代，未来再做 token。
 
-| 情形 | message 形如 |
+## 6. 错误消息示例
+
+| 情形 | message / code |
 |---|---|
-| 不存在 | `item(id=N) not found` |
-| zod 校验 | zod 聚合消息(400) |
-| 文件引用缺失 | `attributes.<路径> 引用的文件不存在: fid_N.ext` |
-| 环/自指 | `parent 不能指向自己` / `不能移动到自己的后代之下` |
-| 删除拒绝 | `item(id=N) 存在子项,不能删除` / `tag(id=N) 存在子项,不能删除` |
-| tag 重名 | `重复的 tag 名: X` |
-| 空 tag 名 | `不能设置空 tag 名` |
-| 缩略图 | `item(id=N) 并不是 image` / `image(id=N) 缺少 src` / `缩略图生成失败,FileID[fid_N.ext]不存在` |
+| item 不存在 | `item(id=N) not found` / NOT_FOUND |
+| unity 重复 | `unity_name 或 tag 名重复` / CONFLICT |
+| tag 重复 | `重复的 tag 名: X` / CONFLICT |
+| 有子项 | `item(id=N) 存在子项，不能删除` / CONFLICT |
+| 系统项 | `系统 item 不能通过通用接口修改` / BAD_REQUEST |
+| 没有 opener | 客户端提示 `没有合适的打开方式` |
+| blob 缺失 | `blob(<id>) not found` / NOT_FOUND |

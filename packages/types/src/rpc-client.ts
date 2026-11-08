@@ -11,12 +11,14 @@ export const ActionNames = [
   'updateItem',
   'deleteItem',
   'listing',
+  'getItemByUnityName',
   'newTag',
   'updateTag',
   'deleteTag',
   'searchTag',
   'getTagByTitle',
-  'generateThumb',
+  'getConfig',
+  'updateConfig',
 ] as const satisfies ReadonlyArray<ActionName>
 
 export type RpcClient = {

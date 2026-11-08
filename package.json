@@ -10,12 +10,13 @@
   "scripts": {
     "dev": "npm run dev -w @laibrary/server",
     "web": "npm run dev -w @laibrary/web",
-    "test": "npm run test -ws --if-present",
-    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "db:generate": "npm run db:generate -w @laibrary/server",
     "db:migrate": "npm run db:migrate -w @laibrary/server",
     "clean": "npm run clean -w @laibrary/server",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

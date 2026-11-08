@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Item, Role } from '@laibrary/types'
+import type { Item, Role } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { resolveModule } from '../modules/registry'
+import { openItem } from '../lib/open-item'
 import type { ViewerCtx } from '../modules/types'
 
-const FILTERS: Array<{ name: string; roles: Role[] | 'all' }> = [
-  { name: '全部', roles: ['custom', 'textline', 'image', 'file', 'database'] },
-  { name: '页面', roles: ['custom'] },
+type Filter = {
+  name: string
+  roles?: Role[]
+  kind?: string
+}
+
+const FILTERS: Filter[] = [
+  { name: '全部', roles: ['page', 'entity', 'textline', 'image', 'file', 'database'] },
+  { name: '页面', roles: ['page'] },
+  { name: '漫画', kind: 'manga' },
   { name: '图片', roles: ['image'] },
   { name: '文件', roles: ['file'] },
   { name: '数据库', roles: ['database'] },
@@ -18,51 +26,61 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   const [filter_idx, setFilterIdx] = useState(0)
   const [loaded_all, setLoadedAll] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [page_size, setPageSize] = useState(50)
+
+  const buildRules = (filter: Filter | undefined): import('@laibrary/types').FilterRule[] => {
+    if (filter === undefined) return []
+    const rules: import('@laibrary/types').FilterRule[] = []
+    if (filter.roles !== undefined) {
+      rules.push({ name: 'role', input: filter.roles, logic: 'and' })
+    }
+    if (filter.kind !== undefined) {
+      rules.push({ name: 'kind', input: filter.kind, logic: 'and' })
+    }
+    return rules
+  }
 
   const loadFirstPage = () => {
     const filter = FILTERS[filter_idx]
-    const rules = (
-      filter !== undefined && filter.roles !== 'all'
-    ) ? [{ name: 'role' as const, input: filter.roles, logic: 'and' as const }] : []
-
     setLoading(true)
     getRpc().listing({
-      limit: 50,
+      limit: page_size,
       sort_by: 'update_date',
       desc: true,
-      filter_rules: rules,
+      filter_rules: buildRules(filter),
     }).then(page => {
       setItems(page)
-      setLoadedAll(page.length < 50)
-    }).catch(err => {
-      ctx.showError(err instanceof Error ? err.message : String(err))
-    }).finally(() => setLoading(false))
+      setLoadedAll(page.length < page_size)
+    }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false))
   }
 
-  useEffect(loadFirstPage, [filter_idx])
+  useEffect(() => {
+    getRpc().getConfig(undefined).then(snapshot => {
+      const entry = snapshot.entries.find(item => item.key === 'sys.config.ui_page_size')
+      if (typeof entry?.value === 'number' && entry.value > 0) {
+        setPageSize(Math.min(200, entry.value))
+      }
+    }).catch(() => undefined)
+  }, [])
+
+  useEffect(loadFirstPage, [filter_idx, page_size])
 
   const loadMore = () => {
-    if (items.length === 0) {
-      return
-    }
+    if (items.length === 0) return
     const filter = FILTERS[filter_idx]
-    const rules = (
-      filter !== undefined && filter.roles !== 'all'
-    ) ? [{ name: 'role' as const, input: filter.roles, logic: 'and' as const }] : []
-
     setLoading(true)
     getRpc().listing({
-      limit: 50,
+      limit: page_size,
       sort_by: 'update_date',
       desc: true,
       after_id: items[items.length - 1]!.id,
-      filter_rules: rules,
+      filter_rules: buildRules(filter),
     }).then(page => {
       setItems(prev => [...prev, ...page])
-      setLoadedAll(page.length < 50)
-    }).catch(err => {
-      ctx.showError(err instanceof Error ? err.message : String(err))
-    }).finally(() => setLoading(false))
+      setLoadedAll(page.length < page_size)
+    }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false))
   }
 
   return (
@@ -82,7 +100,7 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
 
       <div className="card-grid">
         {items.map(item => (
-          <div key={item.id} onClick={() => ctx.navigate(item.id)}>
+          <div key={item.id} onClick={() => { void openItem(item, ctx) }}>
             {resolveModule(item).Presenter.card(item, ctx)}
           </div>
         ))}
@@ -94,9 +112,7 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
         </div>
       )}
       {loading && <div className="loading">加载中…</div>}
-      {!loading && items.length === 0 && (
-        <div className="empty-hint">空空如也。</div>
-      )}
+      {!loading && items.length === 0 && <div className="empty-hint">空空如也。</div>}
     </div>
   )
 }

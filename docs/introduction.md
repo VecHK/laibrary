@@ -2,120 +2,96 @@
 
 ## 一句话
 
-Laibrary 把你在电脑上做的那些事——存东西、整理东西、找东西——统一成同一种做法:一切都变成一条可以读、可以改的"条目",任何程序、任何语言都能访问和编辑它。数据不再属于某个 App。
+Laibrary 把你在电脑上做的那些事——存东西、整理东西、找东西——统一成同一种做法：一切都变成一条可以读、可以改的“Item”。任何程序、任何语言都能访问和编辑它；数据不再属于某个 App。
 
 ## 起源
 
-Laibrary 不是笔记软件,不是文件管理器,也不是传统的数据库。它是一个与文件系统平级的、来自未来的信息组织系统。它的核心理念源自一个第一性原理:**把数据从无序转换为有序(熵减)**。为了达到这个目的,它重新定义了数据、逻辑与副作用的关系。
+Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据库。它是一个与文件系统平级的信息组织系统。核心理念来自第一性原理：**把数据从无序转换为有序（熵减）**。为此它重新定义数据、逻辑与副作用的关系。
 
-## 第一性原理:熵减
+## 第一性原理：熵减
 
-我们操作电脑,做的工作其实就是两件事:
+我们操作电脑，做的工作基本是两件事：
 
-1. **把数据从无序弄成有序**——比如在浏览器里复制一段话存进笔记,或者下载一张图片并重命名。
-2. **把数据从一种有序结构里提取出来,加工后再放进另一种结构**——比如处理了一个表格,复制出来粘贴到字处理软件里继续。
+1. 把数据从无序弄成有序——复制一段话存进笔记、下载图片并重命名。
+2. 把数据从一种有序结构提取出来，加工后放进另一种结构——处理表格后复制到字处理软件。
 
-这两件事在传统工具里都是手工劳动,而且每一步都被 App 的私有格式切割。Laibrary 的目标是让这两件事变成对**结构化数据的直接读写**:数据本身有序地待在那里,规则持续维持秩序,语义判断帮你找东西。
+这两件事在传统工具里都是手工劳动，而且每一步都被 App 的私有格式切割。Laibrary 让它们变成对**结构化数据的直接读写**：数据本身有序地待着，规则持续维持秩序，语义判断帮助找东西。
 
-由此,"数据、逻辑、副作用"三者的关系被重新定义:
-
-| 角色 | 现在(v1) | 未来 |
+| 角色 | 现在（v2 POC） | 未来 |
 |---|---|---|
-| **数据** | Item(结构化条目,已实现) | 同左 |
-| **逻辑** | 客户端模块(Presenter/Editor,负责呈现与编辑) | Gāng(信息治序引擎,待验证) |
-| **副作用** | HTTP 写操作(仅由服务端 API 执行) | Clerk(事务化副作用执行,待验证) |
+| **数据** | Item（role + kind + attributes + 树/tags/blob） | 同左 |
+| **逻辑** | 客户端 kind 模块（inlineIcon/Card/Full/opener） | Gāng（信息治序引擎，待验证） |
+| **副作用** | HTTP 写操作（仅服务端 API） | Clerk（事务化副作用，待验证） |
 
 ## 三大支柱
 
-### 1. 基座:打破 App 边界的数据层
+### 1. 基座：打破 App 边界的数据层
 
-Laibrary 的底层是一个通用数据基座(Generic Data Substrate)。
+- **打破数据孤岛**：一切皆 Item。结构化数据（attributes JSONB）在 PostgreSQL；title/tags/树/日期是独立列；文件是 file/image Item，二进制是内容寻址的 blob。
+- **任何语言、任何程序都可以访问和编辑**：RPC + 文件路由；未来加 token/权限，但“数据对客户端开放”是原则。
+- **高性能与高并发**：全异步、SQL 索引、keyset 分页、内容寻址 blob；不回到“内存索引 + 单线程扫描”。
 
-- **打破数据孤岛**:在传统文件系统或 Notion 中,数据被 App 锁死——格式私有、逻辑封闭。在 Laibrary 中,一切皆 Item:结构化数据(attributes 为 JSONB)存储在 PostgreSQL 中,title、标签、树结构与日期为独立列;无论音乐、漫画、笔记还是电影,底层都是统一的结构化数据。媒体二进制本体长期存放于磁盘文件池,**不进数据库**(见 [item/02-file-system.md](item/02-file-system.md))。
-- **任何语言、任何程序都可以访问和编辑**:这不是"网络版 localStorage"意义上的简单,而是指**接入的普遍性**——未来将支持多用户、协作与权限系统,接口会随之演进,但"数据对一切客户端开放"是原则。
-- **高性能与高并发**:抛弃了早期技术探索(myrepository)手写的文件存储与内存索引方案——它曾导致 180 万 Item 检索阻塞单线程。Laibrary 拥抱 PostgreSQL 的 GIN 索引与多进程并发能力,解决了 JS 单线程无法逾越的 IO/CPU 瓶颈。
+> 早期探索 `myrepository` 的教训（180 万 Item 阻塞单线程）被继承；代码不沿用。
 
-> 注:myrepository 只是早期的一次技术性探索,其教训(而非代码)被继承。
+### 2. 灵魂：Gāng（纲）—— 信息治序引擎
 
-### 2. 灵魂:Gāng(纲)—— 信息治序引擎
+> `[Todo/待验证]` 规格留待 `docs/gang/`。当前未实现。
 
-> `[Todo/待完善/待验证]` 本节为愿景原文,不做设计展开。规格留待 `docs/gang/`。
+- **语义判断（Judgement）**：用自然语言定义判断标准，由 LLM 执行。
+- **DSL 与 Runtime（Task & Routine）**：声明式 JSON，单向 next，Map/Filter/Reduce。
+- **副作用隔离（Clerk）**：Routine 纯函数；写入/命令/HTTP 交给事务化的 Clerk。
 
-如果没有 Gāng,Laibrary 只不过是一个"更好看的 Obsidian/Notion"。Gāng 是 Laibrary 真正的核心灵魂。
+### 3. 生态：能力的组合
 
-- **语义判断(Judgement)**:这是 Laibrary 区别于一切传统工具的分水岭。传统工具只能处理结构化数据(数值比较、正则匹配),而 Laibrary 允许你用自然语言定义判断标准(如"什么是纯爱番"、"这篇文章是否与 AI 监管有关"),由 LLM 执行语义判断。
-- **DSL 与 Runtime(Task & Routine)**:Gāng 是一种面向信息处理的声明式 DSL(JSON 驱动)。它没有 Blueprint 那该死的连线,只有单向的 next 指针。它抛弃了复杂的 for 循环,只保留了 Map / Filter / Reduce 三种并发安全的集合操作。
-- **副作用隔离(Clerk)**:这是 Laibrary 实现"掌控度"的基石。Gāng 中的 Routine 是纯函数,不能产生任何副作用。所有写入、执行命令行、发 HTTP 请求的动作,必须交给终点的 Clerk。Clerk 具备事务化特性(失败全量回滚),并可设定复杂的写入策略(新增、修改、复制后修改),确保了"数据单向流动"的绝对安全。
+- 第一方工具 BPlayer、manfa、lAI、whatsNews 等共享数据层。
+- Gāng 是通用 JSON，LLM 可生成 GangDef 模板。
+- 新内容类型 = `entity + kind` + 客户端 kind 模块；不新增 role、不改基座。
 
-### 3. 生态:不再是 App,而是能力的组合
+## 设计原则
 
-在 Laibrary 的设想中,未来的工具开发将不再需要写 App 代码。
-
-- **第一方工具**:BPlayer(音乐)、manfa(漫画)、lAI(写作)、whatsNews(新闻追踪)等,这些都是插在 Laibrary 数据层上的乐高积木。它们共享同一套数据结构,通过 Gāng 互相配合(比如 whatsNews 抓取 → lAI 总结 → Clerk 归入 myBooks)。
-- **AI 生成模板**:因为 Gāng 是通用 JSON 格式,微调过的 LLM 可以直接生成 GangDef 模板。你只需要对 AI 说:"我要筛选 80-99 年的纯爱动画",AI 会瞬间帮你生成一个包含 Routine 和 Task 的 JSON 草稿,你微调几个 Prompt,全量重跑,系统就自动完成了。
-
-这就是"举一纲而万目张"的终极形态。(出处:郑玄《诗谱序》)
-
-## 设计原则与目的
-
-以下原则是 Laibrary 的设计宪法。每一条都由原则与其目的构成,规格文档(如 `item/01-data-model.md`)会以编号引用它们。
-
-- **P0 第一性原理驱动设计**。目的:每个设计决策都由"熵减"推演而来,而非功能清单驱动;功能是实现原则的副产品。
-- **P1 一切皆 Item**。目的:一张表存万物,role 判别式区分身份,消灭数据孤岛与私有格式。
-- **P2 基座管事实,客户端管呈现**。目的:服务端不认识"manga"是什么,它只存 role/attributes;呈现与编辑由客户端模块注册表决定,新类型零服务端改动。
-- **P3 类型进运行时**。目的:TS 判别联合只保证编译期;`fid_` 自描述值与 zod 校验把类型带进数据本身与运行期边界。
-- **P4 最小系统验证:约定优于机制**。目的:先用约定(tag 引用、sys/ 命名空间)跑通全流程,验证后再引入结构(links 表等),避免过早设计。
-- **P5 结构化数据 + 强校验**。目的:坏数据进不了库(写时校验),查看器无需防御残缺数据——旧实现的教训。
-- **P6 高性能**。目的:全异步、SQL 索引、keyset 分页;杜绝"内存索引 + 单线程扫描"式阻塞。
-- **P7 前后端分离、RPC 全类型化**。目的:`@laibrary/types` 是唯一事实源,RPC 签名与 zod 校验前后端同源,零双份维护。
+- **P0 第一性原理**：由熵减推演，不按功能清单。
+- **P1 一切皆 Item**：用户数据、系统配置都是 Item；语义数据单表。
+- **P2 基座管事实，客户端管呈现**：服务端只理解 role；kind 是开集，由客户端模块解释。
+- **P3 类型进运行时**：zod 在 API 边界；BlobID/unity_name 有运行期格式与约束。
+- **P4 最小系统验证，约定优于机制**：itemlink/token 先用约定；links 表/反链后置。
+- **P5 结构化数据 + 强校验**：坏数据进不了库；文件必须指向存在的 blob。
+- **P6 高性能**：索引、keyset、内容寻址、批量 GC；不为 3M 规模做 premature sharding。
+- **P7 前后端分离、RPC 全类型化**：`@laibrary/types` 是唯一事实源。
 
 ## 与其他工具的区别
 
 | | 数据归属 | 格式与逻辑 | 开放程度 |
 |---|---|---|---|
-| 文件系统 | 文件归"系统",解释归 App | 二进制 + 私有格式,逻辑锁在 App 内 | 文件名/目录是唯一的公共层 |
-| Notion / Obsidian | 数据锁在服务内,导出靠 API/插件 | 私有结构,视图与数据耦合 | 封闭,定制靠插件 |
-| 数据库应用 | 表结构由应用独占定义 | 强 schema,业务逻辑在应用层 | 只对 SQL 客户端开放,语义不开放 |
-| 媒体库(plex 类) | 媒体+元数据归单一应用 | 单一领域(影音),逻辑私有 | 封闭生态 |
-| **Laibrary** | **数据是公共基座,不属于任何 App** | **一切皆 Item,结构化 JSONB;逻辑可插拔(模块/Gāng)** | **任何程序、任何语言可访问编辑** |
+| 文件系统 | 文件归系统，解释归 App | 二进制 + 私有格式 | 文件名/目录是唯一公共层 |
+| Notion / Obsidian | 数据锁在服务内 | 私有结构，视图与数据耦合 | 封闭，定制靠插件 |
+| 数据库应用 | 表结构由应用独占 | 强 schema，逻辑在应用层 | 只对 SQL 客户端开放 |
+| 媒体库（plex 类） | 媒体+元数据归单一应用 | 单一领域，逻辑私有 | 封闭生态 |
+| **Laibrary** | **数据是公共基座，不属于任何 App** | **一切皆 Item，role+kind，结构化 JSONB** | **任何程序可访问；逻辑可插拔** |
 
-## 文档权威声明
+## 当前实现边界（v2 POC）
 
-本文档与实现**同步更新,以文档为准**。修改代码必须同步修改文档;发现文档与代码不一致时,更新文档并记录决策(DESIGN.md),避免规格腐烂。
+已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/textline/image/file/entity/manga、设置页。
 
-## 路线图(一句展望)
-
-v2 候选:links 表、数据驱动模块注册表、鉴权与多用户/协作、Gāng、Electron。细节见 [item/06-runtime.md](item/06-runtime.md) 末节。
+暂未实现：富文本/marks、大纲/反链、文件柜/SMB、database 高级视图、派生数据库、Gāng、Public Space、鉴权/多用户、Electron、200 万导入。
 
 ## 文档地图
 
 | 文档 | 内容 |
 |---|---|
-| `item/01-data-model.md` | Item 数据模型:表结构、role 体系、树与标签 |
-| `item/02-file-system.md` | FileID 与文件机制:blob 池、写时校验、GC、缩略图 |
-| `item/03-repository.md` | 仓储层:全部函数规格、校验规则、过滤 DSL、排序与分页 |
-| `item/04-api.md` | API 规格:RPC 协议、12 个 action、文件路由 |
-| `item/05-database.md` | 数据库规格:索引、迁移、连接与测试库 |
-| `item/06-runtime.md` | 配置、启动流程、CLI、测试策略、路线图细节 |
-| `gang/`(预留) | Gāng 未来规格 |
-| `client/`(预留) | 客户端未来规格 |
+| [glossary.md](glossary.md) | **名词表**（统一术语） |
+| [vision.md](vision.md) | 使用愿景（北极星） |
+| [item/01-data-model.md](item/01-data-model.md) | 数据模型 |
+| [item/02-file-system.md](item/02-file-system.md) | blobs/缩略图 |
+| [item/03-repository.md](item/03-repository.md) | 仓储/校验/分页 |
+| [item/04-api.md](item/04-api.md) | API/路由/错误 |
+| [item/05-database.md](item/05-database.md) | schema/索引/迁移 |
+| [item/06-runtime.md](item/06-runtime.md) | 配置/启动/测试 |
+| [../DESIGN.md](../DESIGN.md) | 概览与决策记录 |
 
-项目概览与决策记录见仓库根目录 `DESIGN.md`。
+## 术语
 
-## 术语表
+统一使用 [glossary.md](glossary.md)：Item、Role、Kind、Entity、Page、Textline、Itemlink、Tag、Database、Unity Name、Blob、BlobID、Thumbnail、Opener、Inline Itemlink、Bootstrap/Runtime Config、Gāng、Public Space、File Cabinet。
 
-| 术语 | 含义 |
-|---|---|
-| **Item** | 一切数据的最小公共实体:一行记录 = role + title + attributes + tags + 树位置 + 日期 |
-| **Role** | Item 的身份:`custom` / `tag` / `textline` / `file` / `image` / `database` |
-| **attributes** | Item 的结构化负载(JSONB),形状由 role 决定 |
-| **树** | parent_id + order_index 组成的单父有序结构 |
-| **blob 池** | 磁盘上的二进制文件存储(分片目录 + 序号),不在数据库中 |
-| **FileID** | 自描述文件引用值,形如 `fid_123.png` |
-| **sys/ 命名空间** | 系统保留 tag 前缀:`sys/type/<名>`(类型分发)、`sys/related/<uuid>/<名>`(引用绑定) |
-| **Gāng(纲)** | 信息治序引擎(文档用 Gāng,代码用 Gang)。`[Todo]` |
-| **GangDef** | Gāng 的 DSL 定义(JSON)。`[Todo]` |
-| **Judgement** | 语义判断:LLM 按自然语言标准判断数据。`[Todo]` |
-| **Routine / Task** | Gāng 的纯函数与任务单位。`[Todo]` |
-| **Clerk** | 副作用执行终端:事务化写入、可配置写入策略。`[Todo]` |
-| **Blueprint** | 此处指虚幻引擎(Unreal Engine)的视觉化脚本系统,被用作"连线式可视化编程"的反例 |
+## 路线图
+
+v2 之后：200 万导入与压测、鉴权/token、多用户/协作、Cloudflare Access 验证、文件柜、富文本、database 高级视图、派生数据库、Gāng、Public Space、Electron。

@@ -1,6 +1,0 @@
-{
-  "database_url": "postgres://root:root@127.0.0.1:5432/root",
-  "http_api_port": 44998,
-  "storage_path": "./storage",
-  "filepool_path": "./storage/files"
-}
