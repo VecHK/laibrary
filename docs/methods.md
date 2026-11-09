@@ -1,7 +1,9 @@
 # TypeScript 编程方法论
 
 > 这不是一份配置清单，而是一套**看待代码的方式**。
-规则会过时，但背后的思想与方法论不会。下面每条都先讲"我们如何看待它"，再讲"因此怎么写"。
+> 规则会过时，但背后的思想与方法论不会。下面每条都先讲"我们如何看待它"，再讲"因此怎么写"。
+>
+> **关于示例**：下面出现的代码都是**示意**，用来讲清判据，不是模板。不要照抄其中的标识符、签名或辅助函数；与规则冲突时以规则为准。要学的是"为什么这样写"，不是"原样长这样"。
 
 ---
 
@@ -162,7 +164,7 @@ for (const x of items) {
 let finded = null
 for (const current of list) {
   if (current === target_num) {
-    finded = null
+    finded = current
     break
   }
 }
@@ -175,9 +177,10 @@ function findList(list: number[], target_num: number): null | number {
       return current
     }
   }
+  return null
 }
 const finded = findList([2,4,5], 4)
-if (finded !== null) console.log('we finded:', finded
+if (finded !== null) console.log('we finded:', finded)
 
 ```
 
@@ -301,21 +304,76 @@ function asUserId(raw: string): UserId {
 
 ---
 
-## 九、异步与错误：分层 catch，兜底统一，保留 cause
+## 九、异步与错误：catch 必须负责，兜底统一，保留 cause
 
-### 9.1 try-catch 要分层，不要层层嵌套
+### 9.1 错误到了这一层，只有三种选择
 
-**看法**：`try-catch` 是"接管错误"的信号。如果每层都套一个，错误会在多层被反复捕获、包装、丢弃，最终没人知道它最初从哪来。正确的做法是：**想清楚每一层的职责**——
+**看法**：catch 不是"我接住了"的证明，而是"我决定对这条错误负责"的声明。接住却不处理，比不接住更糟——错误被藏起来，调用方以为一切正常。
 
-- **只在该层"知道怎么恢复"时 catch**。不知道怎么办，就让它往上冒。
-- **不要层层 catch 再 rethrow 同样的错**，那只是噪音。
-- **每一层 catch 只处理它真正负责的错误**，其余原样上抛。
+**因此**，只有三种选择：
+
+1. **包装后继续抛**：加上本层独有的信息（路径、id、阶段），`throw new Error(msg, { cause: err })`；或者在体系边界翻译成领域错误。包装必须带来新信息，且每个 catch 块最多一次。
+2. **判别后在本层处理**：先确认"这是什么错误"，只对能处理的那一类做真实补救——重试、换源。处理不了的照旧抛。
+3. **交给调用方**：不 catch，让异常继续冒泡；或者在边界把它转成 `Result` 显式返回，逼调用方分支。
+
+**禁止第四种：无条件吞掉。** `catch { return null }`、`catch { return [] }`、空 catch 都是——它让"出事了"和"没有"变成同一个结果。
+
+**判据**：处理之后，失败是**被真正解决**了（重试成功、换到了可用的源），还是只是**被藏起来**了（调用方拿到一个和正常情况无法区分的值）？后者就是吞。
+
+```ts
+// ❌ 吞：缓存挂了，调用方以为只是没命中
+async function readCache(key: string): Promise<string | null> {
+  try {
+    return await cache.get(key)
+  } catch {
+    return null
+  }
+}
+
+// ✅ 处理：只对"暂时性失败"重试，其余包装后上抛
+async function fetchWithRetry(url: string, remain: number): Promise<Response> {
+  try {
+    return await fetch(url)
+  } catch (err: unknown) {
+    if (err instanceof TimeoutError && remain > 0) {
+      return await fetchWithRetry(url, remain - 1)
+    } else {
+      throw new Error(`fetch failed: ${url}`, { cause: err })
+    }
+  }
+}
+
+// ✅ 交给调用方：失败以 Result 显式返回，由调用方分支（定义见 9.4）
+async function readCache(key: string): Promise<Result<string | null, CacheError>> {
+  try {
+    return { ok: true, data: await cache.get(key) }
+  } catch (err: unknown) {
+    return { ok: false, error: new CacheError(`cache read failed: ${key}`, { cause: err }) }
+  }
+}
+```
+
+**要"判别"，错误就必须可判别。** 靠 `err.message.includes('timeout')` 判断类型，等于靠文案猜类型——文案一改，逻辑就错。领域错误要带稳定的 `code`（联合字面量），或使用专用类 + 类型守卫；`code` 是契约的一部分，改动等同破坏 API。判别时穷尽已知情况，未知的用 `else` 兜底并原样上抛。
+
+```ts
+type AppErrorCode = 'CONFIG_INVALID' | 'STORAGE_UNAVAILABLE' | 'NETWORK_TIMEOUT'
+
+class AppError extends Error {
+  readonly code: AppErrorCode
+
+  constructor(code: AppErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'AppError'
+    this.code = code
+  }
+}
+```
 
 ### 9.2 必须有兜底
 
 **看法**：即使各处都有处理，也总有漏网之鱼。程序必须有一个**最后一道防线**，统一处理未被捕获的错误，而不是让它们静默消失或炸穿进程。
 
-**因此**：顶层（进程/框架/入口）必须有一个统一的兜底机制——Node 的 `process.on('unhandledRejection')` / `uncaughtException`、浏览器的 `window.onerror` / `unhandledrejection`、框架的 error boundary / 中间件统一 error handler。兜底逻辑负责记录、上报、给出可读的最终状态。
+**因此**：顶层（进程/框架/入口）必须有一个统一的兜底机制——Node 的 `process.on('unhandledRejection')` / `uncaughtException`、浏览器的 `window.onerror` / `unhandledrejection`、框架的 error boundary / 中间件统一 error handler。兜底逻辑负责记录、上报、给出可读的最终状态。它是整条链上**唯一**记录"未被处理错误"的地方——中间层不要 log 完再抛；已经在本层处理掉的错误可以就地记一次，但同一件事只记一次。
 
 ### 9.3 传递错误必须保留 cause
 
@@ -352,13 +410,46 @@ try {
 
 **理由**：一条完整的 `cause` 链，从最外层错误能一路追到根因；丢掉的 `cause` 就是丢失的排查路径。
 
+**兜底处打完整链**，而不是只打 `message`：
+
+```ts
+function collectCauseChain(err: unknown): unknown[] {
+  if (err instanceof Error) {
+    return [err, ...collectCauseChain(err.cause)]
+  } else {
+    return []
+  }
+}
+
+// 入口：整条链上唯一的记录点
+try {
+  await start()
+} catch (err: unknown) {
+  console.error('fatal:', ...collectCauseChain(err))
+  process.exitCode = 1
+}
+```
+
+并发多错误用 `AggregateError`，每个子错误各自保留 cause。
+
 ### 9.4 其他异步与错误约定
 
 - **悬浮 Promise 是 bug**：不 `await` 就 `void` 或 `.catch()`。
 - **只抛 `Error` 子类**，不抛字符串/裸对象。
 - `catch` 到的按 `unknown` 处理，收窄后再用。
 - `catch` 里同样遵循树形 `if {} else {}`，不早返回。
-- 可预期的业务失败用 **Result 形态**（`{ ok, data }` / `{ ok: false, error }`），异常只留给意外。
+
+**Result 形态**：可预期的业务失败用 Result，异常只留给意外。
+
+```ts
+type Result<T, E = Error> =
+  | { readonly ok: true, readonly data: T }
+  | { readonly ok: false, readonly error: E }
+```
+
+- 校验不过、找不到、余额不足 → Result。
+- 不变量破坏、编程错误、依赖挂了 → throw。
+- 一个函数选定一种，内部不混用；throw ↔ Result 的转换只在边界做一次。
 
 ---
 
@@ -390,9 +481,11 @@ try {
 - [ ] **循环里还有 continue / break 吗？**
 - [ ] **命名对了吗？** 函数 camelCase；返回函数/方法集的工厂 PascalCase；数据变量 snake_case；跨作用域 `__var_name`；顶级导出 `__VAR_NAME__`。
 - [ ] **类型契约还在吗？** 无 `any`、无 `!`、导出有返回类型；该用品牌类型的地方（id 等）用了吗？
-- [ ] **错误分层了吗？** try-catch 没有层层嵌套；有顶层兜底；抛新错误时保留了 `cause`。
+- [ ] **catch 都负责了吗？** 要么包装并保留 `cause`，要么判别后真处理，要么根本没 catch；有没有 `catch { return null }` / `return []`？
+- [ ] **错误可判别吗？** 有没有靠 `message` 字符串猜类型？
+- [ ] **兜底在吗？** 顶层有统一兜底，且未处理的错误只在兜底记录一次。
 - [ ] **注释是否多余？** 能不能靠改名/拆函数让它消失？留下的注释是否都在解释"为什么"或"注意什么"？
 
 ---
 
-> 一句话总结这套方法论：**把代码当作一棵完整的树来写，用函数的组合而不是对象的状态来表达逻辑；让名字和类型把意图说清楚；让副作用集中在可数的几个点；让错误分层捕获、统一兜底、保留根因；让代码自己说话，只在必要处解释。**
+> 一句话总结这套方法论：**把代码当作一棵完整的树来写，用函数的组合而不是对象的状态来表达逻辑；让名字和类型把意图说清楚；让副作用集中在可数的几个点；让每个 catch 都对错误负责、统一兜底、保留根因；让代码自己说话，只在必要处解释。**
