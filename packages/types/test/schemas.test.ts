@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  zAddItemForm, zBlobID, zDatabaseAttributes, zPageAttributes, zUnityName,
+  zAddItemForm, zBlobID, zDatabaseAttributes, zImageAttributes, zPageAttributes, zUnityName,
   itemBuildRowValidator, itemCheckAttributes,
 } from '../src/schemas'
 import { zActionPayloads } from '../src/action-schemas'
@@ -60,6 +60,19 @@ describe('database', () => {
     }).success).toBe(false)
     expect(zPageAttributes.safeParse({ icon: '📄', value: 1 }).success).toBe(true)
     expect(zPageAttributes.safeParse({ icon: 1 }).success).toBe(false)
+  })
+
+  it('image 显示属性可选且限制宽度', () => {
+    expect(zImageAttributes.safeParse({ filename: 'a.png' }).success).toBe(true)
+    expect(zImageAttributes.safeParse({
+      filename: 'a.png',
+      display_width: 1440,
+      align: 'center',
+      caption: 'hello',
+    }).success).toBe(true)
+    expect(zImageAttributes.safeParse({ filename: 'a.png', display_width: 1441 }).success).toBe(false)
+    expect(zImageAttributes.safeParse({ filename: 'a.png', display_width: 79 }).success).toBe(false)
+    expect(zImageAttributes.safeParse({ filename: 'a.png', align: 'justify' }).success).toBe(false)
   })
 
   it('row validator 跳过 unity_name，允许缺字段和额外 key', () => {

@@ -21,6 +21,10 @@ type FocusRequest = {
 }
 
 type UploadKind = 'image' | 'file'
+type DropIndicator = {
+  id: ItemID
+  position: 'before' | 'after'
+}
 
 function sortChildren(items: Item[]): Item[] {
   return [...items].sort((a, b) => (
@@ -34,6 +38,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [active_block_id, setActiveBlockId] = useState<ItemID | null>(null)
   const [focus_request, setFocusRequest] = useState<FocusRequest | null>(null)
   const [picker, setPicker] = useState(false)
+  const [drop_indicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [link_placeholder, setLinkPlaceholder] = useState<Item | null>(null)
   const [title, scheduleTitle, saveTitle] = usePageTitle(item, ctx)
   const alive_ref = useRef(true)
@@ -250,27 +255,35 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
-  const handleDrop = (dragged_id: ItemID, target_id: ItemID) => {
-    const dragged = children_ref.current.find(child => child.id === dragged_id)
+  const handleDrop = (
+    dragged_id: ItemID,
+    target_id: ItemID,
+    position: 'before' | 'after',
+  ) => {
+    setDropIndicator(null)
+    const source = children_ref.current.find(child => child.id === dragged_id)
     const target = children_ref.current.find(child => child.id === target_id)
-    if (dragged !== undefined && target !== undefined) {
-      syncChildren(children_ref.current.map(child => {
-        if (child.id === dragged.id) {
-          return { ...child, order_index: target.order_index }
-        } else if (child.id === target.id) {
-          return { ...child, order_index: dragged.order_index }
-        } else {
-          return child
-        }
-      }))
-
-      Promise.all([
-        ctx.api.rpc.updateItem({ id: dragged.id, data: { order_index: target.order_index } }),
-        ctx.api.rpc.updateItem({ id: target.id, data: { order_index: dragged.order_index } }),
-      ]).catch(err => {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-        void loadChildren()
-      })
+    if (source !== undefined && target !== undefined) {
+      const without = children_ref.current.filter(child => child.id !== source.id)
+      const target_index = without.findIndex(child => child.id === target.id)
+      if (target_index >= 0) {
+        const insert_index = target_index + (position === 'after' ? 1 : 0)
+        const before = without[insert_index - 1]
+        const after = without[insert_index]
+        const order_index = before === undefined
+          ? (after === undefined ? appendOrder() : after.order_index - 1)
+          : (after === undefined ? before.order_index + 1 : orderAfter(before.order_index, after.order_index))
+        const next = [...without]
+        next.splice(insert_index, 0, { ...source, order_index })
+        syncChildren(next)
+        ctx.api.rpc.updateItem({
+          id: source.id,
+          data: { order_index },
+        }).catch(err => {
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
+        })
+      }
     }
   }
 
@@ -484,6 +497,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               can_move_up={index > 0}
               can_move_down={index < children.length - 1}
               onDropBlock={handleDrop}
+              onDragOverBlock={position => setDropIndicator({ id: child.id, position })}
+              onDragLeaveBlock={() => {
+                setDropIndicator(current => current?.id === child.id ? null : current)
+              }}
+              onDragEndBlock={() => setDropIndicator(null)}
+              drop_position={drop_indicator?.id === child.id ? drop_indicator.position : null}
+              drag_anywhere={child.role === 'image'}
               onDuplicate={() => { void duplicateBlock(child) }}
               onMove={direction => moveBlock(child, direction)}
               onDelete={() => { void deleteBlock(child.id) }}

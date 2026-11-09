@@ -51,7 +51,11 @@ export const zFileAttributes = z.object({
   filename: z.string().min(1).max(512),
 }).strict()
 
-export const zImageAttributes = zFileAttributes
+export const zImageAttributes = zFileAttributes.extend({
+  display_width: z.number().int().min(80).max(1440).optional(),
+  align: z.enum(['left', 'center', 'right']).optional(),
+  caption: z.string().max(2000).optional(),
+})
 
 export const zIcon = z.string().trim().min(1).max(16)
 

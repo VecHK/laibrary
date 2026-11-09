@@ -11,6 +11,11 @@ export function PageBlock({
   can_move_up,
   can_move_down,
   onDropBlock,
+  onDragOverBlock,
+  onDragLeaveBlock,
+  onDragEndBlock,
+  drop_position,
+  drag_anywhere,
   onDuplicate,
   onMove,
   onDelete,
@@ -22,7 +27,12 @@ export function PageBlock({
   can_delete: boolean
   can_move_up: boolean
   can_move_down: boolean
-  onDropBlock: (dragged_id: ItemID, target_id: ItemID) => void
+  onDropBlock: (dragged_id: ItemID, target_id: ItemID, position: 'before' | 'after') => void
+  onDragOverBlock: (position: 'before' | 'after') => void
+  onDragLeaveBlock: () => void
+  onDragEndBlock: () => void
+  drop_position: 'before' | 'after' | null
+  drag_anywhere: boolean
   onDuplicate: () => void
   onMove: (direction: 'up' | 'down') => void
   onDelete: () => void
@@ -33,16 +43,55 @@ export function PageBlock({
 
   return (
     <div
-      className={menu_open ? 'page-block menu-open' : 'page-block'}
+      className={[
+        'page-block',
+        menu_open ? 'menu-open' : '',
+        drop_position === 'before' ? 'drop-before' : '',
+        drop_position === 'after' ? 'drop-after' : '',
+      ].filter(part => part.length !== 0).join(' ')}
+      draggable={drag_anywhere}
+      onDragStart={ev => {
+        if (drag_anywhere) {
+          const target = ev.target
+          if (target instanceof Element && target.closest('.block-drag-handle') !== null) {
+            // 六点把手有自己的 dragstart。
+          } else if (target instanceof Element && target.closest('button, input, textarea, a, .image-resizer, .image-toolbar, .block-caption, .image-caption-wrap') !== null) {
+            ev.preventDefault()
+          } else {
+            drag_started_ref.current = true
+            ev.dataTransfer.setData('text/laibrary-block', String(item.id))
+            ev.dataTransfer.effectAllowed = 'move'
+          }
+        }
+      }}
       onDragOver={ev => {
         ev.preventDefault()
         ev.dataTransfer.dropEffect = 'move'
+        const rect = ev.currentTarget.getBoundingClientRect()
+        onDragOverBlock(ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+      }}
+      onDragLeave={ev => {
+        if (ev.relatedTarget instanceof Node && ev.currentTarget.contains(ev.relatedTarget)) {
+          // 只是在 block 内部移动，不清除指示器。
+        } else {
+          onDragLeaveBlock()
+        }
+      }}
+      onDragEnd={() => {
+        window.setTimeout(() => {
+          drag_started_ref.current = false
+        }, 0)
+        onDragEndBlock()
       }}
       onDrop={ev => {
         ev.preventDefault()
         const dragged = zItemID.safeParse(Number(ev.dataTransfer.getData('text/laibrary-block')))
+        const rect = ev.currentTarget.getBoundingClientRect()
+        const position = ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
         if (dragged.success && dragged.data !== item.id) {
-          onDropBlock(dragged.data, item.id)
+          onDropBlock(dragged.data, item.id, position)
+        } else {
+          onDragEndBlock()
         }
       }}
     >
@@ -72,6 +121,7 @@ export function PageBlock({
             window.setTimeout(() => {
               drag_started_ref.current = false
             }, 0)
+            onDragEndBlock()
           }}
           onClick={ev => {
             ev.stopPropagation()

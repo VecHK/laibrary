@@ -35,7 +35,13 @@ export interface FileAttributes {
   readonly filename: string
 }
 
-export type ImageAttributes = FileAttributes
+export type ImageAlignment = 'left' | 'center' | 'right'
+
+export interface ImageAttributes extends FileAttributes {
+  readonly display_width?: number | undefined
+  readonly align?: ImageAlignment | undefined
+  readonly caption?: string | undefined
+}
 
 export type DatabaseFieldType = 'string' | 'number' | 'unity_name'
 

@@ -105,6 +105,8 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 - 连接页设置 API baseurl（localStorage）。
 - page block 编辑器：textline / image / file / itemlink / entity；无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行；hover gutter + block 菜单；文本编辑不触发整页刷新。
 - 页面视觉：正文 `708px` 居中、标题 40px；无每行白框、无常驻删除按钮；左侧 hover 显示 `＋` 和拖拽把手。
+- 图片 block：左右拖拽等比缩放（宽度 80–1440px）、Alignment/Caption/Expand/Download 浮层、双击/Expand 打开 lightbox；放大预加载更高缩略图，缩小不请求更小图。
+- 拖拽 block 显示 before/after 插入线；图片任意位置可作为拖拽源。
 - 侧边栏：page/database/itemlink 树；只有 page 可展开，database/itemlink 为叶子；节点 hover 提供 `+` 和 page/database 的 `···`。
 - 侧边栏菜单：Copy link、Rename、Move to、Remove、Open in new tab、Open in side peek；菜单显示 Last edited / Created Date。
 - `+`：page 新建子页面，database 新建条目，itemlink 仅在 target 为 page 时新建子页面。
@@ -140,7 +142,7 @@ docs             规格、愿景、名词表、方法论、重构记录
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
 - Server 使用闭包工厂（BlobStore/BlobService/ConfigStore/ThumbnailService）与组合根；Web 使用显式 session/tag store/module registry，无 RPC/标签模块单例。
 - 漫画阅读器；局域网可运行。
-- 测试：server 38、types 17、web 27；lint/typecheck/build 通过。
+- 测试：server 38、types 18、web 30；lint/typecheck/build 通过。
 
 待做：
 
