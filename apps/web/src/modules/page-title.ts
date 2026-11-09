@@ -18,7 +18,7 @@ export function usePageTitle(item: Item, ctx: ViewerCtx) {
       timer_ref.current = null
     }
     ctx.api.rpc.updateItem({ id: item.id, data: { title: value_ref.current } })
-      .then(() => ctx.refresh())
+      .then(() => ctx.refreshSidebar())
       .catch(error => ctx.showError(error instanceof Error ? error.message : String(error)))
   }
 
@@ -27,6 +27,7 @@ export function usePageTitle(item: Item, ctx: ViewerCtx) {
       clearTimeout(timer_ref.current)
       timer_ref.current = null
       ctx.api.rpc.updateItem({ id: item.id, data: { title: value_ref.current } })
+        .then(() => ctx.refreshSidebar())
         .catch(error => { console.warn('page title save on unmount', error) })
     }
   }, [item.id])
@@ -40,6 +41,7 @@ export function usePageTitle(item: Item, ctx: ViewerCtx) {
     timer_ref.current = setTimeout(() => {
       timer_ref.current = null
       ctx.api.rpc.updateItem({ id: item.id, data: { title: value_ref.current } })
+        .then(() => ctx.refreshSidebar())
         .catch(error => ctx.showError(error instanceof Error ? error.message : String(error)))
     }, 400)
   }

@@ -3,6 +3,7 @@ import type { DatabaseFieldDef, Item, ItemID } from '@laibrary/types'
 import { zAnyAttributes, zDatabaseAttributes } from '@laibrary/types'
 import { orderCycleSortState, type FieldSortState } from '../lib/order'
 import type { ItemModule, ViewerCtx } from './types'
+import { ItemIcon, ItemIconButton } from './item-icon'
 
 function schemaOf(item: Item): readonly DatabaseFieldDef[] {
   const parsed = zDatabaseAttributes.safeParse(item.attributes)
@@ -13,7 +14,7 @@ function DatabaseCard({ item }: { item: Item }) {
   const fields = schemaOf(item)
   return (
     <div className="card database-card">
-      <div className="card-icon">🗄️</div>
+      <div className="card-icon"><ItemIcon item={item} /></div>
       <div className="card-title">{item.title || '(数据库)'}</div>
       <div className="card-sub">{fields.length} 个字段</div>
     </div>
@@ -78,7 +79,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const new_fields = [...fields, { name: name.trim(), type }]
     ctx.api.rpc.updateItem({
       id: item.id,
-      data: { attributes: { schema: new_fields } },
+      data: { attributes: zDatabaseAttributes.parse({ ...item.attributes, schema: new_fields }) },
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
@@ -88,7 +89,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const new_fields = fields.filter(f => f.name !== field_name)
     ctx.api.rpc.updateItem({
       id: item.id,
-      data: { attributes: { schema: new_fields } },
+      data: { attributes: zDatabaseAttributes.parse({ ...item.attributes, schema: new_fields }) },
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
@@ -140,6 +141,10 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   return (
     <div className="database-full">
+      <div className="database-header">
+        <ItemIconButton item={item} ctx={ctx} />
+        <div className="database-title">{item.title || '(数据库)'}</div>
+      </div>
       <div className="page-toolbar">
         <button className="button" onClick={addRow}>+ 行</button>
         <button className="button" onClick={addField}>+ 字段</button>

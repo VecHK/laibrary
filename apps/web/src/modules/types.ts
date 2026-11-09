@@ -19,7 +19,9 @@ export interface ViewerCtx {
   readonly modules: ItemModuleRegistry
   readonly navigate: (target: ItemID | HashRoute) => void
   readonly refresh: () => void
+  readonly refreshSidebar: () => void
   readonly showError: (message: string) => void
+  readonly showNotice: (message: string) => void
 }
 
 export interface ItemModule {

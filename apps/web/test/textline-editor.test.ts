@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  detectSlashQuery, filterSlashCommands, mergeTextLine, splitTextLine,
+  detectSlashQuery, filterSlashCommands, groupSlashCommands, mergeTextLine, splitTextLine,
 } from '../src/lib/textline-editor'
 
 describe('slash query', () => {
@@ -24,6 +24,14 @@ describe('slash query', () => {
     expect(filterSlashCommands('item').map(command => command.id)).toEqual(['itemlink'])
     expect(filterSlashCommands('manga').map(command => command.id)).toEqual(['manga'])
     expect(filterSlashCommands('不存在')).toEqual([])
+  })
+
+  it('groups commands for the Notion-style menu', () => {
+    const groups = groupSlashCommands(filterSlashCommands(''))
+    expect(groups.map(group => group.id)).toEqual(['suggested', 'basic'])
+    expect(groups[0]?.commands.map(command => command.id)).toEqual(['image', 'file', 'itemlink'])
+    expect(groups[1]?.commands.map(command => command.id)).toEqual(['text', 'manga'])
+    expect(groupSlashCommands([])).toEqual([])
   })
 })
 

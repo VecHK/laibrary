@@ -25,6 +25,7 @@ export default function App() {
   const [route, navigate] = useHashRoute()
   const [session, setSession] = useState<Session | null>(null)
   const [refresh_key, setRefreshKey] = useState(0)
+  const [sidebar_key, setSidebarKey] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const toast_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -47,8 +48,15 @@ export default function App() {
     }, 4000)
   }, [])
 
+  const showNotice = showError
+
+  const refreshSidebar = useCallback(() => {
+    setSidebarKey(current => current + 1)
+  }, [])
+
   const refresh = useCallback(() => {
     setRefreshKey(current => current + 1)
+    setSidebarKey(current => current + 1)
   }, [])
 
   const navigateTarget = useCallback((target: ItemID | HashRoute) => {
@@ -95,7 +103,9 @@ export default function App() {
         modules: session.modules,
         navigate: navigateTarget,
         refresh,
+        refreshSidebar,
         showError,
+        showNotice,
       }
 
   return (
@@ -107,6 +117,7 @@ export default function App() {
           route={route}
           ctx={ctx}
           refresh_key={refresh_key}
+          sidebar_key={sidebar_key}
         />
       )}
       {toast !== null && <div className="toast">{toast}</div>}

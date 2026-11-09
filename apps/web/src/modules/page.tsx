@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
 import { createFileItem, createImageItem } from '../lib/blob'
 import { orderAfter } from '../lib/order'
+import { blockCanDelete, blockCanDuplicate } from '../lib/page-blocks'
 import { mergeTextLine, type SlashCommand } from '../lib/textline-editor'
 import type { ItemModule, ViewerCtx } from './types'
 import { PageBlock } from './page-block'
-import { PageCard } from './page-card'
+import { PageBlockLink, PageCard } from './page-card'
 import { usePageTitle } from './page-title'
 import { ItemPicker } from './item-picker'
+import { ItemIconButton } from './item-icon'
 import {
   TextLineBlock,
   type TextLineFocusRequest,
@@ -52,8 +54,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const insertChild = (child: Item) => {
-    if (children_ref.current.some(existing => existing.id === child.id)) {return}
-    syncChildren([...children_ref.current, child])
+    if (children_ref.current.some(existing => existing.id === child.id)) {
+      // 已存在，不重复插入。
+    } else {
+      syncChildren([...children_ref.current, child])
+    }
   }
 
   const removeChild = (id: ItemID) => {
@@ -198,6 +203,53 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const duplicateBlock = async (source: Item) => {
+    const order_index = orderAfterItem(source)
+    try {
+      const created = await ctx.api.rpc.addItem({
+        role: source.role,
+        title: source.title,
+        parent_id: item.id,
+        order_index,
+        attributes: source.attributes,
+        tags: source.tags,
+        ...(source.kind === null ? {} : { kind: source.kind }),
+        ...(source.blob === null ? {} : { blob_id: source.blob.id }),
+        ...(source.target_id === null ? {} : { target_id: source.target_id }),
+      })
+      insertChild(created)
+    } catch (err) {
+      ctx.showError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const moveBlock = (source: Item, direction: 'up' | 'down') => {
+    const index = children_ref.current.findIndex(child => child.id === source.id)
+    const target_index = direction === 'up' ? index - 1 : index + 1
+    const target = children_ref.current[target_index]
+    if (index < 0 || target === undefined) {
+      // 已经在边界，菜单项应当禁用；这里只是防御。
+    } else {
+      const next = children_ref.current.map((child, child_index) => {
+        if (child_index === index) {
+          return { ...child, order_index: target.order_index }
+        } else if (child_index === target_index) {
+          return { ...child, order_index: source.order_index }
+        } else {
+          return child
+        }
+      })
+      syncChildren(next)
+      Promise.all([
+        ctx.api.rpc.updateItem({ id: source.id, data: { order_index: target.order_index } }),
+        ctx.api.rpc.updateItem({ id: target.id, data: { order_index: source.order_index } }),
+      ]).catch(err => {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+        void loadChildren()
+      })
+    }
+  }
+
   const handleDrop = (dragged_id: ItemID, target_id: ItemID) => {
     const dragged = children_ref.current.find(child => child.id === dragged_id)
     const target = children_ref.current.find(child => child.id === target_id)
@@ -318,14 +370,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handleSlashCommand = (command: SlashCommand, placeholder: Item) => {
     if (command.id === 'image' || command.id === 'file') {
       openUpload(command.id, placeholder)
-      return
-    }
-    if (command.id === 'itemlink') {
+    } else if (command.id === 'itemlink') {
       setLinkPlaceholder(placeholder)
       setPicker(true)
-      return
-    }
-    if (command.id === 'manga') {
+    } else if (command.id === 'manga') {
       void insertManga(placeholder)
     }
   }
@@ -359,51 +407,43 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   return (
     <div className="page-full">
-      <input
-        className="page-title-input"
-        value={title}
-        placeholder="无标题"
-        onChange={ev => scheduleTitle(ev.target.value)}
-        onBlur={saveTitle}
-        onKeyDown={ev => {
-          if (ev.key === 'Enter') {ev.currentTarget.blur()}
-        }}
-      />
-
-      <div className="page-toolbar">
-        <button className="button" onClick={createTextlineAtEnd}>+ 文本行</button>
-        <button className="button" onClick={() => openUpload('image', null)}>+ 图片</button>
-        <button className="button" onClick={() => openUpload('file', null)}>+ 附件</button>
-        <button className="button" onClick={() => {
-          setLinkPlaceholder(null)
-          setPicker(true)
-        }}>+ 链接</button>
-        <button className="button" onClick={() => { void insertManga(null) }}>+ 漫画</button>
-        <span className="page-toolbar-hint">输入 / 快速插入</span>
+      <div className="page-header">
+        <ItemIconButton item={item} ctx={ctx} />
         <input
-          ref={image_input_ref}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={ev => {
-            const files = [...(ev.target.files ?? [])]
-            ev.target.value = ''
-            handleUploadChange('image', files)
-          }}
-        />
-        <input
-          ref={file_input_ref}
-          type="file"
-          multiple
-          hidden
-          onChange={ev => {
-            const files = [...(ev.target.files ?? [])]
-            ev.target.value = ''
-            handleUploadChange('file', files)
+          className="page-title-input"
+          value={title}
+          placeholder="无标题"
+          onChange={ev => scheduleTitle(ev.target.value)}
+          onBlur={saveTitle}
+          onKeyDown={ev => {
+            if (ev.key === 'Enter') {ev.currentTarget.blur()}
           }}
         />
       </div>
+
+      <input
+        ref={image_input_ref}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={ev => {
+          const files = [...(ev.target.files ?? [])]
+          ev.target.value = ''
+          handleUploadChange('image', files)
+        }}
+      />
+      <input
+        ref={file_input_ref}
+        type="file"
+        multiple
+        hidden
+        onChange={ev => {
+          const files = [...(ev.target.files ?? [])]
+          ev.target.value = ''
+          handleUploadChange('file', files)
+        }}
+      />
 
       <div className="children-list">
         {children === null ? (
@@ -413,7 +453,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             <span>点击开始输入</span>
             <small>按 / 插入 block</small>
           </button>
-        ) : children.map(child => {
+        ) : children.map((child, index) => {
           const module = ctx.modules.resolve(child)
           const content = child.role === 'textline' ? (
             <TextLineBlock
@@ -439,15 +479,19 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               key={child.id}
               item={child}
               content={content}
+              can_duplicate={blockCanDuplicate(child)}
+              can_delete={blockCanDelete(child)}
+              can_move_up={index > 0}
+              can_move_down={index < children.length - 1}
               onDropBlock={handleDrop}
+              onDuplicate={() => { void duplicateBlock(child) }}
+              onMove={direction => moveBlock(child, direction)}
               onDelete={() => { void deleteBlock(child.id) }}
               onAddAfter={() => addAfter(child)}
             />
           )
         })}
       </div>
-
-      <div className="page-footer">输入 / 插入 block · Enter 新行 · Shift+Enter 软换行</div>
 
       {picker && (
         <ItemPicker
@@ -473,4 +517,5 @@ export const __PAGE_MODULE__: ItemModule = {
     card: item => <PageCard item={item} />,
     full: (item, ctx) => <PageFull item={item} ctx={ctx} />,
   },
+  Block: (item, ctx) => <PageBlockLink item={item} ctx={ctx} />,
 }

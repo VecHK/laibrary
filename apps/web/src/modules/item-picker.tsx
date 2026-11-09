@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Item } from '@laibrary/types'
+import type { FilterRule, Item, Role } from '@laibrary/types'
 import type { ViewerCtx } from './types'
 
 export function ItemPicker({
@@ -7,11 +7,19 @@ export function ItemPicker({
   onClose,
   exclude_ids,
   ctx,
+  title = '选择要链接的 Item',
+  roles,
+  allow_root = false,
+  onSelectRoot,
 }: {
   onSelect: (item: Item) => void
   onClose: () => void
   exclude_ids?: readonly Item['id'][]
   ctx: ViewerCtx
+  title?: string
+  roles?: readonly Role[]
+  allow_root?: boolean
+  onSelectRoot?: () => void
 }) {
   const [items, setItems] = useState<Item[]>([])
   const [query, setQuery] = useState('')
@@ -19,13 +27,18 @@ export function ItemPicker({
 
   const load = (text: string) => {
     setLoading(true)
+    const filter_rules: FilterRule[] = []
+    if (text.trim().length !== 0) {
+      filter_rules.push({ name: 'title', input: text.trim(), logic: 'and' })
+    }
+    if (roles !== undefined) {
+      filter_rules.push({ name: 'role', input: [...roles], logic: 'and' })
+    }
     ctx.api.rpc.listing({
       limit: 50,
       sort_by: 'update_date',
       desc: true,
-      filter_rules: text.trim().length === 0
-        ? []
-        : [{ name: 'title', input: text.trim(), logic: 'and' }],
+      filter_rules,
     }).then(setItems).catch(error => {
       ctx.showError(error instanceof Error ? error.message : String(error))
     }).finally(() => setLoading(false))
@@ -48,7 +61,7 @@ export function ItemPicker({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={ev => ev.stopPropagation()}>
-        <div className="modal-title">选择要链接的 Item</div>
+        <div className="modal-title">{title}</div>
         <input
           className="big-input"
           autoFocus
@@ -60,6 +73,18 @@ export function ItemPicker({
           }}
         />
         <div className="picker-list">
+          {allow_root && (
+            <button
+              className="picker-row picker-root"
+              onClick={() => {
+                onSelectRoot?.()
+                onClose()
+              }}
+            >
+              <span className="picker-role">root</span>
+              <span className="picker-title">根目录</span>
+            </button>
+          )}
           {loading && <div className="loading">加载中…</div>}
           {!loading && visible_items.length === 0 && <div className="empty-hint">没有结果</div>}
           {visible_items.map(item => (

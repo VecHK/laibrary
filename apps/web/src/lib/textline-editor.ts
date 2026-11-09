@@ -1,10 +1,11 @@
 export type SlashCommandId = 'text' | 'image' | 'file' | 'itemlink' | 'manga'
+export type SlashGroupId = 'suggested' | 'basic'
 
 export type SlashCommand = {
   id: SlashCommandId
   label: string
   description: string
-  icon: string
+  group: SlashGroupId
   role: string
   aliases: string[]
 }
@@ -14,7 +15,7 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     id: 'text',
     label: '文本',
     description: '普通文本块',
-    icon: 'T',
+    group: 'basic',
     role: 'textline',
     aliases: ['text', 'wenben', 'textline'],
   },
@@ -22,7 +23,7 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     id: 'image',
     label: '图片',
     description: '上传并插入图片',
-    icon: '🖼️',
+    group: 'suggested',
     role: 'image',
     aliases: ['image', 'tupian', 'img'],
   },
@@ -30,7 +31,7 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     id: 'file',
     label: '附件',
     description: '上传并插入文件',
-    icon: '📎',
+    group: 'suggested',
     role: 'file',
     aliases: ['file', 'fujian', 'attachment'],
   },
@@ -38,7 +39,7 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     id: 'itemlink',
     label: '链接',
     description: '链接到已有 Item',
-    icon: '🔗',
+    group: 'suggested',
     role: 'itemlink',
     aliases: ['link', 'lianjie', 'itemlink'],
   },
@@ -46,7 +47,7 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     id: 'manga',
     label: '漫画',
     description: '插入一个漫画内容块',
-    icon: '📖',
+    group: 'basic',
     role: 'entity · manga',
     aliases: ['manga', 'manhua', 'comic'],
   },
@@ -64,6 +65,24 @@ export function detectSlashQuery(value: string, selectionStart: number): string 
       return query
     }
   }
+}
+
+export type SlashCommandGroup = {
+  readonly id: SlashGroupId
+  readonly label: string
+  readonly commands: readonly SlashCommand[]
+}
+
+const __SLASH_GROUPS__: readonly { id: SlashGroupId, label: string }[] = [
+  { id: 'suggested', label: '建议' },
+  { id: 'basic', label: '基础块' },
+]
+
+export function groupSlashCommands(commands: readonly SlashCommand[]): readonly SlashCommandGroup[] {
+  return __SLASH_GROUPS__.map(group => ({
+    ...group,
+    commands: commands.filter(command => command.group === group.id),
+  })).filter(group => group.commands.length !== 0)
 }
 
 export function filterSlashCommands(query: string): readonly SlashCommand[] {

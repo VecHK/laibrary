@@ -213,13 +213,11 @@ function TextLineEditor({
 
   const inactive_view = (
     <div
-      className="textline-block"
+      className={value.length === 0 ? 'textline-block is-empty' : 'textline-block'}
       onClick={onActivate}
     >
       <div className="textline-view">
-        {value.length === 0
-          ? <span className="textline-placeholder">输入 / 插入内容</span>
-          : <InlineText text={value} ctx={ctx} />}
+        {value.length === 0 ? null : <InlineText text={value} ctx={ctx} />}
       </div>
     </div>
   )
@@ -230,7 +228,7 @@ function TextLineEditor({
         ref={textarea_ref}
         className="textline-textarea"
         value={value}
-        placeholder="输入 / 插入内容"
+        placeholder="按 / 插入内容"
         rows={1}
         spellCheck={false}
         onChange={ev => {

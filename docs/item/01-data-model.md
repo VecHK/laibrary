@@ -40,14 +40,16 @@ CREATE TABLE items (
 
 | role | kind | attributes | 备注 |
 |---|---|---|---|
-| page | NULL | 自由 record | 页面/block 容器 |
+| page | NULL | 自由 record，可含 `icon` | 页面/block 容器 |
 | entity | **非空** | 自由 record | 插件/复合内容 |
 | textline | NULL | 自由 record（预留） | title 是内容 |
 | image | NULL | `{ filename }` | blob 必须是图片 |
 | file | NULL | `{ filename }` | 任意 blob |
-| itemlink | NULL | 自由 record | target_id |
+| itemlink | NULL | 自由 record，可含 `icon` | target_id |
 | tag | NULL | 自由 record | title 唯一 |
-| database | NULL | `{ schema: FieldDef[] }` | 行 = 子项 |
+| database | NULL | `{ schema: FieldDef[], icon? }` | 行 = 子项 |
+
+- emoji 展示图标存 `attributes.icon`，不新增 `items.icon` 列；它是 presentation metadata，不索引、不参与搜索。
 
 **kind 只属于 entity。** `page` 永远没有 kind。漫画 = `entity kind=manga` + image children；不是 role。
 

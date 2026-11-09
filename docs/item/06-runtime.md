@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 38、types 16、web 17。
+- 当前：server 38、types 17、web 27。
 
 ## 7. Web
 
@@ -103,7 +103,10 @@ npm run web   # Vite 5173
 
 - 连接页保存 API baseurl 到 localStorage。
 - hash 路由：`#/plaza`、`#/item/:id`、`#/settings`。
-- page block 编辑器：`/` 插入菜单、Enter 拆行、Shift+Enter 软换行、inline itemlink；文本编辑本地更新，不整页刷新；entity/manga、设置页。
+- page block 编辑器：无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行、inline itemlink；hover gutter + block 菜单；文本编辑本地更新，不整页刷新；entity/manga、设置页。
+- 侧边栏：page/database/itemlink 树；page 才可展开，database/itemlink 不展开。节点 hover 显示 `+`（page/database，以及 target=page 的 itemlink）和 page/database 的 `···` 菜单。
+- 侧边栏菜单：Copy link、Rename、Move to、Remove、Open in new tab、Open in side peek；显示 Last edited / Created Date。Trash 未实现，非空容器暂不允许 Remove。
+- 页面/数据库/ Itemlink 的 emoji 图标存 `attributes.icon`；缺省回退 📄/🗄️/🔗。
 - 构建：`npm run build -w @laibrary/web`。
 
 ## 8. 部署（当前）

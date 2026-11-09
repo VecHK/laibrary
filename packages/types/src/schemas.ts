@@ -53,6 +53,8 @@ export const zFileAttributes = z.object({
 
 export const zImageAttributes = zFileAttributes
 
+export const zIcon = z.string().trim().min(1).max(16)
+
 export const zDatabaseFieldType = z.enum(['string', 'number', 'unity_name'])
 
 export const zDatabaseFieldDef = z.object({
@@ -61,6 +63,7 @@ export const zDatabaseFieldDef = z.object({
 }).strict()
 
 export const zDatabaseAttributes = z.object({
+  icon: zIcon.optional(),
   schema: z.array(zDatabaseFieldDef).superRefine((fields, ctx) => {
     const seen = new Set<string>()
     let unity_fields = 0
@@ -90,13 +93,24 @@ export const zAnyAttributes: z.ZodType<Record<string, unknown>> = z.record(
   z.unknown(),
 )
 
+export const zPageAttributes = zAnyAttributes.superRefine((attributes, ctx) => {
+  const icon = attributes['icon']
+  if (icon !== undefined && !zIcon.safeParse(icon).success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'icon 必须是 1-16 字符的 emoji 文本',
+      path: ['icon'],
+    })
+  }
+})
+
 export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]>> = {
-  page: zAnyAttributes,
+  page: zPageAttributes,
   entity: zAnyAttributes,
   textline: zAnyAttributes,
   image: zImageAttributes,
   file: zFileAttributes,
-  itemlink: zAnyAttributes,
+  itemlink: zPageAttributes,
   tag: zAnyAttributes,
   database: zDatabaseAttributes,
 }

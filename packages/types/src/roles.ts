@@ -46,15 +46,24 @@ export interface DatabaseFieldDef {
 
 export interface DatabaseAttributes {
   readonly schema: readonly DatabaseFieldDef[]
+  readonly icon?: string | undefined
+}
+
+export interface PageAttributes extends Readonly<Record<string, unknown>> {
+  readonly icon?: string | undefined
+}
+
+export interface ItemLinkAttributes extends Readonly<Record<string, unknown>> {
+  readonly icon?: string | undefined
 }
 
 export interface RoleAttributes {
-  page: Readonly<Record<string, unknown>>
+  page: PageAttributes
   entity: Readonly<Record<string, unknown>>
   textline: Readonly<Record<string, unknown>>
   image: ImageAttributes
   file: FileAttributes
-  itemlink: Readonly<Record<string, unknown>>
+  itemlink: ItemLinkAttributes
   tag: Readonly<Record<string, unknown>>
   database: DatabaseAttributes
 }

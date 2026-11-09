@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Item } from '@laibrary/types'
 import { openItemById } from '../lib/open-item'
 import type { ItemModule, ViewerCtx } from './types'
+import { ItemIconButton } from './item-icon'
 
 function useTarget(item: Item, ctx: ViewerCtx) {
   const [target, setTarget] = useState<Item | null>(null)
@@ -73,7 +74,10 @@ function ItemLinkFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const target_id = item.target_id
   return (
     <div className="panel">
-      <div className="panel-title">链接</div>
+      <div className="itemlink-header">
+        <ItemIconButton item={item} ctx={ctx} />
+        <div className="panel-title">链接</div>
+      </div>
       <p className="empty-hint">{targetLabel(item, target, missing)}</p>
       {target_id !== null && (
         <button className="button" onClick={() => openItemById(target_id, ctx)}>

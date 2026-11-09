@@ -147,7 +147,9 @@ function ItemContent({
     <div className="item-view">
       <div className="breadcrumb">
         <button className="link-button" onClick={back}>⬅ 返回</button>
-        <span className="breadcrumb-role">{item.role}{item.kind ? ` · ${item.kind}` : ''}</span>
+        {item.role !== 'page' && (
+          <span className="breadcrumb-role">{item.role}{item.kind ? ` · ${item.kind}` : ''}</span>
+        )}
       </div>
       <div className="item-content">
         {module.Presenter.full(item, ctx)}
