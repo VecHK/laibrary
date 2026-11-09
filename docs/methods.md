@@ -438,7 +438,7 @@ export const __GALLERY_MAX_PHOTOS__ = 30   // 导出的数据值（带模块名�
 | 类型/接口 | 类型层 | PascalCase | `UserId` |
 | 品牌符号 | 类型层 | PascalCase | `UserIdBrand` |
 | 通用工具函数 | 无领域类型或全泛型、在 `utils/` | 描述性，可用类型后缀 | `findList`、`target_num` |
-| 闭包内被写入的状态 | 所有者 | `__name` | `__count` |
+| 闭包内被写入的状态 | 所有者 | `__name` | `__count`、`__loaded_data` |
 | 只读捕获/局部数据 | 值 | snake_case | `base_url` |
 | 布尔 | 判断 | `is` / `has` / `can` / `should` | `is_voted`、`has_children` |
 | 内部哨兵 | 不导出 | `NONE` | `const NONE = Symbol('NONE')` |
@@ -452,7 +452,7 @@ export const __GALLERY_MAX_PHOTOS__ = 30   // 导出的数据值（带模块名�
 - `parseX` 的输出保证能通过 `checkX`；单元测试用 `expect(() => checkX(parseX(raw))).not.toThrow()` 之类固定这个契约。
 - `asX`：不校验的断言，只允许在测试/fixture/已校验的边界内。
 - `toX`：域内转换，输入已经是领域类型；纯函数、总函数，不做校验、不接收 `unknown`（可选）。
-- 名字必须诚实：转换的叫 `parse`，多项校验的叫 `check`，布尔判断的叫 `is` / `isNot`，不校验的断言叫 `as`。
+- 名字必须诚实：转换的叫 `parse`，会抛出错误的校验的叫 `check`，布尔判断的叫 `is` / `isNot`，不校验的断言叫 `as`。
 
 `checkX` 里用 `isX` / `isNotX` 把失败原因收集起来，最后抛一次；不要在每个单项检查里各抛一次。
 
