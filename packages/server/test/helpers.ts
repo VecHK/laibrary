@@ -3,10 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { sql } from 'drizzle-orm'
-import { createDb, databaseNameOf, ensureDatabaseExists, type DB } from '../src/db/client'
-import { BlobService } from '../src/blob/service'
-import { BlobStore } from '../src/blob/store'
-import { ConfigService } from '../src/config/runtime'
+import { CreateDb, dbClose, dbNameOf, dbEnsureExists, type DB } from '../src/db/client'
+import { CreateBlobService, type BlobService } from '../src/blob/service'
+import { CreateBlobStore, type BlobStore } from '../src/blob/store'
+import { CreateConfigStore, type ConfigStore } from '../src/config/store'
 
 export const TEST_DATABASE_URL = (
   process.env.TEST_DATABASE_URL ??
@@ -14,8 +14,8 @@ export const TEST_DATABASE_URL = (
 )
 
 export async function prepareTestDb(): Promise<DB> {
-  await ensureDatabaseExists(TEST_DATABASE_URL, databaseNameOf(TEST_DATABASE_URL))
-  const db = createDb(TEST_DATABASE_URL)
+  await dbEnsureExists(TEST_DATABASE_URL, dbNameOf(TEST_DATABASE_URL))
+  const db = CreateDb({ database_url: TEST_DATABASE_URL })
   await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`)
   await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`)
   await db.execute(sql`CREATE SCHEMA public`)
@@ -35,24 +35,30 @@ export async function prepareTestBlobs(db: DB): Promise<{
   cleanup: () => Promise<void>
 }> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laibrary-test-blobs-'))
-  const store = new BlobStore(path.join(dir, 'blobs'))
+  const store = CreateBlobStore({
+    root: path.join(dir, 'blobs'),
+    on_error: error => { console.error('test blob cleanup', error) },
+  })
   await store.init()
   return {
-    blobs: new BlobService(db, store),
+    blobs: CreateBlobService({ db, store }),
     store,
     cleanup: () => fs.rm(dir, { recursive: true, force: true }),
   }
 }
 
-export async function prepareTestConfig(db: DB): Promise<ConfigService> {
-  const service = new ConfigService(db)
+export async function prepareTestConfig(db: DB): Promise<ConfigStore> {
+  const service = CreateConfigStore({
+    db,
+    on_error: error => { console.error('test config', error) },
+  })
   await service.ensure()
-  await service.load(true)
+  await service.reload()
   return service
 }
 
 export async function closeDb(db: DB): Promise<void> {
-  await (db as unknown as { $client: { end(): Promise<void> } }).$client.end()
+  await dbClose(db)
 }
 
 export function defined<T>(value: T | null | undefined): T {

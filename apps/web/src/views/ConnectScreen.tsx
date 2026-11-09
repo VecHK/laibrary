@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createRpc } from '../lib/rpc'
+import { settingsGetBaseUrl } from '../lib/settings'
 
 export function ConnectScreen({
   onConnected,
@@ -7,17 +7,15 @@ export function ConnectScreen({
   onConnected: (base_url: string) => Promise<void>
 }) {
   const [value, setValue] = useState(
-    localStorage.getItem('laibrary.baseurl') ?? 'http://127.0.0.1:44998',
+    settingsGetBaseUrl() ?? 'http://127.0.0.1:44998',
   )
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const testConnection = async () => {
+  const connect = async () => {
     setTesting(true)
     setError(null)
     try {
-      const client = createRpc(value)
-      await client.listing({ limit: 1 })
       await onConnected(value)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -38,11 +36,11 @@ export function ConnectScreen({
           onChange={ev => setValue(ev.target.value)}
           onKeyDown={ev => {
             if (ev.key === 'Enter') {
-              testConnection()
+              void connect()
             }
           }}
         />
-        <button className="button primary" disabled={testing} onClick={testConnection}>
+        <button className="button primary" disabled={testing} onClick={() => { void connect() }}>
           {testing ? '测试中…' : '连接'}
         </button>
         {error !== null && <div className="error-text">{error}</div>}

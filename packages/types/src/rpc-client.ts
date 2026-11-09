@@ -1,76 +1,100 @@
 import type { ActionTable } from './rpc'
+import type { BlobID, ConfigSnapshot, Item } from './roles'
+import {
+  zConfigSnapshot, zErrorBody, zItem, zItems, zMessage,
+} from './schemas'
 
 export type ActionName = keyof ActionTable
 export type ActionPayload<N extends ActionName> = Parameters<ActionTable[N]>[0]
 export type ActionResult<N extends ActionName> = Awaited<ReturnType<ActionTable[N]>>
 
-export const ActionNames = [
-  'addItem',
-  'getItem',
-  'getItems',
-  'updateItem',
-  'deleteItem',
-  'listing',
-  'getItemByUnityName',
-  'newTag',
-  'updateTag',
-  'deleteTag',
-  'searchTag',
-  'getTagByTitle',
-  'getConfig',
-  'updateConfig',
-] as const satisfies ReadonlyArray<ActionName>
+export type RpcClient = ActionTable
 
-export type RpcClient = {
-  [N in ActionName]: (payload: ActionPayload<N>) => Promise<ActionResult<N>>
-} & {
-  call<N extends ActionName>(action: N, payload: ActionPayload<N>): Promise<ActionResult<N>>
-  request(action: string, payload: unknown): Promise<unknown>
+export type RpcErrorOptions = {
+  status: number
+  code: string
+  cause?: unknown
 }
 
-export function createRpcClient(
-  base_url: string,
-  fetcher: typeof fetch = globalThis.fetch,
-): RpcClient {
+export class RpcError extends Error {
+  readonly status: number
+  readonly code: string
+
+  constructor(message: string, options: RpcErrorOptions) {
+    super(message, { cause: options.cause })
+    this.name = 'RpcError'
+    this.status = options.status
+    this.code = options.code
+  }
+}
+
+export type CreateRpcClientOptions = {
+  base_url: string
+  fetcher?: typeof fetch
+}
+
+function normalizeBaseUrl(base_url: string): string {
+  return base_url.replace(/\/+$/, '')
+}
+
+export function CreateRpcClient({
+  base_url,
+  fetcher = globalThis.fetch,
+}: CreateRpcClientOptions): RpcClient {
   const request = async (action: string, payload: unknown): Promise<unknown> => {
-    const res = await fetcher(`${base_url}/action`, {
+    const response = await fetcher(`${normalizeBaseUrl(base_url)}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, payload }),
     })
 
-    const text = await res.text()
-    let body: unknown = null
-    try {
-      body = JSON.parse(text)
-    } catch {
-      body = null
+    const text = await response.text()
+    const parsed_body: unknown = (() => {
+      try {
+        return JSON.parse(text)
+      } catch {
+        return null
+      }
+    })()
+
+    if (!response.ok) {
+      const parsed_error = zErrorBody.safeParse(parsed_body)
+      if (parsed_error.success) {
+        throw new RpcError(parsed_error.data.message, {
+          status: response.status,
+          code: parsed_error.data.code,
+        })
+      } else {
+        throw new RpcError(`HTTP ${response.status}`, {
+          status: response.status,
+          code: 'HTTP_ERROR',
+        })
+      }
     }
 
-    if (!res.ok) {
-      const message = (
-        (body !== null) &&
-        (typeof body === 'object') &&
-        ('message' in body)
-      ) ? String(body.message) : `HTTP ${res.status}`
-      throw new Error(message)
-    }
-
-    return body
+    return parsed_body
   }
 
-  const client = {
-    request,
-    call: (action: never, payload: never) => {
-      return request(action, payload)
-    },
-  } as RpcClient
-
-  for (const action of ActionNames) {
-    ;(client as Record<string, unknown>)[action] = (
-      (payload: unknown) => request(action, payload)
-    )
+  return {
+    addItem: async form => zItem.parse(await request('addItem', form)),
+    getItem: async payload => zItem.parse(await request('getItem', payload)),
+    getItems: async ids => zItems.parse(await request('getItems', ids)),
+    updateItem: async payload => zMessage.parse(await request('updateItem', payload)),
+    deleteItem: async payload => zMessage.parse(await request('deleteItem', payload)),
+    listing: async payload => zItems.parse(await request('listing', payload)),
+    getItemByUnityName: async payload => zItem.nullable().parse(
+      await request('getItemByUnityName', payload),
+    ),
+    newTag: async payload => zItem.parse(await request('newTag', payload)),
+    updateTag: async payload => zMessage.parse(await request('updateTag', payload)),
+    deleteTag: async payload => zMessage.parse(await request('deleteTag', payload)),
+    searchTag: async payload => zItems.parse(await request('searchTag', payload)),
+    getTagByTitle: async payload => zItem.nullable().parse(
+      await request('getTagByTitle', payload),
+    ),
+    getConfig: async () => zConfigSnapshot.parse(await request('getConfig', undefined)),
+    updateConfig: async payload => zMessage.parse(await request('updateConfig', payload)),
   }
-
-  return client
 }
+
+export type { BlobID, ConfigSnapshot, Item }

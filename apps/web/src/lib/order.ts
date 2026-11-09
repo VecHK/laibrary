@@ -1,5 +1,5 @@
-export function orderAfter(cur: number, next: number | undefined): number {
-  return next !== undefined ? (cur + next) / 2 : cur + 1
+export function orderAfter(cur: number, next: number | null): number {
+  return next !== null ? (cur + next) / 2 : cur + 1
 }
 
 export type FieldSortState = {
@@ -8,7 +8,7 @@ export type FieldSortState = {
   desc: boolean
 } | null
 
-export function cycleSortState(
+export function orderCycleSortState(
   prev: FieldSortState,
   field_name: string,
   field_type: 'string' | 'number',

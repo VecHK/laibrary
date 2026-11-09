@@ -60,7 +60,7 @@ type FieldDef = { name: string; type: 'string' | 'number' | 'unity_name' }
 ```
 
 - 行 = 任意 item，其 `parent_id` 指向 database item。
-- 写入时按 parent 的 schema 构造 `buildRowValidator`：只校验已声明字段的类型，允许缺字段、允许多余 key。
+- 写入时按 parent 的 schema 构造 `itemBuildRowValidator`：只校验已声明字段的类型，允许缺字段、允许多余 key。
 - 一个 schema 最多一个 `unity_name` 字段；该字段映射 item 的 `unity_name` 列，不进入 attributes；创建行时必须提供，更新不可改。
 - 行的标题是 title 列。
 - schema 变更只影响新写入，旧行不迁移。

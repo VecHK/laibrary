@@ -1,9 +1,9 @@
 import { asc, eq, sql } from 'drizzle-orm'
 import type { Item, ItemID } from '@laibrary/types'
-import { checkAttributes } from '@laibrary/types'
+import { as, itemCheckAttributes } from '@laibrary/types'
 import type { DbLike } from '../db/client'
 import { items, type ItemRow } from '../db/schema'
-import { badRequest, conflict, notFound, pgErrorCode } from '../errors'
+import { errorsBadRequest, errorsConflict, errorsNotFound, errorsPgCode } from '../errors'
 import {
   getItemRowForUpdate, getWireItem,
 } from './wire'
@@ -31,8 +31,8 @@ export async function newTag(
   title: string,
   attributes: Record<string, unknown> = {},
 ): Promise<Item> {
-  if (title.length === 0) {throw badRequest('不能设置空 tag 名')}
-  const parsed_attrs = checkAttributes('tag', attributes)
+  if (title.length === 0) {throw errorsBadRequest('不能设置空 tag 名')}
+  const parsed_attrs = itemCheckAttributes('tag', attributes)
 
   await db.execute(sql`
     INSERT INTO items (role, title, attributes)
@@ -49,13 +49,13 @@ export async function newTag(
 export async function updateTag(
   db: DbLike,
   id: ItemID,
-  data: { title?: string, attributes?: Record<string, unknown> },
+  data: { title?: string | undefined, attributes?: Record<string, unknown> | undefined },
 ): Promise<Item> {
   const prev = await getItemRowForUpdate(db, id)
-  if (prev.role !== 'tag') {throw badRequest(`item(id=${id}) 并不是 tag`)}
+  if (prev.role !== 'tag') {throw errorsBadRequest(`item(id=${id}) 并不是 tag`)}
 
   const new_title = data.title ?? prev.title
-  if (new_title.length === 0) {throw badRequest('不能设置空 tag 名')}
+  if (new_title.length === 0) {throw errorsBadRequest('不能设置空 tag 名')}
 
   if (data.title !== undefined) {
     const dup_rows = await db
@@ -63,11 +63,11 @@ export async function updateTag(
       .from(items)
       .where(sql`${items.role} = 'tag' and lower(${items.title}) = lower(${new_title}) and ${items.id} <> ${id}`)
       .limit(1)
-    if (dup_rows.length !== 0) {throw conflict(`重复的 tag 名: ${new_title}`)}
+    if (dup_rows.length !== 0) {throw errorsConflict(`重复的 tag 名: ${new_title}`)}
   }
 
   const new_attrs = data.attributes !== undefined
-    ? (checkAttributes('tag', data.attributes) as unknown as Record<string, unknown>)
+    ? as<Record<string, unknown>>(itemCheckAttributes('tag', data.attributes))
     : prev.attributes
 
   try {
@@ -81,11 +81,11 @@ export async function updateTag(
       .where(eq(items.id, id))
       .returning()
     const row = updated[0]
-    if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
+    if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
     return await getWireItem(db, row.id)
   } catch (err) {
-    if (pgErrorCode(err) === '23505') {
-      throw conflict(`重复的 tag 名: ${new_title}`)
+    if (errorsPgCode(err) === '23505') {
+      throw errorsConflict(`重复的 tag 名: ${new_title}`)
     }
     throw err
   }
@@ -93,7 +93,7 @@ export async function updateTag(
 
 export async function deleteTag(db: DbLike, id: ItemID): Promise<void> {
   const found = await getItemRowForUpdate(db, id)
-  if (found.role !== 'tag') {throw badRequest(`item(id=${id}) 并不是 tag`)}
+  if (found.role !== 'tag') {throw errorsBadRequest(`item(id=${id}) 并不是 tag`)}
 
   const child_rows = await db
     .select({ id: items.id })
@@ -101,7 +101,7 @@ export async function deleteTag(db: DbLike, id: ItemID): Promise<void> {
     .where(eq(items.parent_id, id))
     .limit(1)
   if (child_rows.length !== 0) {
-    throw conflict(`tag(id=${id}) 存在子项，不能删除`)
+    throw errorsConflict(`tag(id=${id}) 存在子项，不能删除`)
   }
 
   await db

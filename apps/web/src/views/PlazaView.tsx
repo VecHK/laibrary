@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { FilterRule, Item, Role } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { resolveModule } from '../modules/registry'
 import { openItem } from '../lib/open-item'
 import type { ViewerCtx } from '../modules/types'
 
@@ -29,21 +27,24 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   const [page_size, setPageSize] = useState(50)
 
   const buildRules = (filter: Filter | undefined): FilterRule[] => {
-    if (filter === undefined) {return []}
-    const rules: FilterRule[] = []
-    if (filter.roles !== undefined) {
-      rules.push({ name: 'role', input: filter.roles, logic: 'and' })
+    if (filter === undefined) {
+      return []
+    } else {
+      const rules: FilterRule[] = []
+      if (filter.roles !== undefined) {
+        rules.push({ name: 'role', input: filter.roles, logic: 'and' })
+      }
+      if (filter.kind !== undefined) {
+        rules.push({ name: 'kind', input: filter.kind, logic: 'and' })
+      }
+      return rules
     }
-    if (filter.kind !== undefined) {
-      rules.push({ name: 'kind', input: filter.kind, logic: 'and' })
-    }
-    return rules
   }
 
   const loadFirstPage = () => {
     const filter = FILTERS[filter_idx]
     setLoading(true)
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: page_size,
       sort_by: 'update_date',
       desc: true,
@@ -56,32 +57,35 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   }
 
   useEffect(() => {
-    getRpc().getConfig(undefined).then(snapshot => {
+    ctx.api.rpc.getConfig().then(snapshot => {
       const entry = snapshot.entries.find(item => item.key === 'sys.config.ui_page_size')
       if (typeof entry?.value === 'number' && entry.value > 0) {
         setPageSize(Math.min(200, entry.value))
       }
-    }).catch(() => undefined)
+    }).catch(error => { console.warn('ui_page_size fallback', error) })
   }, [])
 
   useEffect(loadFirstPage, [filter_idx, page_size])
 
   const loadMore = () => {
     const last_item = items[items.length - 1]
-    if (last_item === undefined) {return}
-    const filter = FILTERS[filter_idx]
-    setLoading(true)
-    getRpc().listing({
-      limit: page_size,
-      sort_by: 'update_date',
-      desc: true,
-      after_id: last_item.id,
-      filter_rules: buildRules(filter),
-    }).then(page => {
-      setItems(prev => [...prev, ...page])
-      setLoadedAll(page.length < page_size)
-    }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false))
+    if (last_item === undefined) {
+      return
+    } else {
+      const filter = FILTERS[filter_idx]
+      setLoading(true)
+      ctx.api.rpc.listing({
+        limit: page_size,
+        sort_by: 'update_date',
+        desc: true,
+        after_id: last_item.id,
+        filter_rules: buildRules(filter),
+      }).then(page => {
+        setItems(prev => [...prev, ...page])
+        setLoadedAll(page.length < page_size)
+      }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+        .finally(() => setLoading(false))
+    }
   }
 
   return (
@@ -102,7 +106,7 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
       <div className="card-grid">
         {items.map(item => (
           <div key={item.id} onClick={() => { void openItem(item, ctx) }}>
-            {resolveModule(item).Presenter.card(item, ctx)}
+            {ctx.modules.resolve(item).Presenter.card(item, ctx)}
           </div>
         ))}
       </div>

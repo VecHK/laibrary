@@ -102,7 +102,9 @@ export const zActionPayloads = {
   getConfig: z.unknown(),
   updateConfig: z.object({
     key: zUnityName,
-    value: z.unknown(),
+    value: z.unknown().refine(value => value !== undefined, {
+      message: '配置值不能是 undefined',
+    }),
   }).strict(),
 } satisfies Record<ActionName, z.ZodTypeAny>
 

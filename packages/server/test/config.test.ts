@@ -4,8 +4,9 @@ import {
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
-import { ConfigService } from '../src/config/runtime'
-import { createItem, getItemByUnityName, listItems, updateItem } from '../src/repo/items'
+import { CreateConfigStore } from '../src/config/store'
+import { createItem, getItemByUnityName, updateItem } from '../src/repo/items'
+import { listItems } from '../src/repo/item-listing'
 
 let db: DB
 let blobs: BlobService
@@ -28,16 +29,16 @@ afterAll(async () => {
 })
 
 async function config() {
-  const service = new ConfigService(db)
+  const service = CreateConfigStore({ db, on_error: error => console.error('test config', error) })
   await service.ensure()
-  await service.load(true)
+  await service.reload()
   return service
 }
 
 describe('system config', () => {
   it('seed 默认值并返回 snapshot', async () => {
     const service = await config()
-    const snapshot = await service.load(true)
+    const snapshot = await service.reload()
     expect(snapshot.version).toBe(1)
     expect(snapshot.entries.find(e => e.key === 'sys.config.gc_grace_hours')?.value).toBe(24)
     expect(snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')?.value).toBe('rtl')
@@ -50,8 +51,8 @@ describe('system config', () => {
   it('update 后缓存失效并生效', async () => {
     const service = await config()
     await service.update('sys.config.gc_grace_hours', 48)
-    expect(await service.getValue('sys.config.gc_grace_hours')).toBe(48)
-    const snapshot = await service.load(true)
+    expect(await service.getValue('sys.config.gc_grace_hours', value => Number(value))).toBe(48)
+    const snapshot = await service.reload()
     expect(snapshot.entries.find(e => e.key === 'sys.config.gc_grace_hours')?.value).toBe(48)
   })
 

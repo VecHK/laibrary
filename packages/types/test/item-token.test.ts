@@ -17,7 +17,7 @@ describe('inline item tokens', () => {
 
   it('提取 id、格式化、转义', () => {
     expect(extractItemTokenIds('[[item:1]] [[item:2|b]] [[item:1]]')).toEqual([1, 2])
-    expect(formatItemToken(3)).toBe('[[item:3]]')
+    expect(formatItemToken(3, null)).toBe('[[item:3]]')
     expect(formatItemToken(3, 'x')).toBe('[[item:3|x]]')
     expect(parseItemTokens('\\[[item:1]]')).toEqual([
       { type: 'text', text: '\\[[item:1]]' },

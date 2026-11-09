@@ -1,25 +1,31 @@
-import type { Item, Role } from '@laibrary/types'
-import type { ItemModule } from './types'
-import { pageModule } from './page'
-import { textlineModule } from './textline'
-import { imageModule } from './image'
-import { fileModule } from './file'
-import { itemlinkModule } from './itemlink'
-import { tagModule } from './tag'
-import { databaseModule } from './database'
-import { entityModule } from './entity'
+import type { Role } from '@laibrary/types'
+import type { ItemModule, ItemModuleRegistry } from './types'
+import { __PAGE_MODULE__ } from './page'
+import { __TEXTLINE_MODULE__ } from './textline'
+import { __IMAGE_MODULE__ } from './image'
+import { __FILE_MODULE__ } from './file'
+import { __ITEMLINK_MODULE__ } from './itemlink'
+import { __TAG_MODULE__ } from './tag'
+import { __DATABASE_MODULE__ } from './database'
+import { __ENTITY_MODULE__ } from './entity'
+import { __MANGA_MODULE__ } from './manga'
 
-const RoleModules: Record<Role, ItemModule> = {
-  page: pageModule,
-  entity: entityModule,
-  textline: textlineModule,
-  image: imageModule,
-  file: fileModule,
-  itemlink: itemlinkModule,
-  tag: tagModule,
-  database: databaseModule,
+const role_modules: Record<Role, ItemModule> = {
+  page: __PAGE_MODULE__,
+  entity: __ENTITY_MODULE__,
+  textline: __TEXTLINE_MODULE__,
+  image: __IMAGE_MODULE__,
+  file: __FILE_MODULE__,
+  itemlink: __ITEMLINK_MODULE__,
+  tag: __TAG_MODULE__,
+  database: __DATABASE_MODULE__,
 }
 
-export function resolveModule(item: Item): ItemModule {
-  return RoleModules[item.role] ?? pageModule
+const kind_modules: readonly ItemModule[] = [__MANGA_MODULE__]
+
+export function CreateModuleRegistry(): ItemModuleRegistry {
+  return {
+    resolve: item => role_modules[item.role],
+    getKind: kind => kind_modules.find(module => module.kind === kind),
+  }
 }

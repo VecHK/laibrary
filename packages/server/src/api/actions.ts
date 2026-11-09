@@ -1,49 +1,58 @@
 import type { ActionTable } from '@laibrary/types'
 import type { DB } from '../db/client'
 import type { BlobService } from '../blob/service'
-import type { ConfigService } from '../config/runtime'
+import type { ConfigStore } from '../config/store'
 import {
   createItem, deleteItem, getItem, getItemByUnityName, getItems,
-  listItems, updateItem,
+  updateItem,
 } from '../repo/items'
+import { listItems } from '../repo/item-listing'
 import {
   deleteTag, getTagByTitle, newTag, searchTag, updateTag,
 } from '../repo/tags'
 
-export function ActionRoute(
-  db: DB,
-  blobs_service: BlobService,
-  config_service: ConfigService,
-): ActionTable {
+export type CreateActionRouteOptions = {
+  db: DB
+  blobs: BlobService
+  config_store: ConfigStore
+}
+
+const MESSAGE_DONE = { message: 'done' as const }
+
+export function CreateActionRoute({
+  db,
+  blobs,
+  config_store,
+}: CreateActionRouteOptions): ActionTable {
   return {
-    addItem: (form) => db.transaction(tx => createItem(tx, form, blobs_service)),
+    addItem: form => db.transaction(tx => createItem(tx, form, blobs)),
     getItem: ({ id }) => getItem(db, id),
-    getItems: (ids) => getItems(db, ids),
+    getItems: ids => getItems(db, ids),
     updateItem: async ({ id, data }) => {
-      await db.transaction(tx => updateItem(tx, id, data, blobs_service))
-      return { message: 'done' as const }
+      await db.transaction(tx => updateItem(tx, id, data, blobs))
+      return MESSAGE_DONE
     },
     deleteItem: async ({ id }) => {
       await db.transaction(tx => deleteItem(tx, id))
-      return { message: 'done' as const }
+      return MESSAGE_DONE
     },
-    listing: (payload) => listItems(db, payload),
+    listing: payload => listItems(db, payload),
     getItemByUnityName: ({ unity_name }) => getItemByUnityName(db, unity_name),
     newTag: ({ title, attributes }) => db.transaction(tx => newTag(tx, title, attributes)),
     updateTag: async ({ id, data }) => {
       await db.transaction(tx => updateTag(tx, id, data))
-      return { message: 'done' as const }
+      return MESSAGE_DONE
     },
     deleteTag: async ({ id }) => {
       await db.transaction(tx => deleteTag(tx, id))
-      return { message: 'done' as const }
+      return MESSAGE_DONE
     },
     searchTag: ({ name, limit }) => searchTag(db, name, limit),
     getTagByTitle: ({ title }) => getTagByTitle(db, title),
-    getConfig: () => config_service.load(),
+    getConfig: () => config_store.load(),
     updateConfig: async ({ key, value }) => {
-      await config_service.update(key, value)
-      return { message: 'done' as const }
+      await config_store.update(key, value)
+      return MESSAGE_DONE
     },
   }
 }

@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { getTagTitle, loadTags } from '../lib/tags'
-import { resolveModule } from '../modules/registry'
+import type { Item, ItemID } from '@laibrary/types'
 import type { ViewerCtx } from '../modules/types'
 
 function TagBar({
@@ -18,33 +15,35 @@ function TagBar({
     const trimmed = title.trim()
     if (trimmed.length === 0) {
       return
-    }
-    (async () => {
-      try {
-        let tag = await getRpc().getTagByTitle({ title: trimmed })
-        if (tag === null) {
-          tag = await getRpc().newTag({ title: trimmed })
-          await loadTags()
+    } else {
+      void (async () => {
+        try {
+          let tag = await ctx.api.rpc.getTagByTitle({ title: trimmed })
+          if (tag === null) {
+            tag = await ctx.api.rpc.newTag({ title: trimmed })
+            await ctx.tags.load()
+          }
+          const next_tags = [...new Set([...item.tags, tag.id])]
+          await ctx.api.rpc.updateItem({
+            id: item.id,
+            data: { tags: next_tags },
+          })
+          setInputValue('')
+          onChange({ ...item, tags: next_tags })
+        } catch (err) {
+          ctx.showError(err instanceof Error ? err.message : String(err))
         }
-        const next_tags = [...new Set([...item.tags, tag.id])]
-        await getRpc().updateItem({
-          id: item.id,
-          data: { tags: next_tags },
-        })
-        setInputValue('')
-        onChange({ ...item, tags: next_tags })
-      } catch (err) {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-      }
-    })()
+      })()
+    }
   }
 
-  const removeTag = (tag_id: number) => {
-    getRpc().updateItem({
+  const removeTag = (tag_id: ItemID) => {
+    const next_tags = item.tags.filter(id => id !== tag_id)
+    ctx.api.rpc.updateItem({
       id: item.id,
-      data: { tags: item.tags.filter(id => id !== tag_id) },
+      data: { tags: next_tags },
     }).then(() => {
-      onChange({ ...item, tags: item.tags.filter(id => id !== tag_id) })
+      onChange({ ...item, tags: next_tags })
     }).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
@@ -56,7 +55,7 @@ function TagBar({
       {item.tags.map(tag_id => (
         <span key={tag_id} className="tag-chip removable">
           <span className="tag-chip-name" onClick={() => ctx.navigate(tag_id)}>
-            #{getTagTitle(tag_id) ?? tag_id}
+            #{ctx.tags.titleOf(tag_id) ?? tag_id}
           </span>
           <button className="tool-button" onClick={() => removeTag(tag_id)}>✕</button>
         </span>
@@ -86,7 +85,7 @@ export function ItemView({
   ctx,
   refresh_key,
 }: {
-  item_id: number
+  item_id: ItemID
   ctx: ViewerCtx
   refresh_key: number
 }) {
@@ -97,30 +96,45 @@ export function ItemView({
     let alive = true
     setNotFound(false)
     setItem(prev => prev?.id === item_id ? prev : null)
-    getRpc().getItem({ id: item_id }).then(next => {
-      if (alive) {setItem(next)}
+    ctx.api.rpc.getItem({ id: item_id }).then(next => {
+      if (alive) {
+        setItem(next)
+      }
     }).catch(err => {
-      if (!alive) {return}
-      setNotFound(true)
-      ctx.showError(err instanceof Error ? err.message : String(err))
+      if (!alive) {
+        return
+      } else {
+        setNotFound(true)
+        ctx.showError(err instanceof Error ? err.message : String(err))
+      }
     })
     return () => { alive = false }
   }, [item_id, refresh_key])
 
-  if (not_found) {
-    return (
-      <div className="panel">
-        <div className="empty-hint">item 不存在</div>
-        <button className="button" onClick={() => ctx.navigate({ name: 'plaza' })}>返回广场</button>
-      </div>
-    )
-  }
+  const content = not_found ? (
+    <div className="panel">
+      <div className="empty-hint">item 不存在</div>
+      <button className="button" onClick={() => ctx.navigate({ name: 'plaza' })}>返回广场</button>
+    </div>
+  ) : item === null ? (
+    <div className="loading">加载中…</div>
+  ) : (
+    <ItemContent item={item} ctx={ctx} onChange={setItem} />
+  )
 
-  if (item === null) {
-    return <div className="loading">加载中…</div>
-  }
+  return <>{content}</>
+}
 
-  const module = resolveModule(item)
+function ItemContent({
+  item,
+  ctx,
+  onChange,
+}: {
+  item: Item
+  ctx: ViewerCtx
+  onChange: (item: Item) => void
+}) {
+  const module = ctx.modules.resolve(item)
   const back = () => {
     if (item.parent_id !== null) {
       ctx.navigate(item.parent_id)
@@ -138,7 +152,7 @@ export function ItemView({
       <div className="item-content">
         {module.Presenter.full(item, ctx)}
       </div>
-      <TagBar item={item} ctx={ctx} onChange={setItem} />
+      <TagBar item={item} ctx={ctx} onChange={onChange} />
     </div>
   )
 }

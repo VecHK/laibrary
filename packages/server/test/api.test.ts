@@ -8,18 +8,18 @@ import {
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
-import { ConfigService } from '../src/config/runtime'
-import { createApi } from '../src/api'
+import { CreateConfigStore, type ConfigStore } from '../src/config/store'
+import { CreateApi } from '../src/api'
 import type { BootstrapConfig } from '../src/config/bootstrap'
 import type { ConfigSnapshot } from '@laibrary/types'
 import type { ThumbnailService } from '../src/thumbnails/service'
-import { ThumbnailService as Thumbnails } from '../src/thumbnails/service'
+import { CreateThumbnailService } from '../src/thumbnails/service'
 
 let db: DB
 let blobs: BlobService
-let config_service: ConfigService
+let config_service: ConfigStore
 let thumbnails: ThumbnailService
-let app: Awaited<ReturnType<typeof createApi>>
+let app: Awaited<ReturnType<typeof CreateApi>>
 let tmp_dir: string
 let cleanup_blobs: () => Promise<void>
 
@@ -28,10 +28,10 @@ beforeAll(async () => {
   const prepared = await prepareTestBlobs(db)
   blobs = prepared.blobs
   cleanup_blobs = prepared.cleanup
-  config_service = new ConfigService(db)
+  config_service = CreateConfigStore({ db, on_error: error => console.error('test config', error) })
   await config_service.ensure()
-  await config_service.load(true)
-  thumbnails = new Thumbnails(db, blobs)
+  await config_service.reload()
+  thumbnails = CreateThumbnailService({ db, blobs })
 
   tmp_dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laibrary-api-'))
   const config: BootstrapConfig = {
@@ -44,13 +44,13 @@ beforeAll(async () => {
     log_level: 'error',
     migrate_on_start: false,
   }
-  app = await createApi(config, db, blobs, config_service, thumbnails)
+  app = await CreateApi({ config, db, blobs, config_store: config_service, thumbnails })
 })
 
 beforeEach(async () => {
   await truncateAll(db)
   await config_service.ensure()
-  await config_service.load(true)
+  await config_service.reload()
 })
 
 afterAll(async () => {

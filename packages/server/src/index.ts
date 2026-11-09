@@ -1,9 +1,9 @@
-import { prepareApp } from './app'
-import { createApi } from './api'
+import { appPrepare } from './app'
+import { CreateApi } from './api'
 
 async function main() {
-  const { config, db, blobs, config_service, thumbnails } = await prepareApp()
-  const app = await createApi(config, db, blobs, config_service, thumbnails)
+  const { config, db, blobs, config_store, thumbnails } = await appPrepare()
+  const app = await CreateApi({ config, db, blobs, config_store, thumbnails })
 
   app.listen(config.http_api_port, config.host, () => {
     console.log(`Laibrary api listening on http://${config.host}:${config.http_api_port}`)

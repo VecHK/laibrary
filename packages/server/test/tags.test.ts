@@ -7,7 +7,8 @@ import type { BlobService } from '../src/blob/service'
 import {
   deleteTag, getTagByTitle, newTag, searchTag, updateTag,
 } from '../src/repo/tags'
-import { createItem, getItem, listItems } from '../src/repo/items'
+import { createItem, getItem } from '../src/repo/items'
+import { listItems } from '../src/repo/item-listing'
 
 let db: DB
 let blobs: BlobService

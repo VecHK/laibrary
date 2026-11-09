@@ -1,6 +1,6 @@
 # 03 · 仓储层规格
 
-> 位置：`packages/server/src/repo/`。全异步；写操作由 API action 层包事务。
+> 位置：`packages/server/src/repo/`。全异步；写操作由 API action 层包事务。读取/创建/更新/删除在 `items.ts`，listing/filter/keyset 在 `item-listing.ts`；两者都只做仓储，不读环境变量。
 > 术语见 [../glossary.md](../glossary.md)。
 
 ## 1. 通用约定

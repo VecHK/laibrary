@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   zAddItemForm, zBlobID, zDatabaseAttributes, zUnityName,
-  buildRowValidator, checkAttributes,
+  itemBuildRowValidator, itemCheckAttributes,
 } from '../src/schemas'
 import { zActionPayloads } from '../src/action-schemas'
 
@@ -50,7 +50,7 @@ describe('database', () => {
   })
 
   it('row validator 跳过 unity_name，允许缺字段和额外 key', () => {
-    const validator = buildRowValidator([
+    const validator = itemBuildRowValidator([
       { name: 'unity_name', type: 'unity_name' },
       { name: 'year', type: 'number' },
       { name: 'name', type: 'string' },
@@ -64,9 +64,9 @@ describe('database', () => {
 
 describe('attributes and actions', () => {
   it('file / image / page 校验', () => {
-    expect(() => checkAttributes('file', {})).toThrow()
-    expect(() => checkAttributes('file', { filename: 'a.pdf' })).not.toThrow()
-    expect(() => checkAttributes('page', {})).not.toThrow()
+    expect(() => itemCheckAttributes('file', {})).toThrow()
+    expect(() => itemCheckAttributes('file', { filename: 'a.pdf' })).not.toThrow()
+    expect(() => itemCheckAttributes('page', {})).not.toThrow()
   })
 
   it('listing / config payload 校验', () => {

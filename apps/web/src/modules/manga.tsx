@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
+import type { Item, ItemID } from '@laibrary/types'
+import { zAnyAttributes } from '@laibrary/types'
 import { blobUrl, thumbUrl, createImageItem } from '../lib/blob'
 import type { ItemModule, ViewerCtx } from './types'
 
@@ -8,7 +8,7 @@ const TRANSPARENT_PIXEL =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
 
 type MangaPage = {
-  id: number
+  id: ItemID
   src: string
   width: number
   height: number
@@ -16,46 +16,55 @@ type MangaPage = {
 }
 
 function explicitDirectionOf(item: Item): 'rtl' | 'ltr' | null {
-  const attrs = item.attributes as Record<string, unknown>
-  if (attrs['reading_direction'] === 'ltr') {return 'ltr'}
-  if (attrs['reading_direction'] === 'rtl') {return 'rtl'}
-  return null
+  const parsed = zAnyAttributes.safeParse(item.attributes)
+  if (!parsed.success) {
+    return null
+  } else if (parsed.data['reading_direction'] === 'ltr') {
+    return 'ltr'
+  } else if (parsed.data['reading_direction'] === 'rtl') {
+    return 'rtl'
+  } else {
+    return null
+  }
 }
 
 function directionOf(item: Item): 'rtl' | 'ltr' {
   return explicitDirectionOf(item) ?? 'rtl'
 }
 
-function useFirstImage(item: Item): Item | null {
+function useFirstImage(item: Item, ctx: ViewerCtx): Item | null {
   const [image, setImage] = useState<Item | null>(null)
   useEffect(() => {
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: 1,
       sort_by: 'order_index',
       filter_rules: [
         { name: 'parent', input: item.id, logic: 'and' },
         { name: 'role', input: 'image', logic: 'and' },
       ],
-    }).then(rows => setImage(rows[0] ?? null)).catch(() => setImage(null))
-  }, [item.id])
+    }).then(rows => setImage(rows[0] ?? null)).catch(error => {
+      console.warn('manga cover load failed', error)
+      setImage(null)
+    })
+  }, [item.id, ctx.api.rpc])
   return image
 }
 
-function MangaInline({ item }: { item: Item }) {
-  const first = useFirstImage(item)
+function MangaInline({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+  const first = useFirstImage(item, ctx)
   return first === null
     ? <span className="block-entity-emoji">📖</span>
-    : <img className="block-entity-thumb" src={thumbUrl(first.id, 96)} alt="" />
+    : <img className="block-entity-thumb" src={thumbUrl(ctx.api.base_url, first.id, 96)} alt="" />
 }
 
 function MangaCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const first = useFirstImage(item)
+  const first = useFirstImage(item, ctx)
   return (
     <div className="card manga-card" onClick={() => ctx.navigate(item.id)}>
       {first === null ? (
         <div className="card-icon">📖</div>
       ) : (
-        <img className="manga-card-cover" src={thumbUrl(first.id, 384)} alt="" loading="lazy" />
+        <img className="manga-card-cover" src={thumbUrl(ctx.api.base_url, first.id, 384)} alt="" loading="lazy" />
       )}
       <div className="card-title">{item.title || '(漫画)'}</div>
       <div className="card-sub">
@@ -86,7 +95,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const file_input_ref = useRef<HTMLInputElement>(null)
 
   const loadPages = () => {
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: 0,
       sort_by: 'order_index',
       filter_rules: [
@@ -96,7 +105,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }).then(children => {
       setPages(children.map(child => ({
         id: child.id,
-        src: child.blob === null ? '' : blobUrl(child.blob.id),
+        src: child.blob === null ? '' : blobUrl(ctx.api.base_url, child.blob.id),
         width: child.blob?.width ?? 0,
         height: child.blob?.height ?? 0,
         order_index: child.order_index,
@@ -115,12 +124,12 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       return
     }
     setDirection('rtl')
-    getRpc().getConfig(undefined).then(snapshot => {
+    ctx.api.rpc.getConfig().then(snapshot => {
       const entry = snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')
       if (entry?.value === 'ltr' || entry?.value === 'rtl') {
         setDirection(entry.value)
       }
-    }).catch(() => undefined)
+    }).catch(error => { console.warn('manga config fallback', error) })
   }, [item.id, item.attributes])
 
   useEffect(() => {
@@ -136,52 +145,56 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const updateVisibility = () => {
     const container = container_ref.current
-    if (container === null || pages === null) {return}
-    const rect = container.getBoundingClientRect()
-    const over = rect.width * 2
-    const imgs = container.querySelectorAll<HTMLImageElement>('img.manga-page')
-    let changed = false
-    const new_srcs = { ...loaded_srcs }
-    imgs.forEach(img => {
-      const page_id = Number(img.dataset['pageId'])
-      if (loaded_ref.current.has(page_id)) {return}
-      const ir = img.getBoundingClientRect()
-      if (ir.right > rect.left - over && ir.left < rect.right + over) {
-        const page = pages.find(p => p.id === page_id)
-        if (page !== undefined) {
-          loaded_ref.current.add(page_id)
-          new_srcs[page_id] = page.src
-          changed = true
+    if (container !== null && pages !== null) {
+      const rect = container.getBoundingClientRect()
+      const over = rect.width * 2
+      const imgs = container.querySelectorAll<HTMLImageElement>('img.manga-page')
+      let changed = false
+      const new_srcs = { ...loaded_srcs }
+      imgs.forEach(img => {
+        const page_id = Number(img.dataset['pageId'])
+        if (!loaded_ref.current.has(page_id)) {
+          const ir = img.getBoundingClientRect()
+          if (ir.right > rect.left - over && ir.left < rect.right + over) {
+            const page = pages.find(p => p.id === page_id)
+            if (page !== undefined) {
+              loaded_ref.current.add(page_id)
+              new_srcs[page_id] = page.src
+              changed = true
+            }
+          }
         }
-      }
-    })
-    if (changed) {setLoadedSrcs(new_srcs)}
+      })
+      if (changed) {setLoadedSrcs(new_srcs)}
+    }
   }
 
   useEffect(() => {
-    if (pages === null) {return}
-    const container = container_ref.current
-    if (container !== null) {
-      const index = Math.min(readProgress(item), Math.max(0, pages.length - 1))
-      const target = container.querySelector<HTMLImageElement>(`img[data-page-id="${pages[index]?.id}"]`)
-      if (target !== null) {
-        container.scrollLeft = direction === 'rtl'
-          ? container.scrollWidth - target.offsetLeft - target.clientWidth
-          : target.offsetLeft
+    if (pages !== null) {
+      const container = container_ref.current
+      if (container !== null) {
+        const index = Math.min(readProgress(item), Math.max(0, pages.length - 1))
+        const target = container.querySelector<HTMLImageElement>(`img[data-page-id="${pages[index]?.id}"]`)
+        if (target !== null) {
+          container.scrollLeft = direction === 'rtl'
+            ? container.scrollWidth - target.offsetLeft - target.clientWidth
+            : target.offsetLeft
+        }
       }
+      updateVisibility()
     }
-    updateVisibility()
   }, [pages, direction])
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const container = container_ref.current
-      if (container === null) {return}
-      const step = window.innerWidth * 0.9
-      if (ev.key === 'ArrowRight') {
-        container.scrollBy({ left: direction === 'rtl' ? -step : step })
-      } else if (ev.key === 'ArrowLeft') {
-        container.scrollBy({ left: direction === 'rtl' ? step : -step })
+      if (container !== null) {
+        const step = window.innerWidth * 0.9
+        if (ev.key === 'ArrowRight') {
+          container.scrollBy({ left: direction === 'rtl' ? -step : step })
+        } else if (ev.key === 'ArrowLeft') {
+          container.scrollBy({ left: direction === 'rtl' ? step : -step })
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -190,7 +203,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const toggleDirection = () => {
     const next = direction === 'rtl' ? 'ltr' : 'rtl'
-    getRpc().updateItem({
+    ctx.api.rpc.updateItem({
       id: item.id,
       data: { attributes: { ...item.attributes, reading_direction: next } },
     }).then(() => {
@@ -199,25 +212,30 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
   }
 
-  const removePage = (page_id: number) => {
-    getRpc().deleteItem({ id: page_id }).then(refresh)
+  const removePage = (page_id: ItemID) => {
+    ctx.api.rpc.deleteItem({ id: page_id }).then(refresh)
       .catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
   }
 
-  const swapOrder = (page_id: number, other_id: number) => {
-    if (pages === null) {return}
-    const a = pages.find(p => p.id === page_id)
-    const b = pages.find(p => p.id === other_id)
-    if (a === undefined || b === undefined) {return}
-    Promise.all([
-      getRpc().updateItem({ id: a.id, data: { order_index: b.order_index } }),
-      getRpc().updateItem({ id: b.id, data: { order_index: a.order_index } }),
-    ]).then(refresh).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+  const swapOrder = (page_id: ItemID, other_id: ItemID) => {
+    if (pages !== null) {
+      const a = pages.find(p => p.id === page_id)
+      const b = pages.find(p => p.id === other_id)
+      if (a !== undefined && b !== undefined) {
+        Promise.all([
+          ctx.api.rpc.updateItem({ id: a.id, data: { order_index: b.order_index } }),
+          ctx.api.rpc.updateItem({ id: b.id, data: { order_index: a.order_index } }),
+        ]).then(refresh).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+      }
+    }
   }
 
   const page_width = (page: MangaPage): number => {
-    if (page.height <= 0 || page.width <= 0) {return 0}
-    return window.innerHeight * (page.width / page.height)
+    if (page.height <= 0 || page.width <= 0) {
+      return 0
+    } else {
+      return window.innerHeight * (page.width / page.height)
+    }
   }
 
   return (
@@ -243,7 +261,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             ;(async () => {
               for (const file of files) {
                 try {
-                  await createImageItem(file, item.id)
+                  await createImageItem({ api: ctx.api, file, parent_id: item.id })
                 } catch (err) {
                   ctx.showError(err instanceof Error ? err.message : String(err))
                 }
@@ -262,23 +280,25 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         ref={container_ref}
         onScroll={ev => {
           updateVisibility()
-          if (pages === null || pages.length === 0) {return}
-          const container = ev.currentTarget
-          const mid = container.scrollLeft + container.clientWidth / 2
-          let best = 0
-          let best_dist = Infinity
-          pages.forEach((page, index) => {
-            const img = container.querySelector<HTMLImageElement>(`img[data-page-id="${page.id}"]`)
-            if (img === null) {return}
-            const center = img.offsetLeft + img.clientWidth / 2
-            const dist = Math.abs(center - mid)
-            if (dist < best_dist) {
-              best_dist = dist
-              best = index
-            }
-          })
-          setCurrentIndex(best)
-          writeProgress(item, best)
+          if (pages !== null && pages.length !== 0) {
+            const container = ev.currentTarget
+            const mid = container.scrollLeft + container.clientWidth / 2
+            let best = 0
+            let best_dist = Infinity
+            pages.forEach((page, index) => {
+              const img = container.querySelector<HTMLImageElement>(`img[data-page-id="${page.id}"]`)
+              if (img !== null) {
+                const center = img.offsetLeft + img.clientWidth / 2
+                const dist = Math.abs(center - mid)
+                if (dist < best_dist) {
+                  best_dist = dist
+                  best = index
+                }
+              }
+            })
+            setCurrentIndex(best)
+            writeProgress(item, best)
+          }
         }}
         style={{ flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }}
       >
@@ -332,12 +352,12 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const mangaModule: ItemModule = {
+export const __MANGA_MODULE__: ItemModule = {
   kind: 'manga',
   Presenter: {
     card: (item, ctx) => <MangaCard item={item} ctx={ctx} />,
     full: (item, ctx) => <MangaReader item={item} ctx={ctx} />,
   },
-  inlineIcon: (item) => <MangaInline item={item} />,
+  inlineIcon: (item, ctx) => <MangaInline item={item} ctx={ctx} />,
   inlineMeta: () => <>漫画</>,
 }

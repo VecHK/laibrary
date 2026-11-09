@@ -1,34 +1,67 @@
-import type { Item } from '@laibrary/types'
-import { getRpc } from './rpc'
+import { useEffect, useState } from 'react'
+import { Signal } from 'vait'
+import type { Item, ItemID, RpcClient } from '@laibrary/types'
 
-let __tags__: Item[] = []
-let __map__ = new Map<number, string>()
-let __loaded__ = false
-
-export function tagsLoaded(): boolean {
-  return __loaded__
+export type TagStore = {
+  readonly sig_tags_changed: Signal<void>
+  readonly load: () => Promise<void>
+  readonly invalidate: () => void
+  readonly isLoaded: () => boolean
+  readonly all: () => readonly Item[]
+  readonly titleOf: (tag_id: ItemID) => string | null
 }
 
-export function allTags(): Item[] {
-  return __tags__
+export type CreateTagStoreOptions = {
+  rpc: RpcClient
 }
 
-export function getTagTitle(tag_id: number): string | undefined {
-  return __map__.get(tag_id)
+export function CreateTagStore({ rpc }: CreateTagStoreOptions): TagStore {
+  let __tags: readonly Item[] = []
+  let __map = new Map<ItemID, string>()
+  let __loaded = false
+  const sig_tags_changed = Signal<void>()
+
+  const load = async (): Promise<void> => {
+    const tags = await rpc.listing({
+      limit: 0,
+      filter_rules: [{ name: 'role', input: 'tag', logic: 'and' }],
+    })
+    __tags = tags
+    __map = new Map(tags.map(tag => [tag.id, tag.title]))
+    __loaded = true
+    sig_tags_changed.trigger()
+  }
+
+  const invalidate = (): void => {
+    __loaded = false
+    __tags = []
+    __map.clear()
+    sig_tags_changed.trigger()
+  }
+
+  return {
+    sig_tags_changed,
+    load,
+    invalidate,
+    isLoaded: () => __loaded,
+    all: () => __tags,
+    titleOf: tag_id => __map.get(tag_id) ?? null,
+  }
 }
 
-export async function loadTags(): Promise<void> {
-  const tags = await getRpc().listing({
-    limit: 0,
-    filter_rules: [{ name: 'role', input: 'tag', logic: 'and' }],
-  })
-  __tags__ = tags
-  __map__ = new Map(tags.map(tag => [tag.id, tag.title]))
-  __loaded__ = true
-}
+export function useTagStoreVersion(store: TagStore | null): number {
+  const [version, setVersion] = useState(0)
 
-export function invalidateTags(): void {
-  __loaded__ = false
-  __tags__ = []
-  __map__.clear()
+  useEffect(() => {
+    if (store === null) {
+      return undefined
+    } else {
+      const off = store.sig_tags_changed.receive(() => {
+        setVersion(current => current + 1)
+      })
+      return off
+    }
+  }, [store])
+
+  return version
 }

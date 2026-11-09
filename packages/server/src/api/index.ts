@@ -1,106 +1,128 @@
-import Koa from 'koa'
+import Koa, { type Context } from 'koa'
 import Router from '@koa/router'
 import cors from '@koa/cors'
 import { bodyParser } from '@koa/bodyparser'
-import { ZodError } from 'zod'
-import type { ActionTable } from '@laibrary/types'
-import { zActionPayloads } from '@laibrary/types'
+import { z, ZodError } from 'zod'
+import type { ActionName } from '@laibrary/types'
+import { __RPC_ACTION_NAMES__, zActionPayloads } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
 import type { DB } from '../db/client'
 import type { BlobService } from '../blob/service'
-import type { ConfigService } from '../config/runtime'
+import type { ConfigStore } from '../config/store'
 import type { ThumbnailService } from '../thumbnails/service'
-import { AppError } from '../errors'
-import { ActionRoute } from './actions'
-import { createBlobRouter } from './blob-routes'
-import { createThumbRouter } from './thumb-routes'
+import { errorsIsAppError, errorsBadRequest } from '../errors'
+import { CreateActionRoute } from './actions'
+import { CreateBlobRouter } from './blob-routes'
+import { CreateThumbRouter } from './thumb-routes'
+
+const zActionRequest = z.object({
+  action: z.string(),
+  payload: z.unknown().optional(),
+})
 
 function errorBody(err: unknown): { status: number, body: unknown } {
-  if (err instanceof AppError) {
+  if (errorsIsAppError(err)) {
     return {
       status: err.status,
       body: { message: err.message, code: err.code, issues: err.issues },
     }
-  }
-  if (err instanceof ZodError) {
+  } else if (err instanceof ZodError) {
     return {
       status: 400,
       body: { message: err.message, code: 'VALIDATION', issues: err.issues },
     }
-  }
-  return {
-    status: 500,
-    body: {
-      message: err instanceof Error ? err.message : String(err),
-      code: 'INTERNAL',
-    },
+  } else {
+    return {
+      status: 500,
+      body: {
+        message: err instanceof Error ? err.message : String(err),
+        code: 'INTERNAL',
+      },
+    }
   }
 }
 
-export async function createApi(
-  config: BootstrapConfig,
-  db: DB,
-  blobs_service: BlobService,
-  config_service: ConfigService,
-  thumbnails: ThumbnailService,
-) {
+function sendJson(ctx: Context, status: number, body: unknown): void {
+  ctx.status = status
+  ctx.type = 'application/json'
+  ctx.body = body
+}
+
+export type CreateApiOptions = {
+  config: BootstrapConfig
+  db: DB
+  blobs: BlobService
+  config_store: ConfigStore
+  thumbnails: ThumbnailService
+}
+
+export async function CreateApi({
+  config,
+  db,
+  blobs,
+  config_store,
+  thumbnails,
+}: CreateApiOptions) {
   const app = new Koa()
   const router = new Router()
+  const actions = CreateActionRoute({ db, blobs, config_store })
 
   app.use(cors())
 
-  const blob_router = createBlobRouter(
+  const blob_router = CreateBlobRouter({
     config,
-    blobs_service,
-    async () => (
-      await config_service.getValue<number>('sys.config.upload_max_bytes')
+    blobs,
+    get_max_upload_bytes: async () => (
+      await config_store.getValue('sys.config.upload_max_bytes', value => z.number().parse(value))
     ) ?? 256 * 1024 * 1024,
-  )
+  })
   app.use(blob_router.routes())
   app.use(blob_router.allowedMethods())
-  const thumb_router = createThumbRouter(thumbnails, blobs_service)
+  const thumb_router = CreateThumbRouter({ thumbnails, blobs })
   app.use(thumb_router.routes())
   app.use(thumb_router.allowedMethods())
 
   app.use(bodyParser({ jsonLimit: '4mb' }))
 
-  router.post('/action', async (ctx) => {
-    const action = ctx.request.body as { action?: unknown, payload?: unknown } | undefined
-    if (action === undefined || typeof action.action !== 'string') {
-      ctx.status = 400
-      ctx.type = 'application/json'
-      ctx.body = { message: 'require { action, payload }', code: 'BAD_REQUEST' }
-      return
-    }
+  const handlers = {
+    addItem: async payload => actions.addItem(zActionPayloads.addItem.parse(payload)),
+    getItem: async payload => actions.getItem(zActionPayloads.getItem.parse(payload)),
+    getItems: async payload => actions.getItems(zActionPayloads.getItems.parse(payload)),
+    updateItem: async payload => actions.updateItem(zActionPayloads.updateItem.parse(payload)),
+    deleteItem: async payload => actions.deleteItem(zActionPayloads.deleteItem.parse(payload)),
+    listing: async payload => actions.listing(zActionPayloads.listing.parse(payload)),
+    getItemByUnityName: async payload => actions.getItemByUnityName(
+      zActionPayloads.getItemByUnityName.parse(payload),
+    ),
+    newTag: async payload => actions.newTag(zActionPayloads.newTag.parse(payload)),
+    updateTag: async payload => actions.updateTag(zActionPayloads.updateTag.parse(payload)),
+    deleteTag: async payload => actions.deleteTag(zActionPayloads.deleteTag.parse(payload)),
+    searchTag: async payload => actions.searchTag(zActionPayloads.searchTag.parse(payload)),
+    getTagByTitle: async payload => actions.getTagByTitle(zActionPayloads.getTagByTitle.parse(payload)),
+    getConfig: async payload => {
+      zActionPayloads.getConfig.parse(payload)
+      return actions.getConfig()
+    },
+    updateConfig: async payload => actions.updateConfig(zActionPayloads.updateConfig.parse(payload)),
+  } satisfies Record<ActionName, (payload: unknown) => Promise<unknown>>
 
-    const name = action.action
-    if (!Object.hasOwn(zActionPayloads, name)) {
-      ctx.status = 400
-      ctx.type = 'application/json'
-      ctx.body = { message: `unknown ACTION: ${name}`, code: 'BAD_REQUEST' }
-      return
-    }
-
+  router.post('/action', async ctx => {
     try {
-      const schema = zActionPayloads[name as keyof typeof zActionPayloads]
-      const payload = schema.parse(action.payload)
-      const actions = ActionRoute(db, blobs_service, config_service) as ActionTable
-      const act = (actions as unknown as Record<string, (payload: unknown) => Promise<unknown>>)[name]
-      if (act === undefined) {
-        ctx.status = 400
-        ctx.body = { message: `unknown ACTION: ${name}`, code: 'BAD_REQUEST' }
-        return
+      const request = zActionRequest.parse(ctx.request.body)
+      const action = __RPC_ACTION_NAMES__.find(each => each === request.action)
+      if (action === undefined) {
+        throw errorsBadRequest(`unknown ACTION: ${request.action}`)
+      } else {
+        const handler = handlers[action]
+        const result = await handler(request.payload)
+        sendJson(ctx, 200, result)
       }
-      const result = await act(payload)
-      ctx.status = 200
-      ctx.type = 'application/json'
-      ctx.body = result
     } catch (err) {
       const { status, body } = errorBody(err)
-      if (status >= 500) {console.error(`[action:${name}]`, err)}
-      ctx.status = status
-      ctx.type = 'application/json'
-      ctx.body = body
+      if (status >= 500) {
+        console.error('[action]', err)
+      }
+      sendJson(ctx, status, body)
     }
   })
 

@@ -79,7 +79,12 @@ describe('blob GC', () => {
     expect(refs.has(referenced.blob.id)).toBe(true)
     expect(refs.has(orphan.blob.id)).toBe(false)
 
-    const result = await cleanUnreferencedBlobs(db, blobs, DAY)
+    const result = await cleanUnreferencedBlobs({
+    db,
+    blobs,
+    grace_ms: DAY,
+    on_error: error => { console.error('test gc', error) },
+  })
     expect(result.deleted).toBe(1)
     expect(await blobs.exists(referenced.blob.id)).toBe(true)
     expect(await blobs.exists(orphan.blob.id)).toBe(false)
@@ -87,7 +92,12 @@ describe('blob GC', () => {
 
   it('宽限期内的孤儿保留', async () => {
     const orphan = await blobs.putBuffer(Buffer.from('new orphan'), 'application/pdf')
-    const result = await cleanUnreferencedBlobs(db, blobs, DAY)
+    const result = await cleanUnreferencedBlobs({
+    db,
+    blobs,
+    grace_ms: DAY,
+    on_error: error => { console.error('test gc', error) },
+  })
     expect(result.deleted).toBe(0)
     expect(await blobs.exists(orphan.blob.id)).toBe(true)
   })

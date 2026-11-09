@@ -1,6 +1,6 @@
 # 04 · API 规格
 
-> 类型事实源：`@laibrary/types` 的 `ActionTable`。客户端 `createRpcClient(base_url)` 获得全类型调用。
+> 类型事实源：`@laibrary/types` 的 `ActionTable`。客户端 `CreateRpcClient({ base_url })` 获得全类型调用，并对响应做 zod 校验。
 
 ## 1. RPC
 

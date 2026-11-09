@@ -2,10 +2,11 @@ import type { Item } from '@laibrary/types'
 import type { ItemModule, ViewerCtx } from './types'
 import { blobUrl } from '../lib/blob'
 import { openItem } from '../lib/open-item'
+import { zFileAttributes } from '@laibrary/types'
 
 function filenameOf(item: Item): string {
-  const attrs = item.attributes as Record<string, unknown>
-  return typeof attrs['filename'] === 'string' ? attrs['filename'] : item.title
+  const parsed = zFileAttributes.safeParse(item.attributes)
+  return parsed.success ? parsed.data.filename : item.title
 }
 
 function FileCard({ item }: { item: Item }) {
@@ -28,8 +29,8 @@ function FileBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-function FileFull({ item }: { item: Item }) {
-  const src = item.blob === null ? null : blobUrl(item.blob.id)
+function FileFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+  const src = item.blob === null ? null : blobUrl(ctx.api.base_url, item.blob.id)
   return (
     <div className="panel">
       <div className="panel-title">{item.title}</div>
@@ -47,11 +48,11 @@ function FileFull({ item }: { item: Item }) {
   )
 }
 
-export const fileModule: ItemModule = {
+export const __FILE_MODULE__: ItemModule = {
   role: 'file',
   Presenter: {
     card: item => <FileCard item={item} />,
-    full: item => <FileFull item={item} />,
+    full: (item, ctx) => <FileFull item={item} ctx={ctx} />,
   },
   Block: (item, ctx) => <FileBlock item={item} ctx={ctx} />,
 }

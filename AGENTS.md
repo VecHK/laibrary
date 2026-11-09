@@ -42,6 +42,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 
 - **一切皆 Item**：用户数据、系统配置都是 Item；单表 `items` 是事实源。
 - **后端/数据基座优先**：当前先把模型、blob、配置、API 做稳；前端先完成 POC，不追求大而全。
+- **组合根 + 闭包工厂**：server 不写 service class；web 不搞 RPC/标签模块单例。依赖从 App/组合根显式注入。
 - **当前 POC 范围**：文本 block 编辑、inline itemlink、image/file、entity + manga 阅读、tags、database 基础、系统设置。
 - **明确后置**：文件柜/SMB、富文本 marks、大纲缩进、反向链接、database 高级视图、派生/不可变数据库、Gāng、Public Space、Electron、鉴权/多用户、200 万数据导入。
 - **规模目标**：最终约 300 万 Item；当前不做 3M 压测/导入，但不要引入全表扫描、无界根列表、同步大 JSON 处理等会堵死后路的写法。
@@ -64,6 +65,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 配置分两层：bootstrap 只在根 `.env`/OS env；runtime 只在 `sys.config` Item；runtime 不接受 env 覆盖。
 - 系统项（`sys.`）不出现在公共 listing，不能被通用 item 写接口修改/删除。
 - 术语表是领域契约：新增概念先更新 `docs/glossary.md`，再写代码/文档；不要发明同义词。
+- 常量用 `__MODULE_NAME__`；Drizzle table、zod schema、React module descriptor 是模块 API 对象，保留其稳定接口名。
 
 ## 文档权威与冲突处理
 
@@ -110,7 +112,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 悬浮 Promise 必须 `await` / `void` / `.catch()`。
 - 注释只解释“为什么”和“注意什么”；不写复述代码的注释。
 
-现有代码有历史例外（服务类、早返回等）。**新代码遵守规则；旧代码只在与本次改动直接相关时局部迁移，不做全仓重构。** 需要偏离时写 `// justify: <节号> <理由>` 并在交付说明列出。
+当前生产代码已完成主体重构：server 不写 service class，web 无 RPC/标签模块单例，外部输入在边界 parse。**新代码必须遵守规则；发现新的历史例外时只在与改动直接相关的局部迁移，不做全仓重排。** 需要偏离时写 `// justify: <节号> <理由>` 并在交付说明列出。
 
 ## 前端交互契约
 

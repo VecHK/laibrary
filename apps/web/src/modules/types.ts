@@ -1,11 +1,25 @@
 import type { ReactNode } from 'react'
-import type { Item, ItemID, Role } from '@laibrary/types'
+import type { Item, ItemID, Role, RpcClient } from '@laibrary/types'
 import type { HashRoute } from '../lib/hash-router'
+import type { TagStore } from '../lib/tags'
+
+export type ApiContext = {
+  readonly base_url: string
+  readonly rpc: RpcClient
+}
+
+export type ItemModuleRegistry = {
+  readonly resolve: (item: Item) => ItemModule
+  readonly getKind: (kind: string) => ItemModule | undefined
+}
 
 export interface ViewerCtx {
-  navigate(target: ItemID | HashRoute): void
-  refresh(): void
-  showError(message: string): void
+  readonly api: ApiContext
+  readonly tags: TagStore
+  readonly modules: ItemModuleRegistry
+  readonly navigate: (target: ItemID | HashRoute) => void
+  readonly refresh: () => void
+  readonly showError: (message: string) => void
 }
 
 export interface ItemModule {

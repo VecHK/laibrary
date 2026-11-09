@@ -1,6 +1,4 @@
 import type { Item, ItemID } from '@laibrary/types'
-import { getRpc } from './rpc'
-import { getKindModule } from './kind-registry'
 import type { ViewerCtx } from '../modules/types'
 
 const MAX_LINK_DEPTH = 5
@@ -8,63 +6,53 @@ const MAX_LINK_DEPTH = 5
 export async function openItemById(
   id: ItemID,
   ctx: ViewerCtx,
-  depth: number = 0,
+): Promise<void> {
+  await openItemByIdDepth(id, ctx, 0)
+}
+
+async function openItemByIdDepth(
+  id: ItemID,
+  ctx: ViewerCtx,
+  depth: number,
 ): Promise<void> {
   try {
-    const item = await getRpc().getItem({ id })
-    await openItem(item, ctx, depth)
+    const item = await ctx.api.rpc.getItem({ id })
+    await openItemDepth(item, ctx, depth)
   } catch (err) {
     ctx.showError(err instanceof Error ? err.message : String(err))
   }
 }
 
-export async function openItem(
+export async function openItem(item: Item, ctx: ViewerCtx): Promise<void> {
+  await openItemDepth(item, ctx, 0)
+}
+
+async function openItemDepth(
   item: Item,
   ctx: ViewerCtx,
-  depth: number = 0,
+  depth: number,
 ): Promise<void> {
   if (depth > MAX_LINK_DEPTH) {
     ctx.showError('链接层数过深')
-    return
-  }
-
-  if (item.role === 'itemlink') {
+  } else if (item.role === 'itemlink') {
     if (item.target_id === null) {
       ctx.showError('链接目标不存在')
-      return
+    } else {
+      await openItemByIdDepth(item.target_id, ctx, depth + 1)
     }
-    await openItemById(item.target_id, ctx, depth + 1)
-    return
-  }
-
-  if (item.role === 'entity') {
-    if (item.kind === null || getKindModule(item.kind) === undefined) {
+  } else if (item.role === 'entity') {
+    if (item.kind === null || ctx.modules.getKind(item.kind) === undefined) {
       ctx.showError('没有合适的打开方式')
-      return
+    } else {
+      ctx.navigate(item.id)
     }
-    ctx.navigate(item.id)
-    return
-  }
-
-  if (item.role === 'textline') {
+  } else if (item.role === 'textline') {
     if (item.parent_id !== null) {
       ctx.navigate(item.parent_id)
     } else {
       ctx.navigate(item.id)
     }
-    return
-  }
-
-  if (
-    item.role === 'page' ||
-    item.role === 'image' ||
-    item.role === 'file' ||
-    item.role === 'database' ||
-    item.role === 'tag'
-  ) {
+  } else {
     ctx.navigate(item.id)
-    return
   }
-
-  ctx.showError('没有合适的打开方式')
 }

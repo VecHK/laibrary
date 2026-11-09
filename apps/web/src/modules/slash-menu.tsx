@@ -10,7 +10,7 @@ export function SlashMenu({
   onSelectIndex,
   onPick,
 }: {
-  commands: SlashCommand[]
+  commands: readonly SlashCommand[]
   selected_index: number
   query: string
   placement: 'up' | 'down'

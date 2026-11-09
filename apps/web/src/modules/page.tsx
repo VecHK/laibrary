@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
+import { useEffect, useRef, useState } from 'react'
+import type { Item, ItemID } from '@laibrary/types'
 import { createFileItem, createImageItem } from '../lib/blob'
 import { orderAfter } from '../lib/order'
 import { mergeTextLine, type SlashCommand } from '../lib/textline-editor'
 import type { ItemModule, ViewerCtx } from './types'
-import { resolveModule } from './registry'
+import { PageBlock } from './page-block'
+import { PageCard } from './page-card'
+import { usePageTitle } from './page-title'
 import { ItemPicker } from './item-picker'
 import {
   TextLineBlock,
@@ -13,7 +14,7 @@ import {
 } from './textline'
 
 type FocusRequest = {
-  id: number
+  id: ItemID
   request: TextLineFocusRequest
 }
 
@@ -25,128 +26,14 @@ function sortChildren(items: Item[]): Item[] {
   ))
 }
 
-function useDebouncedTitle(item: Item, ctx: ViewerCtx) {
-  const [value, setValue] = useState(item.title)
-  const timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const value_ref = useRef(item.title)
-
-  useEffect(() => {
-    setValue(item.title)
-    value_ref.current = item.title
-  }, [item.title, item.id])
-
-  const save = () => {
-    if (timer_ref.current !== null) {
-      clearTimeout(timer_ref.current)
-      timer_ref.current = null
-    }
-    getRpc().updateItem({ id: item.id, data: { title: value_ref.current } })
-      .then(() => ctx.refresh())
-      .catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
-  }
-
-  useEffect(() => () => {
-    if (timer_ref.current !== null) {
-      clearTimeout(timer_ref.current)
-      timer_ref.current = null
-      getRpc().updateItem({ id: item.id, data: { title: value_ref.current } })
-        .catch(() => undefined)
-    }
-  }, [item.id])
-
-  const scheduleSave = (new_value: string) => {
-    setValue(new_value)
-    value_ref.current = new_value
-    if (timer_ref.current !== null) {clearTimeout(timer_ref.current)}
-    timer_ref.current = setTimeout(() => {
-      timer_ref.current = null
-      getRpc().updateItem({ id: item.id, data: { title: value_ref.current } })
-        .catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
-    }, 400)
-  }
-
-  return [value, scheduleSave, save] as const
-}
-
-function PageCard({ item }: { item: Item }) {
-  return (
-    <div className="card page-card">
-      <div className="card-icon">📄</div>
-      <div className="card-title">{item.title || '(无标题)'}</div>
-    </div>
-  )
-}
-
-function BlockWrapper({
-  item,
-  content,
-  onDropBlock,
-  onDelete,
-  onAddAfter,
-}: {
-  item: Item
-  content: ReactNode
-  onDropBlock: (dragged_id: number, target_id: number) => void
-  onDelete: () => void
-  onAddAfter: () => void
-}) {
-  return (
-    <div
-      className="page-block"
-      onDragOver={ev => {
-        ev.preventDefault()
-        ev.dataTransfer.dropEffect = 'move'
-      }}
-      onDrop={ev => {
-        ev.preventDefault()
-        const dragged = Number(ev.dataTransfer.getData('text/laibrary-block'))
-        if (Number.isSafeInteger(dragged) && dragged !== item.id) {
-          onDropBlock(dragged, item.id)
-        }
-      }}
-    >
-      <span className="block-gutter">
-        <span
-          className="block-drag-handle"
-          title="拖拽排序"
-          draggable
-          onDragStart={ev => {
-            ev.dataTransfer.setData('text/laibrary-block', String(item.id))
-            ev.dataTransfer.effectAllowed = 'move'
-          }}
-        >⠿</span>
-        <button
-          className="block-add"
-          title="在下方插入文本行"
-          onClick={ev => {
-            ev.stopPropagation()
-            onAddAfter()
-          }}
-        >＋</button>
-      </span>
-      <div className="page-block-content">
-        {content}
-      </div>
-      <button
-        className="tool-button block-delete"
-        title="删除 block"
-        onClick={ev => {
-          ev.stopPropagation()
-          onDelete()
-        }}
-      >✕</button>
-    </div>
-  )
-}
-
 function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [children, setChildren] = useState<Item[] | null>(null)
   const children_ref = useRef<Item[]>([])
-  const [active_block_id, setActiveBlockId] = useState<number | null>(null)
+  const [active_block_id, setActiveBlockId] = useState<ItemID | null>(null)
   const [focus_request, setFocusRequest] = useState<FocusRequest | null>(null)
   const [picker, setPicker] = useState(false)
   const [link_placeholder, setLinkPlaceholder] = useState<Item | null>(null)
-  const [title, scheduleTitle, saveTitle] = useDebouncedTitle(item, ctx)
+  const [title, scheduleTitle, saveTitle] = usePageTitle(item, ctx)
   const alive_ref = useRef(true)
   const pending_upload_ref = useRef<{ kind: UploadKind, placeholder: Item | null } | null>(null)
   const image_input_ref = useRef<HTMLInputElement>(null)
@@ -158,7 +45,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     setChildren(sorted)
   }
 
-  const patchChild = (id: number, patch: Partial<Item>) => {
+  const patchChild = (id: ItemID, patch: Partial<Item>) => {
     syncChildren(children_ref.current.map(child => (
       child.id === id ? { ...child, ...patch } : child
     )))
@@ -169,7 +56,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     syncChildren([...children_ref.current, child])
   }
 
-  const removeChild = (id: number) => {
+  const removeChild = (id: ItemID) => {
     syncChildren(children_ref.current.filter(child => child.id !== id))
     if (active_block_id === id) {setActiveBlockId(null)}
   }
@@ -185,10 +72,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         (child.order_index === item.order_index && child.id > item.id)
       ))
       .sort((a, b) => a.order_index - b.order_index || a.id - b.id)[0]
-    return orderAfter(item.order_index, next?.order_index)
+    return orderAfter(item.order_index, next === undefined ? null : next.order_index)
   }
 
-  const focusBlock = (id: number, caret: number | 'end') => {
+  const focusBlock = (id: ItemID, caret: number | 'end') => {
     setActiveBlockId(id)
     setFocusRequest({ id, request: { caret } })
   }
@@ -199,21 +86,22 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   ) => {
     if (show_loading) {setChildren(null)}
     try {
-      const list = await getRpc().listing({
+      const list = await ctx.api.rpc.listing({
         limit: 0,
         sort_by: 'order_index',
         filter_rules: [{ name: 'parent', input: item.id, logic: 'and' }],
       })
-      if (!alive_ref.current) {return}
-      syncChildren(list)
-      const first = list[0]
-      if (
-        auto_focus_first &&
-        list.length === 1 &&
-        first?.role === 'textline' &&
-        first.title.length === 0
-      ) {
-        focusBlock(first.id, 0)
+      if (alive_ref.current) {
+        syncChildren(list)
+        const first = list[0]
+        if (
+          auto_focus_first &&
+          list.length === 1 &&
+          first?.role === 'textline' &&
+          first.title.length === 0
+        ) {
+          focusBlock(first.id, 0)
+        }
       }
     } catch (err) {
       ctx.showError(err instanceof Error ? err.message : String(err))
@@ -234,7 +122,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   ): Promise<Item | null> => {
     const order_index = after === undefined ? appendOrder() : orderAfterItem(after)
     try {
-      const created = await getRpc().addItem({
+      const created = await ctx.api.rpc.addItem({
         role: 'textline',
         title: title_text,
         parent_id: item.id,
@@ -253,8 +141,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const order_index = orderAfterItem(current)
     patchChild(current.id, { title: left })
     try {
-      await getRpc().updateItem({ id: current.id, data: { title: left } })
-      const created = await getRpc().addItem({
+      await ctx.api.rpc.updateItem({ id: current.id, data: { title: left } })
+      const created = await ctx.api.rpc.addItem({
         role: 'textline',
         title: right,
         parent_id: item.id,
@@ -276,8 +164,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     if (previous?.role === 'textline') {
       const merged = mergeTextLine(previous.title, value)
       try {
-        await getRpc().updateItem({ id: previous.id, data: { title: merged.title } })
-        await getRpc().deleteItem({ id: current.id })
+        await ctx.api.rpc.updateItem({ id: previous.id, data: { title: merged.title } })
+        await ctx.api.rpc.deleteItem({ id: current.id })
         patchChild(previous.id, { title: merged.title })
         removeChild(current.id)
         focusBlock(previous.id, merged.caret)
@@ -285,17 +173,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         ctx.showError(err instanceof Error ? err.message : String(err))
         void loadChildren()
       }
-      return
-    }
-
-    if (value.length !== 0) {return}
-
-    try {
-      await getRpc().deleteItem({ id: current.id })
-      removeChild(current.id)
-      setFocusRequest(null)
-    } catch (err) {
-      ctx.showError(err instanceof Error ? err.message : String(err))
+    } else if (value.length === 0) {
+      try {
+        await ctx.api.rpc.deleteItem({ id: current.id })
+        removeChild(current.id)
+        setFocusRequest(null)
+      } catch (err) {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+      }
     }
   }
 
@@ -304,33 +189,37 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     void createTextlineAfter(last)
   }
 
-  const deleteBlock = async (block_id: number) => {
+  const deleteBlock = async (block_id: ItemID) => {
     try {
-      await getRpc().deleteItem({ id: block_id })
+      await ctx.api.rpc.deleteItem({ id: block_id })
       removeChild(block_id)
     } catch (err) {
       ctx.showError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  const handleDrop = (dragged_id: number, target_id: number) => {
+  const handleDrop = (dragged_id: ItemID, target_id: ItemID) => {
     const dragged = children_ref.current.find(child => child.id === dragged_id)
     const target = children_ref.current.find(child => child.id === target_id)
-    if (dragged === undefined || target === undefined) {return}
+    if (dragged !== undefined && target !== undefined) {
+      syncChildren(children_ref.current.map(child => {
+        if (child.id === dragged.id) {
+          return { ...child, order_index: target.order_index }
+        } else if (child.id === target.id) {
+          return { ...child, order_index: dragged.order_index }
+        } else {
+          return child
+        }
+      }))
 
-    syncChildren(children_ref.current.map(child => {
-      if (child.id === dragged.id) {return { ...child, order_index: target.order_index }}
-      if (child.id === target.id) {return { ...child, order_index: dragged.order_index }}
-      return child
-    }))
-
-    Promise.all([
-      getRpc().updateItem({ id: dragged.id, data: { order_index: target.order_index } }),
-      getRpc().updateItem({ id: target.id, data: { order_index: dragged.order_index } }),
-    ]).catch(err => {
-      ctx.showError(err instanceof Error ? err.message : String(err))
-      void loadChildren()
-    })
+      Promise.all([
+        ctx.api.rpc.updateItem({ id: dragged.id, data: { order_index: target.order_index } }),
+        ctx.api.rpc.updateItem({ id: target.id, data: { order_index: dragged.order_index } }),
+      ]).catch(err => {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+        void loadChildren()
+      })
+    }
   }
 
   const replacePlaceholder = async (
@@ -338,7 +227,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     created: Item,
   ): Promise<void> => {
     try {
-      await getRpc().deleteItem({ id: placeholder.id })
+      await ctx.api.rpc.deleteItem({ id: placeholder.id })
       removeChild(placeholder.id)
       insertChild(created)
       await createTextlineAfter(created)
@@ -351,7 +240,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const insertManga = async (placeholder: Item | null) => {
     const order_index = placeholder === null ? appendOrder() : placeholder.order_index
     try {
-      const created = await getRpc().addItem({
+      const created = await ctx.api.rpc.addItem({
         role: 'entity',
         kind: 'manga',
         title: '新漫画',
@@ -383,27 +272,32 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   ) => {
     let anchor: Item | null = placeholder
     let first_created: Item | null = null
+    let upload_failed = false
 
     for (const file of files) {
-      const order_index = anchor === null ? appendOrder() : (
-        anchor.id === placeholder?.id ? placeholder.order_index : orderAfterItem(anchor)
-      )
-      try {
-        const created = kind === 'image'
-          ? await createImageItem(file, item.id, order_index)
-          : await createFileItem(file, item.id, order_index)
+      if (upload_failed) {
+        // 出错后不再继续上传，等待当前批次收尾。
+      } else {
+        const order_index = anchor === null ? appendOrder() : (
+          anchor.id === placeholder?.id ? placeholder.order_index : orderAfterItem(anchor)
+        )
+        try {
+          const created = kind === 'image'
+            ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
+            : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
 
-        if (anchor !== null && anchor.id === placeholder?.id) {
-          await getRpc().deleteItem({ id: anchor.id })
-          removeChild(anchor.id)
+          if (anchor !== null && anchor.id === placeholder?.id) {
+            await ctx.api.rpc.deleteItem({ id: anchor.id })
+            removeChild(anchor.id)
+          }
+          insertChild(created)
+          if (first_created === null) {first_created = created}
+          anchor = created
+        } catch (err) {
+          upload_failed = true
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
         }
-        insertChild(created)
-        if (first_created === null) {first_created = created}
-        anchor = created
-      } catch (err) {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-        void loadChildren()
-        break
       }
     }
 
@@ -415,9 +309,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handleUploadChange = (kind: UploadKind, files: File[]) => {
     const pending = pending_upload_ref.current
     pending_upload_ref.current = null
-    if (files.length === 0) {return}
-    const placeholder = pending?.kind === kind ? pending.placeholder : null
-    void insertUploadedFiles(kind, placeholder, files)
+    if (files.length !== 0) {
+      const placeholder = pending?.kind === kind ? pending.placeholder : null
+      void insertUploadedFiles(kind, placeholder, files)
+    }
   }
 
   const handleSlashCommand = (command: SlashCommand, placeholder: Item) => {
@@ -440,7 +335,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     setLinkPlaceholder(null)
     const order_index = placeholder === null ? appendOrder() : placeholder.order_index
     try {
-      const created = await getRpc().addItem({
+      const created = await ctx.api.rpc.addItem({
         role: 'itemlink',
         title: target.title || `#${target.id}`,
         parent_id: item.id,
@@ -519,7 +414,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             <small>按 / 插入 block</small>
           </button>
         ) : children.map(child => {
-          const module = resolveModule(child)
+          const module = ctx.modules.resolve(child)
           const content = child.role === 'textline' ? (
             <TextLineBlock
               item={child}
@@ -540,7 +435,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           )
 
           return (
-            <BlockWrapper
+            <PageBlock
               key={child.id}
               item={child}
               content={content}
@@ -556,6 +451,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
       {picker && (
         <ItemPicker
+          ctx={ctx}
           exclude_ids={link_placeholder === null ? [] : [link_placeholder.id]}
           onClose={() => {
             setPicker(false)
@@ -571,7 +467,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const pageModule: ItemModule = {
+export const __PAGE_MODULE__: ItemModule = {
   role: 'page',
   Presenter: {
     card: item => <PageCard item={item} />,

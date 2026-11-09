@@ -32,7 +32,7 @@ sys.config (database)
   └─ sys.config.config_version
 ```
 
-- ConfigService `ensure()`：查找/创建 system DB、seed 缺失默认行、修复 schema。
+- ConfigStore `ensure()`：查找/创建 system DB、seed 缺失默认行、修复 schema。
 - `load()`：读取子项、合并默认值、缓存。
 - `update()`：校验 key 前缀/类型；更新行；失效缓存。
 - `getConfig` / `updateConfig` action；设置页编辑。
@@ -42,19 +42,19 @@ sys.config (database)
 ## 3. 启动流程
 
 ```text
-loadRootEnv() + loadBootstrapConfig()
-→ ensureDatabaseExists
-→ createDb
+bootstrapLoadEnv() + bootstrapLoadConfig()
+→ dbEnsureExists
+→ CreateDb({ database_url })
 → migrate（MIGRATE_ON_START）
-→ BlobStore.init()
-→ BlobService
-→ ConfigService.ensure() + load(true)
-→ ThumbnailService
-→ createApi()
+→ CreateBlobStore({ root, on_error }) + init()
+→ CreateBlobService({ db, store })
+→ CreateConfigStore({ db, on_error }) + ensure() + reload()
+→ CreateThumbnailService({ db, blobs })
+→ CreateApi({ config, db, blobs, config_store, thumbnails })
 → listen(HOST, HTTP_API_PORT)
 ```
 
-`createApi` 构造 `/blob` multipart 中间件与 `/action` 路由；每次 upload 读取 runtime `upload_max_bytes`（硬上限 1GiB）。
+`CreateApi` 构造 `/blob` multipart 中间件与 `/action` 路由；每次 upload 读取 runtime `upload_max_bytes`（硬上限 1GiB）。
 
 ## 4. API 进程
 
@@ -71,7 +71,7 @@ loadRootEnv() + loadBootstrapConfig()
 npm run clean
 ```
 
-`prepareApp` → 读 `gc_grace_hours` → `cleanUnreferencedBlobs` → 批量删无引用 blob → 退出。
+`appPrepare` → 读 `gc_grace_hours` → `cleanUnreferencedBlobs` → 批量删无引用 blob → 退出。
 
 ### DB
 
@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 38、types 11、web 16。
+- 当前：server 38、types 16、web 17。
 
 ## 7. Web
 

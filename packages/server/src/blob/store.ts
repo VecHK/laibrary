@@ -3,15 +3,37 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import sharp from 'sharp'
+import { as } from '@laibrary/types'
 import type { BlobID } from '@laibrary/types'
-import { storageError } from '../errors'
+import { errorsIsAppError, errorsStorage } from '../errors'
 
 export type StoredBlob = {
-  id: BlobID
-  size: number
-  mime: string
-  width: number | null
-  height: number | null
+  readonly id: BlobID
+  readonly size: number
+  readonly mime: string
+  readonly width: number | null
+  readonly height: number | null
+}
+
+export type BlobStore = {
+  readonly root: string
+  readonly init: () => Promise<void>
+  readonly idFromHash: (hash: string) => BlobID
+  readonly pathFor: (id: BlobID) => string
+  readonly exists: (id: BlobID) => Promise<boolean>
+  readonly stat: (id: BlobID) => Promise<fs.Stats>
+  readonly delete: (id: BlobID) => Promise<void>
+  readonly putFile: (temp_path: string, mime: string) => Promise<StoredBlob>
+  readonly putBuffer: (buf: Buffer, mime: string) => Promise<StoredBlob>
+}
+
+export type CreateBlobStoreOptions = {
+  root: string
+  on_error: (error: unknown) => void
+}
+
+function isErrno(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
 }
 
 function normalizeDimensions(
@@ -21,10 +43,13 @@ function normalizeDimensions(
 ): { width: number | null, height: number | null } {
   if (width === undefined || height === undefined) {
     return { width: null, height: null }
+  } else {
+    if ((orientation ?? 0) >= 5) {
+      return { width: height, height: width }
+    } else {
+      return { width, height }
+    }
   }
-  return ((orientation ?? 0) >= 5)
-    ? { width: height, height: width }
-    : { width, height }
 }
 
 function sha256File(file_path: string): Promise<string> {
@@ -37,7 +62,10 @@ function sha256File(file_path: string): Promise<string> {
   })
 }
 
-async function fsyncFile(file_path: string): Promise<void> {
+async function fsyncFile(
+  file_path: string,
+  on_error: (error: unknown) => void,
+): Promise<void> {
   try {
     const handle = await fs.promises.open(file_path, 'r')
     try {
@@ -45,12 +73,15 @@ async function fsyncFile(file_path: string): Promise<void> {
     } finally {
       await handle.close()
     }
-  } catch {
-    // Best effort: some platforms/filesystems do not allow fsync on a read handle.
+  } catch (error) {
+    on_error(error)
   }
 }
 
-async function fsyncDirectory(dir_path: string): Promise<void> {
+async function fsyncDirectory(
+  dir_path: string,
+  on_error: (error: unknown) => void,
+): Promise<void> {
   try {
     const handle = await fs.promises.open(dir_path, 'r')
     try {
@@ -58,83 +89,69 @@ async function fsyncDirectory(dir_path: string): Promise<void> {
     } finally {
       await handle.close()
     }
-  } catch {
-    // Best effort.
+  } catch (error) {
+    on_error(error)
   }
 }
 
-export class BlobStore {
-  readonly root: string
-
-  constructor(root: string) {
-    this.root = root
-  }
-
-  async init(): Promise<void> {
-    await fs.promises.mkdir(this.root, { recursive: true })
-    // 清理上次进程崩溃留下的临时文件；正常上传文件在 commit 后 rename 走。
-    const entries = await fs.promises.readdir(this.root, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.startsWith('.tmp-')) {
-        await fs.promises.unlink(path.join(this.root, entry.name)).catch(() => undefined)
-      }
+async function removeIfExists(
+  file_path: string,
+  on_error: (error: unknown) => void,
+): Promise<void> {
+  try {
+    await fs.promises.unlink(file_path)
+  } catch (error) {
+    if (!(isErrno(error) && error.code === 'ENOENT')) {
+      on_error(error)
     }
   }
+}
 
-  idFromHash(hash: string): BlobID {
-    return hash as BlobID
-  }
+export function CreateBlobStore({
+  root,
+  on_error,
+}: CreateBlobStoreOptions): BlobStore {
+  const pathFor = (id: BlobID): string => path.join(root, id.slice(0, 2), id.slice(2, 4), id)
 
-  pathFor(id: BlobID): string {
-    return path.join(this.root, id.slice(0, 2), id.slice(2, 4), id)
-  }
-
-  async exists(id: BlobID): Promise<boolean> {
+  const exists = async (id: BlobID): Promise<boolean> => {
     try {
-      const stat = await fs.promises.stat(this.pathFor(id))
+      const stat = await fs.promises.stat(pathFor(id))
       return stat.isFile()
-    } catch {
-      return false
-    }
-  }
-
-  async stat(id: BlobID): Promise<fs.Stats> {
-    return fs.promises.stat(this.pathFor(id))
-  }
-
-  async delete(id: BlobID): Promise<void> {
-    try {
-      await fs.promises.unlink(this.pathFor(id))
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {throw err}
-    }
-  }
-
-  private async inspect(file_path: string, mime: string): Promise<{
-    width: number | null
-    height: number | null
-  }> {
-    try {
-      const meta = await sharp(file_path).metadata()
-      return normalizeDimensions(meta.width, meta.height, meta.orientation)
-    } catch (err) {
-      if (mime.startsWith('image/')) {
-        throw storageError('无法读取图片元数据', err)
+    } catch (error) {
+      if (isErrno(error) && error.code === 'ENOENT') {
+        return false
+      } else {
+        throw error
       }
-      return { width: null, height: null }
     }
   }
 
-  private async commitTemp(
+  const inspect = async (
+    file_path: string,
+    mime: string,
+  ): Promise<{ width: number | null, height: number | null }> => {
+    if (!mime.startsWith('image/')) {
+      return { width: null, height: null }
+    } else {
+      try {
+        const meta = await sharp(file_path).metadata()
+        return normalizeDimensions(meta.width, meta.height, meta.orientation)
+      } catch (cause) {
+        throw errorsStorage('无法读取图片元数据', cause)
+      }
+    }
+  }
+
+  const commitTemp = async (
     temp_path: string,
     id: BlobID,
     metadata: { width: number | null, height: number | null },
-  ): Promise<StoredBlob> {
-    const final_path = this.pathFor(id)
+  ): Promise<StoredBlob> => {
+    const final_path = pathFor(id)
     await fs.promises.mkdir(path.dirname(final_path), { recursive: true })
 
-    if (await this.exists(id)) {
-      await fs.promises.unlink(temp_path).catch(() => undefined)
+    if (await exists(id)) {
+      await removeIfExists(temp_path, on_error)
       return {
         id,
         size: (await fs.promises.stat(final_path)).size,
@@ -142,66 +159,104 @@ export class BlobStore {
         width: metadata.width,
         height: metadata.height,
       }
-    }
-
-    await fsyncFile(temp_path)
-    try {
-      await fs.promises.rename(temp_path, final_path)
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EXDEV') {throw err}
-      await fs.promises.copyFile(temp_path, final_path)
-      await fsyncFile(final_path)
-      await fs.promises.unlink(temp_path).catch(() => undefined)
-    }
-    await fsyncDirectory(path.dirname(final_path))
-    const stat = await fs.promises.stat(final_path)
-    return {
-      id,
-      size: stat.size,
-      mime: '',
-      width: metadata.width,
-      height: metadata.height,
+    } else {
+      await fsyncFile(temp_path, on_error)
+      try {
+        await fs.promises.rename(temp_path, final_path)
+      } catch (error) {
+        if (isErrno(error) && error.code === 'EXDEV') {
+          await fs.promises.copyFile(temp_path, final_path)
+          await fsyncFile(final_path, on_error)
+          await removeIfExists(temp_path, on_error)
+        } else {
+          throw error
+        }
+      }
+      await fsyncDirectory(path.dirname(final_path), on_error)
+      const stat = await fs.promises.stat(final_path)
+      return {
+        id,
+        size: stat.size,
+        mime: '',
+        width: metadata.width,
+        height: metadata.height,
+      }
     }
   }
 
-  async putFile(temp_path: string, mime: string): Promise<StoredBlob> {
+  const init = async (): Promise<void> => {
+    await fs.promises.mkdir(root, { recursive: true })
+    const entries = await fs.promises.readdir(root, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.startsWith('.tmp-')) {
+        await removeIfExists(path.join(root, entry.name), on_error)
+      }
+    }
+  }
+
+  const putFile = async (temp_path: string, mime: string): Promise<StoredBlob> => {
     try {
-      const id = this.idFromHash(await sha256File(temp_path))
-      const metadata = await this.inspect(temp_path, mime)
-      const stored = await this.commitTemp(temp_path, id, metadata)
+      const id = as<BlobID>(await sha256File(temp_path))
+      const metadata = await inspect(temp_path, mime)
+      const stored = await commitTemp(temp_path, id, metadata)
       return { ...stored, mime }
-    } catch (err) {
-      await fs.promises.unlink(temp_path).catch(() => undefined)
-      if (err instanceof Error && err.name === 'AppError') {throw err}
-      throw storageError('写入 blob 失败', err)
+    } catch (error) {
+      await removeIfExists(temp_path, on_error)
+      if (errorsIsAppError(error)) {
+        throw error
+      } else {
+        throw errorsStorage('写入 blob 失败', error)
+      }
     }
   }
 
-  async putBuffer(buf: Buffer, mime: string): Promise<StoredBlob> {
-    const id = this.idFromHash(crypto.createHash('sha256').update(buf).digest('hex'))
-    const temp_path = path.join(this.root, `.tmp-${crypto.randomUUID()}`)
-    await fs.promises.mkdir(this.root, { recursive: true })
+  const putBuffer = async (buf: Buffer, mime: string): Promise<StoredBlob> => {
+    const id = as<BlobID>(crypto.createHash('sha256').update(buf).digest('hex'))
+    const temp_path = path.join(root, `.tmp-${crypto.randomUUID()}`)
+    await fs.promises.mkdir(root, { recursive: true })
     await fs.promises.writeFile(temp_path, buf)
 
     try {
-      const final_path = this.pathFor(id)
-      if (await this.exists(id)) {
-        await fs.promises.unlink(temp_path).catch(() => undefined)
+      const final_path = pathFor(id)
+      if (await exists(id)) {
+        await removeIfExists(temp_path, on_error)
         const stat = await fs.promises.stat(final_path)
-        const meta = await this.inspect(final_path, mime)
+        const meta = await inspect(final_path, mime)
         return { id, size: stat.size, mime, ...meta }
+      } else {
+        const metadata = mime.startsWith('image/')
+                          ? await inspect(temp_path, mime)
+                          : { width: null, height: null }
+        const stored = await commitTemp(temp_path, id, metadata)
+        return { ...stored, mime }
       }
-      let metadata: { width: number | null, height: number | null } = { width: null, height: null }
-      if (mime.startsWith('image/')) {
-        const meta = await sharp(buf).metadata()
-        metadata = normalizeDimensions(meta.width, meta.height, meta.orientation)
+    } catch (error) {
+      await removeIfExists(temp_path, on_error)
+      if (errorsIsAppError(error)) {
+        throw error
+      } else {
+        throw errorsStorage('写入 blob 失败', error)
       }
-      const stored = await this.commitTemp(temp_path, id, metadata)
-      return { ...stored, mime }
-    } catch (err) {
-      await fs.promises.unlink(temp_path).catch(() => undefined)
-      if (err instanceof Error && err.name === 'AppError') {throw err}
-      throw storageError('写入 blob 失败', err)
     }
+  }
+
+  return {
+    root,
+    init,
+    idFromHash: hash => as<BlobID>(hash),
+    pathFor,
+    exists,
+    stat: id => fs.promises.stat(pathFor(id)),
+    delete: async id => {
+      try {
+        await fs.promises.unlink(pathFor(id))
+      } catch (error) {
+        if (!(isErrno(error) && error.code === 'ENOENT')) {
+          throw error
+        }
+      }
+    },
+    putFile,
+    putBuffer,
   }
 }

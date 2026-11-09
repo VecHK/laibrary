@@ -70,7 +70,7 @@ PRIMARY KEY (image_id, size)
 
 - 连接串：`DATABASE_URL`（bootstrap）。
 - 连接池：node-postgres `Pool`，默认 max 10。
-- `ensureDatabaseExists` 以 `/postgres` 管理库检查并 `CREATE DATABASE`（库名白名单）。
+- `dbEnsureExists` 以 `/postgres` 管理库检查并 `CREATE DATABASE`（库名白名单）。
 - 启动时 `MIGRATE_ON_START=true` 则执行 drizzle migrate；迁移目录 `packages/server/drizzle/`。
 - 新基线：`0000_v2_init.sql`；旧 0000/0001 已移除。
 - `drizzle.config.ts` 从 `DATABASE_URL` 读连接串；本地默认 root/root@127.0.0.1/root。

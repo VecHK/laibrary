@@ -1,38 +1,49 @@
 import { useEffect, useState } from 'react'
 import type { ConfigEntry } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { getBaseUrl, clearBaseUrl } from '../lib/settings'
+import { settingsClearBaseUrl, settingsGetBaseUrl } from '../lib/settings'
 import type { ViewerCtx } from '../modules/types'
 
 function displayValue(entry: ConfigEntry): string {
-  if (entry.type === 'json') {return JSON.stringify(entry.value, null, 2)}
-  return String(entry.value)
+  if (entry.type === 'json') {
+    return JSON.stringify(entry.value, null, 2)
+  } else {
+    return String(entry.value)
+  }
 }
 
 function parseValue(entry: ConfigEntry, raw: string): unknown {
   if (entry.type === 'number') {
     const value = Number(raw)
-    if (!Number.isFinite(value)) {throw new Error('需要数字')}
-    return value
+    if (!Number.isFinite(value)) {
+      throw new Error('需要数字')
+    } else {
+      return value
+    }
+  } else if (entry.type === 'boolean') {
+    if (raw === 'true') {
+      return true
+    } else if (raw === 'false') {
+      return false
+    } else {
+      throw new Error('需要 true / false')
+    }
+  } else if (entry.type === 'json') {
+    const parsed: unknown = JSON.parse(raw)
+    return parsed
+  } else {
+    return raw
   }
-  if (entry.type === 'boolean') {
-    if (raw === 'true') {return true}
-    if (raw === 'false') {return false}
-    throw new Error('需要 true / false')
-  }
-  if (entry.type === 'json') {return JSON.parse(raw) as unknown}
-  return raw
 }
 
 export function SettingsView({ ctx }: { ctx: ViewerCtx }) {
-  const [entries, setEntries] = useState<ConfigEntry[] | null>(null)
+  const [entries, setEntries] = useState<readonly ConfigEntry[] | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [version, setVersion] = useState(1)
   const [saving, setSaving] = useState<string | null>(null)
 
   const load = () => {
-    getRpc().getConfig(undefined).then(snapshot => {
-      setEntries(snapshot.entries)
+    ctx.api.rpc.getConfig().then(snapshot => {
+      setEntries([...snapshot.entries])
       setVersion(snapshot.version)
       setDrafts(Object.fromEntries(snapshot.entries.map(entry => [entry.key, displayValue(entry)])))
     }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
@@ -45,7 +56,7 @@ export function SettingsView({ ctx }: { ctx: ViewerCtx }) {
     setSaving(entry.key)
     try {
       const value = parseValue(entry, raw)
-      getRpc().updateConfig({ key: entry.key, value })
+      ctx.api.rpc.updateConfig({ key: entry.key, value })
         .then(() => {
           ctx.refresh()
           load()
@@ -68,11 +79,11 @@ export function SettingsView({ ctx }: { ctx: ViewerCtx }) {
         </p>
         <div className="meta-row">
           <span>配置版本: {version}</span>
-          <span>服务地址: {getBaseUrl() ?? '(未连接)'}</span>
+          <span>服务地址: {settingsGetBaseUrl() ?? '(未连接)'}</span>
           <button
             className="button"
             onClick={() => {
-              clearBaseUrl()
+              settingsClearBaseUrl()
               window.location.reload()
             }}
           >更改连接地址</button>

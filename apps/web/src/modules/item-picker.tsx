@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
+import type { ViewerCtx } from './types'
 
 export function ItemPicker({
   onSelect,
   onClose,
   exclude_ids,
+  ctx,
 }: {
   onSelect: (item: Item) => void
   onClose: () => void
-  exclude_ids?: number[]
+  exclude_ids?: readonly Item['id'][]
+  ctx: ViewerCtx
 }) {
   const [items, setItems] = useState<Item[]>([])
   const [query, setQuery] = useState('')
@@ -17,14 +19,16 @@ export function ItemPicker({
 
   const load = (text: string) => {
     setLoading(true)
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: 50,
       sort_by: 'update_date',
       desc: true,
       filter_rules: text.trim().length === 0
         ? []
         : [{ name: 'title', input: text.trim(), logic: 'and' }],
-    }).then(setItems).finally(() => setLoading(false))
+    }).then(setItems).catch(error => {
+      ctx.showError(error instanceof Error ? error.message : String(error))
+    }).finally(() => setLoading(false))
   }
 
   useEffect(() => {

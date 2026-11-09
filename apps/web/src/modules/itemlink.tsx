@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
 import { openItemById } from '../lib/open-item'
 import type { ItemModule, ViewerCtx } from './types'
 
-function useTarget(item: Item) {
+function useTarget(item: Item, ctx: ViewerCtx) {
   const [target, setTarget] = useState<Item | null>(null)
   const [missing, setMissing] = useState(false)
 
@@ -13,24 +12,28 @@ function useTarget(item: Item) {
     setMissing(false)
     if (item.target_id === null) {
       setMissing(true)
-      return
+    } else {
+      ctx.api.rpc.getItem({ id: item.target_id })
+        .then(setTarget)
+        .catch(() => setMissing(true))
     }
-    getRpc().getItem({ id: item.target_id })
-      .then(setTarget)
-      .catch(() => setMissing(true))
-  }, [item.id, item.target_id])
+  }, [item.id, item.target_id, ctx.api.rpc])
 
   return { target, missing }
 }
 
 function targetLabel(item: Item, target: Item | null, missing: boolean): string {
-  if (missing) {return '链接失效'}
-  if (target === null) {return '加载中…'}
-  return target.title || `#${target.id}`
+  if (missing) {
+    return '链接失效'
+  } else if (target === null) {
+    return '加载中…'
+  } else {
+    return target.title || `#${target.id}`
+  }
 }
 
 function ItemLinkBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const { target, missing } = useTarget(item)
+  const { target, missing } = useTarget(item, ctx)
   return (
     <div
       className={`block-link ${missing ? 'is-missing' : ''}`}
@@ -50,7 +53,7 @@ function ItemLinkBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function ItemLinkCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const { target, missing } = useTarget(item)
+  const { target, missing } = useTarget(item, ctx)
   return (
     <div
       className="card link-card"
@@ -66,7 +69,7 @@ function ItemLinkCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function ItemLinkFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const { target, missing } = useTarget(item)
+  const { target, missing } = useTarget(item, ctx)
   const target_id = item.target_id
   return (
     <div className="panel">
@@ -81,7 +84,7 @@ function ItemLinkFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const itemlinkModule: ItemModule = {
+export const __ITEMLINK_MODULE__: ItemModule = {
   role: 'itemlink',
   Presenter: {
     card: (item, ctx) => <ItemLinkCard item={item} ctx={ctx} />,

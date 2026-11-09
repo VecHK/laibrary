@@ -8,30 +8,31 @@ export type Role =
   | 'tag'
   | 'database'
 
-export type ItemID = number
+declare const ItemIDBrand: unique symbol
+
+export type ItemID = number & { readonly [ItemIDBrand]: 'ItemID' }
 
 /** Content-addressed blob id: lowercase SHA-256 hex. */
-export type BlobID = string & { __BLOB_ID__: never }
+declare const BlobIDBrand: unique symbol
+export type BlobID = string & { readonly [BlobIDBrand]: 'BlobID' }
 
 /** Globally unique, machine-readable item name. */
-export type UnityName = string & { __UNITY_NAME__: never }
+declare const UnityNameBrand: unique symbol
+export type UnityName = string & { readonly [UnityNameBrand]: 'UnityName' }
 
 /** Open semantic kind. Only meaningful on role='entity'. */
 export type Kind = string
 
-export const THUMB_SIZES = [96, 384, 800, 1440] as const
-export type ThumbSize = (typeof THUMB_SIZES)[number]
-
 export interface BlobMeta {
-  id: BlobID
-  size: number
-  mime: string
-  width: number | null
-  height: number | null
+  readonly id: BlobID
+  readonly size: number
+  readonly mime: string
+  readonly width: number | null
+  readonly height: number | null
 }
 
 export interface FileAttributes {
-  filename: string
+  readonly filename: string
 }
 
 export type ImageAttributes = FileAttributes
@@ -39,81 +40,78 @@ export type ImageAttributes = FileAttributes
 export type DatabaseFieldType = 'string' | 'number' | 'unity_name'
 
 export interface DatabaseFieldDef {
-  name: string
-  type: DatabaseFieldType
+  readonly name: string
+  readonly type: DatabaseFieldType
 }
 
 export interface DatabaseAttributes {
-  schema: DatabaseFieldDef[]
+  readonly schema: readonly DatabaseFieldDef[]
 }
 
 export interface RoleAttributes {
-  page: Record<string, unknown>
-  entity: Record<string, unknown>
-  textline: Record<string, unknown>
+  page: Readonly<Record<string, unknown>>
+  entity: Readonly<Record<string, unknown>>
+  textline: Readonly<Record<string, unknown>>
   image: ImageAttributes
   file: FileAttributes
-  itemlink: Record<string, unknown>
-  tag: Record<string, unknown>
+  itemlink: Readonly<Record<string, unknown>>
+  tag: Readonly<Record<string, unknown>>
   database: DatabaseAttributes
 }
 
 export interface ItemBase {
-  id: ItemID
-  role: Role
-  kind: Kind | null
-  unity_name: UnityName | null
-  title: string
-  attributes: RoleAttributes[Role]
-  tags: ItemID[]
-  parent_id: ItemID | null
-  order_index: number
-  blob: BlobMeta | null
-  target_id: ItemID | null
-  create_date: string
-  update_date: string
+  readonly id: ItemID
+  readonly role: Role
+  readonly kind: Kind | null
+  readonly unity_name: UnityName | null
+  readonly title: string
+  readonly attributes: RoleAttributes[Role]
+  readonly tags: readonly ItemID[]
+  readonly parent_id: ItemID | null
+  readonly order_index: number
+  readonly blob: BlobMeta | null
+  readonly target_id: ItemID | null
+  readonly create_date: string
+  readonly update_date: string
 }
 
 export type Item<R extends Role = Role> = ItemBase & {
-  role: R
-  attributes: RoleAttributes[R]
+  readonly role: R
+  readonly attributes: RoleAttributes[R]
 }
 
 export interface AddItemForm<R extends Role = Role> {
   role: R
-  kind?: Kind
-  unity_name?: string
-  title?: string
-  attributes?: RoleAttributes[R]
-  tags?: ItemID[]
-  parent_id?: ItemID | null
-  order_index?: number
-  blob_id?: BlobID
-  target_id?: ItemID
+  kind?: Kind | undefined
+  unity_name?: string | undefined
+  title?: string | undefined
+  attributes?: RoleAttributes[R] | undefined
+  tags?: readonly ItemID[] | undefined
+  parent_id?: ItemID | null | undefined
+  order_index?: number | undefined
+  blob_id?: BlobID | undefined
+  target_id?: ItemID | undefined
 }
 
 export interface UpdateItemForm {
-  title?: string
-  attributes?: RoleAttributes[Role]
-  tags?: ItemID[]
-  parent_id?: ItemID | null
-  order_index?: number
-  target_id?: ItemID
+  title?: string | undefined
+  attributes?: RoleAttributes[Role] | undefined
+  tags?: readonly ItemID[] | undefined
+  parent_id?: ItemID | null | undefined
+  order_index?: number | undefined
+  target_id?: ItemID | undefined
 }
 
 export type ConfigValueType = 'string' | 'number' | 'boolean' | 'json'
 
 export interface ConfigEntry {
-  key: string
-  title: string
-  type: ConfigValueType
-  value: unknown
+  readonly key: string
+  readonly title: string
+  readonly type: ConfigValueType
+  readonly value: unknown
 }
 
 export interface ConfigSnapshot {
-  version: number
-  entries: ConfigEntry[]
+  readonly version: number
+  readonly entries: readonly ConfigEntry[]
 }
-
-export const SYSTEM_CONFIG_UNITY_NAME = 'sys.config'
-export const SYSTEM_UNITY_PREFIX = 'sys.'

@@ -86,7 +86,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 ## 7. 系统配置
 
 - **Bootstrap**：`.env`/OS env，启动前必需：DB URL、端口、host、storage/blob 路径、日志级别、migrate 开关；密钥只在这里。
-- **Runtime**：`sys.config` database Item；配置行是 `page` Item，`unity_name='sys.config.*'`，attributes `{value,type}`；ConfigService 读取、合并默认、zod 校验、缓存。
+- **Runtime**：`sys.config` database Item；配置行是 `page` Item，`unity_name='sys.config.*'`，attributes `{value,type}`；ConfigStore 读取、合并默认、zod 校验、缓存。
 - `getConfig` / `updateConfig` action；设置页编辑。
 - 通用 item 写接口禁止 `sys.` unity_name；系统项不出现在公共 listing。
 - runtime 不接受 env 覆盖；bootstrap 不进入 Item。
@@ -129,11 +129,12 @@ docs             规格、愿景、名词表、方法论、重构记录
 - 单表 + role/kind/unity_name + itemlink + database schema（含 unity_name 字段）。
 - blobs 内容寻址、file/image Item、上传/读取/去重/GC。
 - thumbnails 四档 AVIF 惰性生成、隐藏、级联。
-- sys.config database + ConfigService + 设置页；根 `.env` bootstrap。
+- sys.config database + ConfigStore + 设置页；根 `.env` bootstrap。
 - 统一 open resolver；kind registry（manga）。
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
+- Server 使用闭包工厂（BlobStore/BlobService/ConfigStore/ThumbnailService）与组合根；Web 使用显式 session/tag store/module registry，无 RPC/标签模块单例。
 - 漫画阅读器；局域网可运行。
-- 测试：server 38、types 11、web 16；lint/typecheck/build 通过。
+- 测试：server 38、types 16、web 17；lint/typecheck/build 通过。
 
 待做：
 

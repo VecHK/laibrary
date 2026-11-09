@@ -9,7 +9,7 @@ export type SlashCommand = {
   aliases: string[]
 }
 
-export const SLASH_COMMANDS: SlashCommand[] = [
+export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
   {
     id: 'text',
     label: '文本',
@@ -54,21 +54,29 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 
 /** Slash 菜单只在行首、无空格、光标在行尾时触发。 */
 export function detectSlashQuery(value: string, selectionStart: number): string | null {
-  if (selectionStart !== value.length) {return null}
-  if (!value.startsWith('/')) {return null}
-  const query = value.slice(1)
-  if (query.includes('/') || /\s/.test(query)) {return null}
-  return query
+  if (selectionStart !== value.length || !value.startsWith('/')) {
+    return null
+  } else {
+    const query = value.slice(1)
+    if (query.includes('/') || /\s/.test(query)) {
+      return null
+    } else {
+      return query
+    }
+  }
 }
 
-export function filterSlashCommands(query: string): SlashCommand[] {
+export function filterSlashCommands(query: string): readonly SlashCommand[] {
   const needle = query.trim().toLowerCase()
-  if (needle.length === 0) {return SLASH_COMMANDS}
-  return SLASH_COMMANDS.filter(command => (
-    command.label.toLowerCase().includes(needle) ||
-    command.role.toLowerCase().includes(needle) ||
-    command.aliases.some(alias => alias.includes(needle))
-  ))
+  if (needle.length === 0) {
+    return __SLASH_COMMANDS__
+  } else {
+    return __SLASH_COMMANDS__.filter(command => (
+      command.label.toLowerCase().includes(needle) ||
+      command.role.toLowerCase().includes(needle) ||
+      command.aliases.some(alias => alias.includes(needle))
+    ))
+  }
 }
 
 export function splitTextLine(

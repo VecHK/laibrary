@@ -1,19 +1,23 @@
 import { z } from 'zod'
 import type {
-  BlobID, DatabaseFieldDef, Role, RoleAttributes, UnityName,
+  BlobID, DatabaseFieldDef, ItemID, Role, RoleAttributes, UnityName,
 } from './roles'
+import { as } from './as'
+import {
+  __THUMBNAIL_SIZES__, type ThumbSize,
+} from './constants'
 
 export const zBlobID = z
   .string()
   .regex(/^[0-9a-f]{64}$/, '非法的 BlobID')
-  .transform(value => value as BlobID)
+  .transform(value => as<BlobID>(value))
 
 export const zUnityName = z
   .string()
   .min(1, 'unity_name 不能为空')
   .max(200, 'unity_name 太长')
   .regex(/^[a-z][a-z0-9._-]*$/, 'unity_name 只能使用小写字母、数字、._-')
-  .transform(value => value as UnityName)
+  .transform(value => as<UnityName>(value))
 
 export const zKind = z
   .string()
@@ -24,8 +28,15 @@ export const zKind = z
 export const zRole = z.enum([
   'page', 'entity', 'textline', 'image', 'file', 'itemlink', 'tag', 'database',
 ])
+export const zThumbSize = z.custom<ThumbSize>(value => (
+  typeof value === 'number' && __THUMBNAIL_SIZES__.some(size => size === value)
+))
 
-export const zItemID = z.number().int().positive()
+export const zItemID = z
+  .number()
+  .int()
+  .positive()
+  .transform(value => as<ItemID>(value))
 export const zTags = z.array(zItemID)
 
 export const zBlobMeta = z.object({
@@ -94,8 +105,8 @@ export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]
  * Row validation for a database parent. `unity_name` is backed by the item
  * column, not by attributes, so it is intentionally excluded here.
  */
-export function buildRowValidator(
-  fields: DatabaseFieldDef[],
+export function itemBuildRowValidator(
+  fields: readonly DatabaseFieldDef[],
 ): z.ZodType<Record<string, unknown>> {
   const shape: Record<string, z.ZodTypeAny> = {}
   for (const field of fields) {
@@ -108,11 +119,11 @@ export function buildRowValidator(
   return z.object(shape).passthrough()
 }
 
-export function checkAttributes(
+export function itemCheckAttributes(
   role: Role,
   attributes: unknown,
 ): RoleAttributes[Role] {
-  return zRoleAttributesSchemas[role].parse(attributes) as RoleAttributes[Role]
+  return zRoleAttributesSchemas[role].parse(attributes)
 }
 
 const zAddItemBase = z.object({
@@ -161,6 +172,49 @@ export const zUpdateItemForm = z.object({
   order_index: z.number().finite().optional(),
   target_id: zItemID.optional(),
 }).strict()
+
+export const zItem = z.object({
+  id: zItemID,
+  role: zRole,
+  kind: zKind.nullable(),
+  unity_name: zUnityName.nullable(),
+  title: z.string(),
+  attributes: zAnyAttributes,
+  tags: z.array(zItemID),
+  parent_id: zItemID.nullable(),
+  order_index: z.number().finite(),
+  blob: zBlobMeta.nullable(),
+  target_id: zItemID.nullable(),
+  create_date: z.string(),
+  update_date: z.string(),
+})
+
+export const zItems = z.array(zItem)
+
+export const zConfigEntry = z.object({
+  key: z.string(),
+  title: z.string(),
+  type: z.enum(['string', 'number', 'boolean', 'json']),
+  value: z.custom<unknown>(() => true),
+}).transform(entry => ({ ...entry, value: entry.value }))
+
+export const zConfigSnapshot = z.object({
+  version: z.number(),
+  entries: z.array(zConfigEntry),
+})
+
+export const zMessage = z.object({ message: z.literal('done') })
+
+export const zErrorBody = z.object({
+  message: z.string(),
+  code: z.string(),
+  issues: z.unknown().optional(),
+})
+
+export const zBlobUploadResponse = z.object({
+  blob: zBlobMeta,
+  reused: z.boolean(),
+})
 
 export type AddItemPayload = z.infer<typeof zAddItemForm>
 export type UpdateItemPayload = z.infer<typeof zUpdateItemForm>

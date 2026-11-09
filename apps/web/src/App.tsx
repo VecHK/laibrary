@@ -1,28 +1,57 @@
-import { useCallback, useEffect, useState } from 'react'
-import { createRpc, setRpc } from './lib/rpc'
-import { getBaseUrl, setBaseUrl } from './lib/settings'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RpcClient } from '@laibrary/types'
+import { CreateRpcClient } from '@laibrary/types'
+import {
+  settingsGetBaseUrl, settingsParseBaseUrl, settingsSetBaseUrl,
+} from './lib/settings'
 import { useHashRoute, type HashRoute } from './lib/hash-router'
-import { loadTags } from './lib/tags'
+import {
+  CreateTagStore, useTagStoreVersion, type TagStore,
+} from './lib/tags'
+import { CreateModuleRegistry } from './modules/registry'
 import { ConnectScreen } from './views/ConnectScreen'
 import { MainLayout } from './views/MainLayout'
-import type { ViewerCtx } from './modules/types'
+import type { ItemModuleRegistry, ViewerCtx } from './modules/types'
+import type { ItemID } from '@laibrary/types'
+
+type Session = {
+  readonly base_url: string
+  readonly rpc: RpcClient
+  readonly tags: TagStore
+  readonly modules: ItemModuleRegistry
+}
 
 export default function App() {
   const [route, navigate] = useHashRoute()
-  const [connected, setConnected] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
   const [refresh_key, setRefreshKey] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+  const toast_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useTagStoreVersion(session?.tags ?? null)
+
+  useEffect(() => () => {
+    if (toast_timer_ref.current !== null) {
+      clearTimeout(toast_timer_ref.current)
+    }
+  }, [])
 
   const showError = useCallback((message: string) => {
+    if (toast_timer_ref.current !== null) {
+      clearTimeout(toast_timer_ref.current)
+    }
     setToast(message)
-    setTimeout(() => setToast(null), 4000)
+    toast_timer_ref.current = setTimeout(() => {
+      setToast(null)
+      toast_timer_ref.current = null
+    }, 4000)
   }, [])
 
   const refresh = useCallback(() => {
-    setRefreshKey(k => k + 1)
+    setRefreshKey(current => current + 1)
   }, [])
 
-  const navigateTarget = useCallback((target: number | HashRoute) => {
+  const navigateTarget = useCallback((target: ItemID | HashRoute) => {
     if (typeof target === 'number') {
       navigate({ name: 'item', id: target })
     } else {
@@ -30,39 +59,55 @@ export default function App() {
     }
   }, [navigate])
 
-  const ctx: ViewerCtx = { navigate: navigateTarget, refresh, showError }
-
   const connect = useCallback(async (base_url: string) => {
-    setRpc(createRpc(base_url))
-    setBaseUrl(base_url)
-    await loadTags()
-    setConnected(true)
+    const parsed = settingsParseBaseUrl(base_url)
+    if (parsed === null) {
+      throw new Error('服务地址必须是 http/https URL')
+    }
+    const rpc = CreateRpcClient({ base_url: parsed })
+    await rpc.listing({ limit: 1 })
+    const tags = CreateTagStore({ rpc })
+    await tags.load()
+    settingsSetBaseUrl(parsed)
+    setSession({
+      base_url: parsed,
+      rpc,
+      tags,
+      modules: CreateModuleRegistry(),
+    })
   }, [])
 
   useEffect(() => {
-    const saved = getBaseUrl()
+    const saved = settingsGetBaseUrl()
     if (saved !== null) {
-      (async () => {
-        try {
-          await connect(saved)
-        } catch (err) {
-          console.warn('自动连接失败', err)
-          setConnected(false)
-        }
-      })()
+      void connect(saved).catch(error => {
+        setSession(null)
+        showError(error instanceof Error ? error.message : String(error))
+      })
     }
-  }, [connect])
+  }, [connect, showError])
+
+  const ctx: ViewerCtx | null = session === null
+    ? null
+    : {
+        api: { base_url: session.base_url, rpc: session.rpc },
+        tags: session.tags,
+        modules: session.modules,
+        navigate: navigateTarget,
+        refresh,
+        showError,
+      }
 
   return (
     <>
-      {connected ? (
+      {ctx === null ? (
+        <ConnectScreen onConnected={connect} />
+      ) : (
         <MainLayout
           route={route}
           ctx={ctx}
           refresh_key={refresh_key}
         />
-      ) : (
-        <ConnectScreen onConnected={connect} />
       )}
       {toast !== null && <div className="toast">{toast}</div>}
     </>

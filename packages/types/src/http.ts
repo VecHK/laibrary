@@ -1,4 +1,6 @@
-import type { BlobID, BlobMeta, ThumbSize } from './roles'
+import type { BlobID, BlobMeta } from './roles'
+import type { ThumbSize } from './constants'
+import { zBlobUploadResponse, zErrorBody } from './schemas'
 
 function normalizeBaseUrl(base_url: string): string {
   return base_url.replace(/\/+$/, '')
@@ -16,12 +18,19 @@ export function createThumbUrl(
   return `${normalizeBaseUrl(base_url)}/thumb/${image_id}?size=${size}`
 }
 
-export async function uploadBlob(
-  base_url: string,
-  file: Blob,
-  filename: string,
-  fetcher: typeof fetch = globalThis.fetch,
-): Promise<{ blob: BlobMeta; reused: boolean }> {
+export type UploadBlobOptions = {
+  base_url: string
+  file: Blob
+  filename: string
+  fetcher?: typeof fetch | undefined
+}
+
+export async function uploadBlob({
+  base_url,
+  file,
+  filename,
+  fetcher = globalThis.fetch,
+}: UploadBlobOptions): Promise<{ blob: BlobMeta; reused: boolean }> {
   const form_data = new FormData()
   form_data.append('file', file, filename)
 
@@ -31,30 +40,23 @@ export async function uploadBlob(
   )
 
   const text = await res.text()
-  let body: unknown = null
-  try {
-    body = JSON.parse(text)
-  } catch {
-    body = null
-  }
+  const parsed_body: unknown = (() => {
+    try {
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  })()
 
   if (!res.ok) {
-    const message = (
-      (body !== null) &&
-      (typeof body === 'object') &&
-      ('message' in body)
-    ) ? String(body.message) : `HTTP ${res.status}`
-    throw new Error(message)
+    const parsed_error = zErrorBody.safeParse(parsed_body)
+    if (parsed_error.success) {
+      throw new Error(parsed_error.data.message)
+    } else {
+      throw new Error(`HTTP ${res.status}`)
+    }
+  } else {
+    const payload = zBlobUploadResponse.parse(parsed_body)
+    return { blob: payload.blob, reused: payload.reused }
   }
-
-  if (
-    body === null ||
-    typeof body !== 'object' ||
-    !('blob' in body)
-  ) {
-    throw new Error('上传响应并不是 BlobMeta')
-  }
-
-  const payload = body as { blob: BlobMeta; reused?: boolean }
-  return { blob: payload.blob, reused: payload.reused === true }
 }

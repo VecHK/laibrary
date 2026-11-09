@@ -1,21 +1,19 @@
 import type { ConfigValueType, DatabaseFieldDef } from '@laibrary/types'
 
 export type ConfigDefault = {
-  key: string
-  title: string
-  type: ConfigValueType
-  value: unknown
+  readonly key: string
+  readonly title: string
+  readonly type: ConfigValueType
+  readonly value: unknown
 }
 
-export const SYSTEM_CONFIG_UNITY_NAME = 'sys.config'
-
-export const SYSTEM_CONFIG_SCHEMA: DatabaseFieldDef[] = [
+export const __SYSTEM_CONFIG_SCHEMA__: readonly DatabaseFieldDef[] = [
   { name: 'unity_name', type: 'unity_name' },
   { name: 'value', type: 'string' },
   { name: 'type', type: 'string' },
-]
+] as const
 
-export const DEFAULT_CONFIG: ConfigDefault[] = [
+export const __SYSTEM_CONFIG_DEFAULTS__: readonly ConfigDefault[] = [
   {
     key: 'sys.config.gc_grace_hours',
     title: 'GC 宽限期（小时）',
@@ -46,8 +44,8 @@ export const DEFAULT_CONFIG: ConfigDefault[] = [
     type: 'number',
     value: 1,
   },
-]
+] as const
 
-export function defaultFor(key: string): ConfigDefault | undefined {
-  return DEFAULT_CONFIG.find(item => item.key === key)
+export function configDefaultFor(key: string): ConfigDefault | undefined {
+  return __SYSTEM_CONFIG_DEFAULTS__.find(item => item.key === key)
 }

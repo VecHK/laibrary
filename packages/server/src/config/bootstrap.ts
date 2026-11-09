@@ -3,24 +3,27 @@ import { existsSync } from 'node:fs'
 import { z } from 'zod'
 
 /** Repository root: this file lives at packages/server/src/config/bootstrap.ts */
-export const REPO_ROOT = path.resolve(import.meta.dirname, '../../../..')
+export const __BOOTSTRAP_REPO_ROOT__ = path.resolve(import.meta.dirname, '../../../..')
 
 export type BootstrapConfig = {
-  database_url: string
-  http_api_port: number
-  host: string
-  storage_path: string
-  blob_path: string
-  upload_temp_path: string
-  log_level: 'debug' | 'info' | 'warn' | 'error'
-  migrate_on_start: boolean
+  readonly database_url: string
+  readonly http_api_port: number
+  readonly host: string
+  readonly storage_path: string
+  readonly blob_path: string
+  readonly upload_temp_path: string
+  readonly log_level: 'debug' | 'info' | 'warn' | 'error'
+  readonly migrate_on_start: boolean
 }
 
 const zBoolean = z
   .union([z.boolean(), z.string()])
   .transform(value => {
-    if (typeof value === 'boolean') {return value}
-    return !['false', '0', 'no', 'off', ''].includes(value.toLowerCase())
+    if (typeof value === 'boolean') {
+      return value
+    } else {
+      return !['false', '0', 'no', 'off', ''].includes(value.toLowerCase())
+    }
   })
 
 const zBootstrapEnv = z.object({
@@ -34,17 +37,18 @@ const zBootstrapEnv = z.object({
 })
 
 /** Load the repository-root .env without overriding existing environment variables. */
-export function loadRootEnv(): void {
-  const env_path = path.join(REPO_ROOT, '.env')
-  if (!existsSync(env_path)) {return}
-  process.loadEnvFile(env_path)
+export function bootstrapLoadEnv(): void {
+  const env_path = path.join(__BOOTSTRAP_REPO_ROOT__, '.env')
+  if (existsSync(env_path)) {
+    process.loadEnvFile(env_path)
+  }
 }
 
 function resolveFromRoot(value: string): string {
-  return path.isAbsolute(value) ? value : path.resolve(REPO_ROOT, value)
+  return path.isAbsolute(value) ? value : path.resolve(__BOOTSTRAP_REPO_ROOT__, value)
 }
 
-export function loadBootstrapConfig(
+export function bootstrapLoadConfig(
   env: Record<string, string | undefined> = process.env,
 ): BootstrapConfig {
   const parsed = zBootstrapEnv.parse(env)

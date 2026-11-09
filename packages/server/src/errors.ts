@@ -12,8 +12,14 @@ export class AppError extends Error {
   readonly status: number
   readonly issues?: unknown
 
-  constructor(code: ErrorCode, message: string, status: number, issues?: unknown) {
-    super(message)
+  constructor(
+    code: ErrorCode,
+    message: string,
+    status: number,
+    issues?: unknown,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
     this.name = 'AppError'
     this.code = code
     this.status = status
@@ -21,51 +27,62 @@ export class AppError extends Error {
   }
 }
 
-export function isAppError(err: unknown): err is AppError {
+export function errorsIsAppError(err: unknown): err is AppError {
   return err instanceof AppError
 }
 
-export function badRequest(message: string, issues?: unknown): AppError {
+export function errorsBadRequest(message: string, issues?: unknown): AppError {
   return new AppError('BAD_REQUEST', message, 400, issues)
 }
 
-export function validationError(message: string, issues?: unknown): AppError {
+export function errorsValidation(message: string, issues?: unknown): AppError {
   return new AppError('VALIDATION', message, 400, issues)
 }
 
-export function notFound(message: string): AppError {
+export function errorsNotFound(message: string): AppError {
   return new AppError('NOT_FOUND', message, 404)
 }
 
-export function conflict(message: string): AppError {
+export function errorsConflict(message: string): AppError {
   return new AppError('CONFLICT', message, 409)
 }
 
-export function storageError(message: string, cause?: unknown): AppError {
-  const error = new AppError('STORAGE_ERROR', message, 500)
-  if (cause !== undefined) {
-    ;(error as Error & { cause?: unknown }).cause = cause
-  }
-  return error
+export function errorsPayloadTooLarge(message: string): AppError {
+  return new AppError('PAYLOAD_TOO_LARGE', message, 413)
 }
 
-export function internalError(message: string, cause?: unknown): AppError {
-  const error = new AppError('INTERNAL', message, 500)
-  if (cause !== undefined) {
-    ;(error as Error & { cause?: unknown }).cause = cause
-  }
-  return error
+export function errorsStorage(message: string, cause?: unknown): AppError {
+  return new AppError(
+    'STORAGE_ERROR',
+    message,
+    500,
+    undefined,
+    cause === undefined ? undefined : { cause },
+  )
+}
+
+export function errorsInternal(message: string, cause?: unknown): AppError {
+  return new AppError(
+    'INTERNAL',
+    message,
+    500,
+    undefined,
+    cause === undefined ? undefined : { cause },
+  )
+}
+
+function hasCode(value: unknown): value is { code?: unknown, cause?: unknown } {
+  return typeof value === 'object' && value !== null
 }
 
 /** Drizzle wraps driver errors; walk the cause chain for PostgreSQL error codes. */
-export function pgErrorCode(err: unknown): string | undefined {
+export function errorsPgCode(err: unknown): string | undefined {
   let current: unknown = err
   for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
-    if (typeof current === 'object' && 'code' in current) {
-      const code = (current as { code?: unknown }).code
-      if (typeof code === 'string') {return code}
+    if (hasCode(current) && typeof current.code === 'string') {
+      return current.code
     }
-    current = (current as { cause?: unknown }).cause
+    current = hasCode(current) ? current.cause : undefined
   }
   return undefined
 }

@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { invalidateTags, loadTags } from '../lib/tags'
 import type { ItemModule, ViewerCtx } from './types'
 
 function TagCard({ item }: { item: Item }) {
@@ -18,10 +16,9 @@ function TagFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       return
     }
     setSaving(true)
-    getRpc().updateTag({ id: item.id, data: { title: value } })
+    ctx.api.rpc.updateTag({ id: item.id, data: { title: value } })
       .then(async () => {
-        invalidateTags()
-        await loadTags()
+        await ctx.tags.load()
         ctx.refresh()
         setSaving(false)
       })
@@ -49,7 +46,7 @@ function TagFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const tagModule: ItemModule = {
+export const __TAG_MODULE__: ItemModule = {
   role: 'tag',
   Presenter: {
     card: (item) => <TagCard item={item} />,

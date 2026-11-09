@@ -1,114 +1,127 @@
 import { and, eq } from 'drizzle-orm'
 import sharp from 'sharp'
-import {
-  THUMB_SIZES, type BlobMeta, type ItemID, type ThumbSize,
-} from '@laibrary/types'
+import type { BlobMeta, ItemID, ThumbSize } from '@laibrary/types'
+import { __THUMBNAIL_SIZES__ } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items, thumbnails } from '../db/schema'
-import { notFound, pgErrorCode, storageError, validationError } from '../errors'
+import { errorsNotFound, errorsPgCode, errorsStorage, errorsValidation } from '../errors'
 import type { BlobService } from '../blob/service'
 
-function isThumbSize(value: number): value is ThumbSize {
-  return (THUMB_SIZES as readonly number[]).includes(value)
+export type ThumbnailService = {
+  readonly getExisting: (image_id: ItemID, size: ThumbSize) => Promise<BlobMeta | null>
+  readonly ensure: (image_id: ItemID, size: number) => Promise<BlobMeta>
 }
 
-export class ThumbnailService {
-  private readonly in_flight = new Map<string, Promise<BlobMeta>>()
+export type CreateThumbnailServiceOptions = {
+  db: DB
+  blobs: BlobService
+}
 
-  constructor(
-    private readonly db: DB,
-    private readonly blobs: BlobService,
-  ) {}
+function isThumbSize(value: number): value is ThumbSize {
+  return __THUMBNAIL_SIZES__.some(size => size === value)
+}
 
-  async getExisting(image_id: ItemID, size: ThumbSize): Promise<BlobMeta | null> {
-    const rows = await this.db
+export function CreateThumbnailService({
+  db,
+  blobs,
+}: CreateThumbnailServiceOptions): ThumbnailService {
+  const __in_flight = new Map<string, Promise<BlobMeta>>()
+
+  const getExisting = async (
+    image_id: ItemID,
+    size: ThumbSize,
+  ): Promise<BlobMeta | null> => {
+    const rows = await db
       .select()
       .from(thumbnails)
       .where(and(eq(thumbnails.image_id, image_id), eq(thumbnails.size, size)))
       .limit(1)
     const row = rows[0]
-    if (row === undefined) {return null}
-    return this.blobs.requireMeta(row.blob_id as never)
+    return row === undefined ? null : blobs.requireMeta(row.blob_id)
   }
 
-  async ensure(image_id: ItemID, size: number): Promise<BlobMeta> {
-    if (!Number.isSafeInteger(image_id) || image_id <= 0) {
-      throw validationError('非法的 image id')
-    }
-    if (!isThumbSize(size)) {
-      throw validationError(`不支持的缩略图尺寸: ${size}`)
-    }
-
-    const existing = await this.getExisting(image_id, size)
-    if (existing !== null) {return existing}
-
-    const key = `${image_id}:${size}`
-    const running = this.in_flight.get(key)
-    if (running !== undefined) {return running}
-
-    const task = this.generate(image_id, size).finally(() => {
-      this.in_flight.delete(key)
-    })
-    this.in_flight.set(key, task)
-    return task
-  }
-
-  private async generate(image_id: ItemID, size: ThumbSize): Promise<BlobMeta> {
-    const image_rows = await this.db
+  const generate = async (image_id: ItemID, size: ThumbSize): Promise<BlobMeta> => {
+    const image_rows = await db
       .select()
       .from(items)
       .where(eq(items.id, image_id))
       .limit(1)
     const image = image_rows[0]
-    if (image === undefined) {throw notFound(`item(id=${image_id}) not found`)}
-    if (image.role !== 'image') {
-      throw validationError(`item(id=${image_id}) 并不是 image`)
-    }
-    if (image.blob_id === null) {
-      throw notFound(`image(id=${image_id}) 缺少 blob`)
-    }
+    if (image === undefined) {
+      throw errorsNotFound(`item(id=${image_id}) not found`)
+    } else if (image.role !== 'image') {
+      throw errorsValidation(`item(id=${image_id}) 并不是 image`)
+    } else if (image.blob_id === null) {
+      throw errorsNotFound(`image(id=${image_id}) 缺少 blob`)
+    } else {
+      const source = await blobs.getMeta(image.blob_id)
+      if (source === null) {
+        throw errorsNotFound(`blob(${image.blob_id}) not found`)
+      } else if (!(await blobs.exists(source.id))) {
+        throw errorsNotFound(`blob(${source.id}) 文件不存在`)
+      } else {
+        let output: { data: Buffer, info: { width: number, height: number } }
+        try {
+          output = await sharp(blobs.pathFor(source.id))
+            .rotate()
+            .flatten({ background: '#FFFFFF' })
+            .resize(size, size, { fit: 'inside', withoutEnlargement: true })
+            .avif({ quality: 40, effort: 4 })
+            .toBuffer({ resolveWithObject: true })
+        } catch (cause) {
+          throw errorsStorage(`生成缩略图失败: image(${image_id}) size=${size}`, cause)
+        }
 
-    const source = await this.blobs.getMeta(image.blob_id as never)
-    if (source === null) {throw notFound(`blob(${image.blob_id}) not found`)}
-    if (!(await this.blobs.exists(source.id))) {
-      throw notFound(`blob(${source.id}) 文件不存在`)
-    }
+        const thumb = await blobs.putBuffer(output.data, 'image/avif')
+        try {
+          await db
+            .insert(thumbnails)
+            .values({
+              image_id,
+              size,
+              blob_id: thumb.blob.id,
+              width: output.info.width,
+              height: output.info.height,
+            })
+            .onConflictDoNothing()
+        } catch (cause) {
+          if (errorsPgCode(cause) === '23503') {
+            throw errorsNotFound(`image(id=${image_id}) not found`)
+          } else {
+            throw errorsStorage('写入缩略图记录失败', cause)
+          }
+        }
 
-    let output: { data: Buffer, info: { width: number, height: number } }
-    try {
-      output = await sharp(this.blobs.pathFor(source.id))
-        .rotate()
-        .flatten({ background: '#FFFFFF' })
-        .resize(size, size, { fit: 'inside', withoutEnlargement: true })
-        .avif({ quality: 40, effort: 4 })
-        .toBuffer({ resolveWithObject: true })
-    } catch (err) {
-      throw storageError(`生成缩略图失败: image(${image_id}) size=${size}`, err)
-    }
-
-    const thumb = await this.blobs.putBuffer(output.data, 'image/avif')
-
-    try {
-      await this.db
-        .insert(thumbnails)
-        .values({
-          image_id,
-          size,
-          blob_id: thumb.blob.id,
-          width: output.info.width,
-          height: output.info.height,
-        })
-        .onConflictDoNothing()
-    } catch (err) {
-      // The image may have been deleted while the thumbnail was generated.
-      if (pgErrorCode(err) === '23503') {
-        throw notFound(`image(id=${image_id}) not found`)
+        const saved = await getExisting(image_id, size)
+        return saved === null ? thumb.blob : saved
       }
-      throw storageError('写入缩略图记录失败', err)
     }
-
-    const saved = await this.getExisting(image_id, size)
-    if (saved !== null) {return saved}
-    return thumb.blob
   }
+
+  const ensure = async (image_id: ItemID, size: number): Promise<BlobMeta> => {
+    if (!Number.isSafeInteger(image_id) || image_id <= 0) {
+      throw errorsValidation('非法的 image id')
+    } else if (!isThumbSize(size)) {
+      throw errorsValidation(`不支持的缩略图尺寸: ${size}`)
+    } else {
+      const existing = await getExisting(image_id, size)
+      if (existing !== null) {
+        return existing
+      } else {
+        const key = `${image_id}:${size}`
+        const running = __in_flight.get(key)
+        if (running !== undefined) {
+          return running
+        } else {
+          const task = generate(image_id, size).finally(() => {
+            __in_flight.delete(key)
+          })
+          __in_flight.set(key, task)
+          return task
+        }
+      }
+    }
+  }
+
+  return { getExisting, ensure }
 }

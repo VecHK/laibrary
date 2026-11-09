@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { DatabaseFieldDef, Item } from '@laibrary/types'
-import { zDatabaseAttributes } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { cycleSortState, type FieldSortState } from '../lib/order'
+import type { DatabaseFieldDef, Item, ItemID } from '@laibrary/types'
+import { zAnyAttributes, zDatabaseAttributes } from '@laibrary/types'
+import { orderCycleSortState, type FieldSortState } from '../lib/order'
 import type { ItemModule, ViewerCtx } from './types'
 
-function schemaOf(item: Item): DatabaseFieldDef[] {
+function schemaOf(item: Item): readonly DatabaseFieldDef[] {
   const parsed = zDatabaseAttributes.safeParse(item.attributes)
   return parsed.success ? parsed.data.schema : []
 }
@@ -24,13 +23,13 @@ function DatabaseCard({ item }: { item: Item }) {
 function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [rows, setRows] = useState<Item[] | null>(null)
   const [sort, setSort] = useState<FieldSortState>(null)
-  const [editing_cell, setEditingCell] = useState<{ row_id: number; field: string } | null>(null)
+  const [editing_cell, setEditingCell] = useState<{ row_id: ItemID; field: string } | null>(null)
   const [editing_title_row, setEditingTitleRow] = useState<number | null>(null)
 
   const fields = schemaOf(item)
 
   const loadRows = () => {
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: 0,
       sort_by: 'order_index',
       ...(sort === null ? {} : { sort_field: sort, desc: sort.desc }),
@@ -49,7 +48,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const cycleSort = (field: DatabaseFieldDef) => {
     const sort_type = field.type === 'number' ? 'number' : 'string'
-    setSort(prev => cycleSortState(prev, field.name, sort_type))
+    setSort(prev => orderCycleSortState(prev, field.name, sort_type))
   }
 
   const addRow = () => {
@@ -60,7 +59,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       if (value === null || value.trim().length === 0) {return}
       unity_name = value.trim()
     }
-    getRpc().addItem({
+    ctx.api.rpc.addItem({
       role: 'page',
       title: '',
       parent_id: item.id,
@@ -77,9 +76,9 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
     const type = window.confirm('类型: 确定 = number, 取消 = string') ? 'number' : 'string'
     const new_fields = [...fields, { name: name.trim(), type }]
-    getRpc().updateItem({
+    ctx.api.rpc.updateItem({
       id: item.id,
-      data: { attributes: { schema: new_fields } as never },
+      data: { attributes: { schema: new_fields } },
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
@@ -87,18 +86,18 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const removeField = (field_name: string) => {
     const new_fields = fields.filter(f => f.name !== field_name)
-    getRpc().updateItem({
+    ctx.api.rpc.updateItem({
       id: item.id,
-      data: { attributes: { schema: new_fields } as never },
+      data: { attributes: { schema: new_fields } },
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
   }
 
   const updateRowAttributes = (row: Item, new_attrs: Record<string, unknown>) => {
-    getRpc().updateItem({
+    ctx.api.rpc.updateItem({
       id: row.id,
-      data: { attributes: { ...row.attributes, ...new_attrs } as never },
+      data: { attributes: zAnyAttributes.parse({ ...row.attributes, ...new_attrs }) },
     }).then(() => {
       setEditingCell(null)
       refresh()
@@ -127,7 +126,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const deleteRow = (row: Item) => {
-    getRpc().deleteItem({ id: row.id }).then(() => refresh()).catch(err => {
+    ctx.api.rpc.deleteItem({ id: row.id }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
   }
@@ -178,7 +177,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                     autoFocus
                     defaultValue={row.title}
                     onBlur={ev => {
-                      getRpc().updateItem({
+                      ctx.api.rpc.updateItem({
                         id: row.id,
                         data: { title: ev.target.value },
                       }).then(() => {
@@ -190,7 +189,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                     }}
                     onKeyDown={ev => {
                       if (ev.key === 'Enter') {
-                        (ev.target as HTMLInputElement).blur()
+                        ev.currentTarget.blur()
                       }
                     }}
                   />
@@ -204,7 +203,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               {fields.map(field => {
                 const value = field.type === 'unity_name'
                   ? row.unity_name
-                  : (row.attributes as Record<string, unknown>)[field.name]
+                  : zAnyAttributes.parse(row.attributes)[field.name]
                 const is_editing = (
                   field.type !== 'unity_name' &&
                   editing_cell !== null &&
@@ -228,7 +227,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                         onBlur={ev => commitCell(row, field, ev.target.value)}
                         onKeyDown={ev => {
                           if (ev.key === 'Enter') {
-                            (ev.target as HTMLInputElement).blur()
+                            ev.currentTarget.blur()
                           } else if (ev.key === 'Escape') {
                             setEditingCell(null)
                           }
@@ -256,7 +255,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const databaseModule: ItemModule = {
+export const __DATABASE_MODULE__: ItemModule = {
   role: 'database',
   Presenter: {
     card: (item) => <DatabaseCard item={item} />,

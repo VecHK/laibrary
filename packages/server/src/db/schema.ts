@@ -15,9 +15,10 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import type { BlobID, ItemID, Kind, Role, UnityName } from '@laibrary/types'
 
 export const blobs = pgTable('blobs', {
-  id: text('id').primaryKey(),
+  id: text('id').$type<BlobID>().primaryKey(),
   size: bigint('size', { mode: 'number' }).notNull(),
   mime: text('mime').notNull(),
   width: integer('width'),
@@ -28,17 +29,17 @@ export const blobs = pgTable('blobs', {
 ])
 
 export const items = pgTable('items', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  role: text('role').notNull().default('page'),
-  kind: text('kind'),
-  unity_name: text('unity_name'),
+  id: bigserial('id', { mode: 'number' }).$type<ItemID>().primaryKey(),
+  role: text('role').$type<Role>().notNull().default('page'),
+  kind: text('kind').$type<Kind>(),
+  unity_name: text('unity_name').$type<UnityName>(),
   title: text('title').notNull().default(''),
   attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}),
-  tags: bigint('tags', { mode: 'number' }).array().notNull().default(sql`'{}'`),
-  parent_id: bigint('parent_id', { mode: 'number' }).references((): AnyPgColumn => items.id),
+  tags: bigint('tags', { mode: 'number' }).array().$type<ItemID[]>().notNull().default(sql`'{}'`),
+  parent_id: bigint('parent_id', { mode: 'number' }).$type<ItemID>().references((): AnyPgColumn => items.id),
   order_index: doublePrecision('order_index').notNull().default(0),
-  blob_id: text('blob_id').references(() => blobs.id),
-  target_id: bigint('target_id', { mode: 'number' }),
+  blob_id: text('blob_id').$type<BlobID>().references(() => blobs.id),
+  target_id: bigint('target_id', { mode: 'number' }).$type<ItemID>(),
   create_date: timestamp('create_date', { withTimezone: true }).notNull().defaultNow(),
   update_date: timestamp('update_date', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -87,10 +88,11 @@ export const items = pgTable('items', {
 
 export const thumbnails = pgTable('thumbnails', {
   image_id: bigint('image_id', { mode: 'number' })
+    .$type<ItemID>()
     .notNull()
     .references(() => items.id, { onDelete: 'cascade' }),
   size: smallint('size').notNull(),
-  blob_id: text('blob_id').notNull().references(() => blobs.id),
+  blob_id: text('blob_id').$type<BlobID>().notNull().references(() => blobs.id),
   width: integer('width').notNull(),
   height: integer('height').notNull(),
   create_date: timestamp('create_date', { withTimezone: true }).notNull().defaultNow(),
@@ -105,7 +107,3 @@ export const thumbnails = pgTable('thumbnails', {
 export type ItemRow = typeof items.$inferSelect
 export type BlobRow = typeof blobs.$inferSelect
 export type ThumbnailRow = typeof thumbnails.$inferSelect
-
-export const ROLE_VALUES = [
-  'page', 'entity', 'textline', 'image', 'file', 'itemlink', 'tag', 'database',
-] as const

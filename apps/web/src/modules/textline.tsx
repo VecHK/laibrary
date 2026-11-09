@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Item } from '@laibrary/types'
+import type { Item, ItemID } from '@laibrary/types'
 import { parseItemTokens } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { openItemById } from '../lib/open-item'
+import { InlineText } from './inline-text'
 import {
   detectSlashQuery, filterSlashCommands, splitTextLine,
   type SlashCommand,
@@ -21,61 +20,10 @@ export type TextLineBlockProps = {
   focus_request: TextLineFocusRequest | null
   onFocusHandled: () => void
   onActivate: () => void
-  onTitleChange: (id: number, title: string) => void
+  onTitleChange: (id: ItemID, title: string) => void
   onSplit?: (item: Item, left: string, right: string) => void | Promise<void>
   onBackspace?: (item: Item, value: string) => void | Promise<void>
   onSlashCommand?: (command: SlashCommand, item: Item) => void
-}
-
-function InlineItemLink({
-  target_id, label, ctx,
-}: {
-  target_id: number
-  label: string | null
-  ctx: ViewerCtx
-}) {
-  const [title, setTitle] = useState<string | null>(null)
-  useEffect(() => {
-    let alive = true
-    getRpc().getItem({ id: target_id })
-      .then(item => { if (alive) {setTitle(item.title)} })
-      .catch(() => { if (alive) {setTitle(null)} })
-    return () => { alive = false }
-  }, [target_id])
-
-  return (
-    <button
-      className="inline-item-link"
-      title={title ?? `#${target_id}`}
-      onClick={ev => {
-        ev.stopPropagation()
-        openItemById(target_id, ctx)
-      }}
-    >
-      {label ?? title ?? `#${target_id}`}
-    </button>
-  )
-}
-
-function InlineText({ text, ctx }: { text: string; ctx: ViewerCtx }) {
-  const tokens = useMemo(() => parseItemTokens(text), [text])
-  return (
-    <>
-      {tokens.map((token, index) => {
-        if (token.type === 'text') {
-          return <span key={index}>{token.text}</span>
-        }
-        return (
-          <InlineItemLink
-            key={index}
-            target_id={token.target_id}
-            label={token.label}
-            ctx={ctx}
-          />
-        )
-      })}
-    </>
-  )
 }
 
 function TextLineEditor({
@@ -140,9 +88,10 @@ function TextLineEditor({
 
   const resize = () => {
     const node = textarea_ref.current
-    if (node === null) {return}
-    node.style.height = '0px'
-    node.style.height = `${node.scrollHeight}px`
+    if (node !== null) {
+      node.style.height = '0px'
+      node.style.height = `${node.scrollHeight}px`
+    }
   }
 
   useEffect(() => {
@@ -150,34 +99,44 @@ function TextLineEditor({
   }, [value, is_active])
 
   useEffect(() => {
-    if (!is_active || focus_request === null) {return}
-    const node = textarea_ref.current
-    if (node === null) {return}
-    const caret = focus_request.caret
-    node.focus()
-    skip_blur_save_ref.current = false
-    const position = caret === 'end'
-      ? node.value.length
-      : Math.max(0, Math.min(caret, node.value.length))
-    node.setSelectionRange(position, position)
-    resize()
-    // Controlled textarea 的值更新可能发生在 focus 之后，用 macrotask 再落一次 caret。
-    const settle_timer = window.setTimeout(() => {
-      if (!alive_ref.current) {return}
-      const settled = caret === 'end'
-        ? node.value.length
-        : Math.max(0, Math.min(caret, node.value.length))
-      node.setSelectionRange(settled, settled)
-      onFocusHandled()
-    }, 0)
-    return () => window.clearTimeout(settle_timer)
+    let settle_timer: number | null = null
+    if (is_active && focus_request !== null) {
+      const node = textarea_ref.current
+      if (node !== null) {
+        const caret = focus_request.caret
+        node.focus()
+        skip_blur_save_ref.current = false
+        const position = caret === 'end'
+          ? node.value.length
+          : Math.max(0, Math.min(caret, node.value.length))
+        node.setSelectionRange(position, position)
+        resize()
+        // Controlled textarea 的值更新可能发生在 focus 之后，用 macrotask 再落一次 caret。
+        settle_timer = window.setTimeout(() => {
+          if (alive_ref.current) {
+            const settled = caret === 'end'
+              ? node.value.length
+              : Math.max(0, Math.min(caret, node.value.length))
+            node.setSelectionRange(settled, settled)
+            onFocusHandled()
+          }
+        }, 0)
+      }
+    }
+    return () => {
+      if (settle_timer !== null) {
+        window.clearTimeout(settle_timer)
+      }
+    }
   }, [is_active, focus_request, item.id])
 
   const persist = (title: string): Promise<void> => {
     const run = write_chain_ref.current.then(async () => {
-      await getRpc().updateItem({ id: item.id, data: { title } })
+      await ctx.api.rpc.updateItem({ id: item.id, data: { title } })
     })
-    write_chain_ref.current = run.catch(() => undefined)
+    write_chain_ref.current = run.catch(error => {
+      console.warn('textline save queue', error)
+    })
     run.catch(err => {
       if (alive_ref.current) {
         ctx.showError(err instanceof Error ? err.message : String(err))
@@ -212,60 +171,60 @@ function TextLineEditor({
   }
 
   const pickCommand = (command: SlashCommand) => {
-    if (busy_ref.current) {return}
-    setSlashQuery(null)
-    if (command.id === 'text') {
-      clearLine()
-      void persist('')
-      textarea_ref.current?.focus()
-      return
+    if (!busy_ref.current) {
+      setSlashQuery(null)
+      if (command.id === 'text') {
+        clearLine()
+        void persist('')
+        textarea_ref.current?.focus()
+      } else if (onSlashCommand !== undefined) {
+        clearLine()
+        skip_blur_save_ref.current = true
+        busy_ref.current = true
+        void (async () => {
+          await persist('')
+          busy_ref.current = false
+          onSlashCommand(command, item)
+        })()
+      }
     }
-    if (onSlashCommand === undefined) {return}
-    clearLine()
-    skip_blur_save_ref.current = true
-    busy_ref.current = true
-    void (async () => {
-      await persist('')
-      busy_ref.current = false
-      onSlashCommand(command, item)
-    })()
   }
 
   const handleSplit = async () => {
-    if (onSplit === undefined || busy_ref.current) {return}
-    const node = textarea_ref.current
-    if (node === null) {return}
-    busy_ref.current = true
-    const { left, right } = splitTextLine(value_ref.current, node.selectionStart, node.selectionEnd)
-    cancelTimer()
-    value_ref.current = left
-    setValue(left)
-    onTitleChange(item.id, left)
-    setSlashQuery(null)
-    skip_blur_save_ref.current = true
-    try {
-      await onSplit(item, left, right)
-    } finally {
-      busy_ref.current = false
+    if (onSplit !== undefined && !busy_ref.current) {
+      const node = textarea_ref.current
+      if (node !== null) {
+        busy_ref.current = true
+        const { left, right } = splitTextLine(value_ref.current, node.selectionStart, node.selectionEnd)
+        cancelTimer()
+        value_ref.current = left
+        setValue(left)
+        onTitleChange(item.id, left)
+        setSlashQuery(null)
+        skip_blur_save_ref.current = true
+        try {
+          await onSplit(item, left, right)
+        } finally {
+          busy_ref.current = false
+        }
+      }
     }
   }
 
-  if (!is_active) {
-    return (
-      <div
-        className="textline-block"
-        onClick={onActivate}
-      >
-        <div className="textline-view">
-          {value.length === 0
-            ? <span className="textline-placeholder">输入 / 插入内容</span>
-            : <InlineText text={value} ctx={ctx} />}
-        </div>
+  const inactive_view = (
+    <div
+      className="textline-block"
+      onClick={onActivate}
+    >
+      <div className="textline-view">
+        {value.length === 0
+          ? <span className="textline-placeholder">输入 / 插入内容</span>
+          : <InlineText text={value} ctx={ctx} />}
       </div>
-    )
-  }
+    </div>
+  )
 
-  return (
+  return is_active ? (
     <div className="textline-block is-active">
       <textarea
         ref={textarea_ref}
@@ -301,59 +260,59 @@ function TextLineEditor({
           setSlashQuery(null)
           if (skip_blur_save_ref.current) {
             skip_blur_save_ref.current = false
-            return
+          } else {
+            flushSave()
           }
-          flushSave()
         }}
         onKeyDown={ev => {
-          const composing = composing_ref.current || (ev.nativeEvent as KeyboardEvent).isComposing
-          if (composing) {return}
-
-          if (slash_query !== null) {
-            if (ev.key === 'ArrowDown') {
-              ev.preventDefault()
-              if (commands.length !== 0) {
-                setSelectedIndex(index => (index + 1) % commands.length)
+          const composing = composing_ref.current || ev.nativeEvent.isComposing
+          if (!composing) {
+            let handled = false
+            if (slash_query !== null) {
+              if (ev.key === 'ArrowDown') {
+                ev.preventDefault()
+                if (commands.length !== 0) {
+                  setSelectedIndex(index => (index + 1) % commands.length)
+                }
+                handled = true
+              } else if (ev.key === 'ArrowUp') {
+                ev.preventDefault()
+                if (commands.length !== 0) {
+                  setSelectedIndex(index => (index - 1 + commands.length) % commands.length)
+                }
+                handled = true
+              } else if ((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Tab') {
+                ev.preventDefault()
+                const command = commands[selected_index]
+                if (command !== undefined) {
+                  pickCommand(command)
+                }
+                handled = true
+              } else if (ev.key === 'Escape') {
+                ev.preventDefault()
+                setSlashQuery(null)
+                handled = true
               }
-              return
             }
-            if (ev.key === 'ArrowUp') {
-              ev.preventDefault()
-              if (commands.length !== 0) {
-                setSelectedIndex(index => (index - 1 + commands.length) % commands.length)
+
+            if (!handled) {
+              if (ev.key === 'Enter' && !ev.shiftKey) {
+                if (onSplit !== undefined) {
+                  ev.preventDefault()
+                  void handleSplit()
+                }
+              } else if (
+                ev.key === 'Backspace' &&
+                ev.currentTarget.selectionStart === 0 &&
+                ev.currentTarget.selectionEnd === 0 &&
+                onBackspace !== undefined
+              ) {
+                ev.preventDefault()
+                cancelTimer()
+                setSlashQuery(null)
+                void onBackspace(item, value)
               }
-              return
             }
-            if ((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Tab') {
-              ev.preventDefault()
-              const command = commands[selected_index]
-              if (command !== undefined) {pickCommand(command)}
-              return
-            }
-            if (ev.key === 'Escape') {
-              ev.preventDefault()
-              setSlashQuery(null)
-              return
-            }
-          }
-
-          if (ev.key === 'Enter' && !ev.shiftKey) {
-            if (onSplit === undefined) {return}
-            ev.preventDefault()
-            void handleSplit()
-            return
-          }
-
-          if (
-            ev.key === 'Backspace' &&
-            ev.currentTarget.selectionStart === 0 &&
-            ev.currentTarget.selectionEnd === 0 &&
-            onBackspace !== undefined
-          ) {
-            ev.preventDefault()
-            cancelTimer()
-            setSlashQuery(null)
-            void onBackspace(item, value)
           }
         }}
         onSelect={ev => {
@@ -375,7 +334,7 @@ function TextLineEditor({
         />
       )}
     </div>
-  )
+  ) : inactive_view
 }
 
 export function TextLineBlock(props: TextLineBlockProps) {
@@ -415,7 +374,7 @@ function TextLineFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const textlineModule: ItemModule = {
+export const __TEXTLINE_MODULE__: ItemModule = {
   role: 'textline',
   Presenter: {
     card: item => <TextLineCard item={item} />,

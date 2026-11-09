@@ -4,7 +4,7 @@ export type FilterRuleLogic = 'and' | 'or'
 
 export interface RuleBase {
   logic: FilterRuleLogic
-  invert?: boolean
+  invert?: boolean | undefined
 }
 
 export type AttributeScalar = string | number | boolean
@@ -30,11 +30,11 @@ export type ItemSortBy = 'id' | 'create_date' | 'update_date' | 'order_index'
 export type SortField = { name: string; type: 'string' | 'number' }
 
 export interface ListingParams {
-  sort_by?: ItemSortBy
-  sort_field?: SortField
-  after_id?: ItemID
-  desc?: boolean
+  sort_by?: ItemSortBy | undefined
+  sort_field?: SortField | undefined
+  after_id?: ItemID | undefined
+  desc?: boolean | undefined
   limit: number
-  filter_rules?: FilterRule[]
-  filter_groups?: FilterGroup[]
+  filter_rules?: FilterRule[] | undefined
+  filter_groups?: FilterGroup[] | undefined
 }

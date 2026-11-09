@@ -3,13 +3,13 @@ import type { ItemModule, ViewerCtx } from './types'
 import { blobUrl, thumbUrl } from '../lib/blob'
 import { openItem } from '../lib/open-item'
 
-function ImageCard({ item }: { item: Item }) {
+function ImageCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   return (
     <div className="card image-card">
       {item.blob !== null ? (
         <img
           className="image-card-img"
-          src={thumbUrl(item.id, 384)}
+          src={thumbUrl(ctx.api.base_url, item.id, 384)}
           alt={item.title}
           loading="lazy"
         />
@@ -25,7 +25,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   return (
     <div className="block-image" onClick={() => openItem(item, ctx)}>
       {item.blob !== null ? (
-        <img src={thumbUrl(item.id, 384)} alt={item.title} loading="lazy" />
+        <img src={thumbUrl(ctx.api.base_url, item.id, 384)} alt={item.title} loading="lazy" />
       ) : (
         <div className="empty-hint">图片缺失</div>
       )}
@@ -35,7 +35,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function ImageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const src = item.blob === null ? null : blobUrl(item.blob.id)
+  const src = item.blob === null ? null : blobUrl(ctx.api.base_url, item.blob.id)
   return (
     <div className="image-full" onClick={() => ctx.navigate(item.parent_id ?? item.id)}>
       <div className="image-full-bar">
@@ -57,10 +57,10 @@ function ImageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const imageModule: ItemModule = {
+export const __IMAGE_MODULE__: ItemModule = {
   role: 'image',
   Presenter: {
-    card: item => <ImageCard item={item} />,
+    card: (item, ctx) => <ImageCard item={item} ctx={ctx} />,
     full: (item, ctx) => <ImageFull item={item} ctx={ctx} />,
   },
   Block: (item, ctx) => <ImageBlock item={item} ctx={ctx} />,

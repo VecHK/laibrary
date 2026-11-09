@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { THUMB_SIZES } from '@laibrary/types'
+import { __THUMBNAIL_SIZES__ } from '@laibrary/types'
 import {
   closeDb, defined, prepareTestBlobs, prepareTestDb, testPng, truncateAll,
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
-import { ThumbnailService } from '../src/thumbnails/service'
+import { CreateThumbnailService, type ThumbnailService } from '../src/thumbnails/service'
 import { items, thumbnails } from '../src/db/schema'
 import { createItem, deleteItem } from '../src/repo/items'
 
@@ -20,7 +20,7 @@ beforeAll(async () => {
   const prepared = await prepareTestBlobs(db)
   blobs = prepared.blobs
   cleanup = prepared.cleanup
-  service = new ThumbnailService(db, blobs)
+  service = CreateThumbnailService({ db, blobs })
 })
 
 beforeEach(async () => {
@@ -46,7 +46,7 @@ describe('thumbnails', () => {
   it('四档 AVIF 惰性生成', async () => {
     const image = await imageItem()
     const metas = []
-    for (const size of THUMB_SIZES) {
+    for (const size of __THUMBNAIL_SIZES__) {
       const meta = await service.ensure(image.id, size)
       expect(meta.mime).toBe('image/avif')
       expect(meta.width).toBe(1)
@@ -56,7 +56,7 @@ describe('thumbnails', () => {
 
     const rows = await db.select().from(thumbnails)
     expect(rows).toHaveLength(4)
-    expect(rows.map(row => row.size).sort((a, b) => a - b)).toEqual([...THUMB_SIZES])
+    expect(rows.map(row => row.size).sort((a, b) => a - b)).toEqual([...__THUMBNAIL_SIZES__])
 
     const row = defined(rows[0])
     expect(await blobs.exists(row.blob_id as never)).toBe(true)

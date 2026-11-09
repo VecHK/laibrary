@@ -1,6 +1,5 @@
 import type { Item } from '@laibrary/types'
 import type { ItemModule, ViewerCtx } from './types'
-import { getKindModule } from '../lib/kind-registry'
 import { openItem } from '../lib/open-item'
 
 function EntityFallbackBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
@@ -19,11 +18,10 @@ function EntityFallbackBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function EntityBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const module = item.kind === null ? undefined : getKindModule(item.kind)
-  if (module?.inlineIcon === undefined) {
-    return <EntityFallbackBlock item={item} ctx={ctx} />
-  }
-  return (
+  const module = item.kind === null ? undefined : ctx.modules.getKind(item.kind)
+  return module?.inlineIcon === undefined ? (
+    <EntityFallbackBlock item={item} ctx={ctx} />
+  ) : (
     <div
       className="block-entity"
       onClick={() => openItem(item, ctx)}
@@ -38,9 +36,10 @@ function EntityBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function EntityCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const module = item.kind === null ? undefined : getKindModule(item.kind)
-  if (module !== undefined) {return <>{module.Presenter.card(item, ctx)}</>}
-  return (
+  const module = item.kind === null ? undefined : ctx.modules.getKind(item.kind)
+  return module !== undefined ? (
+    <>{module.Presenter.card(item, ctx)}</>
+  ) : (
     <div className="card entity-card">
       <div className="card-icon">❓</div>
       <div className="card-title">{item.title || '(未知内容)'}</div>
@@ -50,9 +49,10 @@ function EntityCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 }
 
 function EntityFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const module = item.kind === null ? undefined : getKindModule(item.kind)
-  if (module !== undefined) {return <>{module.Presenter.full(item, ctx)}</>}
-  return (
+  const module = item.kind === null ? undefined : ctx.modules.getKind(item.kind)
+  return module !== undefined ? (
+    <>{module.Presenter.full(item, ctx)}</>
+  ) : (
     <div className="panel">
       <div className="panel-title">没有合适的打开方式</div>
       <p className="empty-hint">kind: {item.kind ?? '(无)'}</p>
@@ -60,7 +60,7 @@ function EntityFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const entityModule: ItemModule = {
+export const __ENTITY_MODULE__: ItemModule = {
   role: 'entity',
   Presenter: {
     card: (item, ctx) => <EntityCard item={item} ctx={ctx} />,

@@ -26,7 +26,7 @@
 | **Inline Itemlink（行内链接）** | `[[item:123]]` | textline 中的纯文本链接 token；不是富文本。可写 `[[item:123\|标签]]`，`\[[` 转义。 |
 | **System Config（系统配置）** | `sys.config` | 一个 `database` Item，`unity_name='sys.config'`；配置行是 `page` Item，`unity_name='sys.config.*'`，attributes 存 value/type。 |
 | **Bootstrap Config（启动配置）** | `.env` / env | 连接 DB、端口、存储路径、密钥等**启动前**必须知道的值；只来自环境变量/根 `.env`，不是 Item。 |
-| **Runtime Config（运行时配置）** | ConfigService | 来自 `sys.config` Item 的可编辑设置；热更新，不接受 env 覆盖。 |
+| **Runtime Config（运行时配置）** | ConfigStore | 来自 `sys.config` Item 的可编辑设置；热更新，不接受 env 覆盖。 |
 | **Block（块）** | block | page/entity 的有序子项。textline/image/file/itemlink/entity 都可以是 block；支持拖拽排序。 |
 | **Open-with（打开方式）** | kind/role opener | 见 Opener。未来 Electron 可接系统 open-with；Web 只做下载/查看。 |
 | **Gāng（纲）** | Gang | 未来的信息治序引擎；当前未实现。 |

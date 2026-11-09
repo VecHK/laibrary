@@ -4,7 +4,8 @@ import {
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
-import { createItem, listItems } from '../src/repo/items'
+import { createItem } from '../src/repo/items'
+import { listItems } from '../src/repo/item-listing'
 
 let db: DB
 let blobs: BlobService

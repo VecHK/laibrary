@@ -1,4 +1,5 @@
 import type { ItemID } from './roles'
+import { as } from './as'
 
 export type ItemToken =
   | { type: 'text'; text: string }
@@ -6,8 +7,11 @@ export type ItemToken =
 
 const TOKEN_PATTERN = /(?<!\\)\[\[item:(\d+)(?:\|([^\]]*))?\]\]/g
 
-export function formatItemToken(target_id: ItemID, label?: string): string {
-  if (label !== undefined && label.length > 0) {
+export function formatItemToken(
+  target_id: ItemID,
+  label: string | null,
+): string {
+  if (label !== null && label.length > 0) {
     return `[[item:${target_id}|${label}]]`
   }
   return `[[item:${target_id}]]`
@@ -19,23 +23,28 @@ export function parseItemTokens(text: string): ItemToken[] {
   let cursor = 0
   TOKEN_PATTERN.lastIndex = 0
 
-  for (let match = TOKEN_PATTERN.exec(text); match !== null; match = TOKEN_PATTERN.exec(text)) {
+  let match = TOKEN_PATTERN.exec(text)
+  while (match !== null) {
     const index = match.index
     if (index > cursor) {
       tokens.push({ type: 'text', text: text.slice(cursor, index) })
     }
-    const id = Number.parseInt(match[1] as string, 10)
+
+    const raw_id = match[1] ?? ''
+    const id = Number.parseInt(raw_id, 10)
     if (Number.isSafeInteger(id) && id > 0) {
       tokens.push({
         type: 'item',
-        target_id: id,
+        target_id: as<ItemID>(id),
         label: match[2] === undefined || match[2].length === 0 ? null : match[2],
         raw: match[0],
       })
     } else {
       tokens.push({ type: 'text', text: match[0] })
     }
+
     cursor = index + match[0].length
+    match = TOKEN_PATTERN.exec(text)
   }
 
   if (cursor < text.length) {
@@ -47,7 +56,9 @@ export function parseItemTokens(text: string): ItemToken[] {
 export function extractItemTokenIds(text: string): ItemID[] {
   const ids = new Set<ItemID>()
   for (const token of parseItemTokens(text)) {
-    if (token.type === 'item') {ids.add(token.target_id)}
+    if (token.type === 'item') {
+      ids.add(token.target_id)
+    }
   }
   return [...ids]
 }

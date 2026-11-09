@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Item } from '@laibrary/types'
-import { getRpc } from '../lib/rpc'
-import { loadTags, tagsLoaded } from '../lib/tags'
 import type { ViewerCtx } from '../modules/types'
 import type { HashRoute } from '../lib/hash-router'
 import { ItemView } from './ItemView'
@@ -18,10 +16,9 @@ export function MainLayout({
   refresh_key: number
 }) {
   const [root_items, setRootItems] = useState<Item[]>([])
-  const [tags_ready, setTagsReady] = useState(tagsLoaded())
 
   const loadRoots = useCallback(() => {
-    getRpc().listing({
+    ctx.api.rpc.listing({
       limit: 200,
       sort_by: 'order_index',
       filter_rules: [
@@ -35,20 +32,11 @@ export function MainLayout({
 
   useEffect(loadRoots, [loadRoots, refresh_key])
 
-  useEffect(() => {
-    if (!tagsLoaded()) {
-      loadTags().then(() => setTagsReady(true)).catch(err => {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-      })
-    } else {
-      setTagsReady(true)
-    }
-  }, [refresh_key])
 
   const createPage = async () => {
     try {
-      const page = await getRpc().addItem({ role: 'page', title: '新页面' })
-      await getRpc().addItem({
+      const page = await ctx.api.rpc.addItem({ role: 'page', title: '新页面' })
+      await ctx.api.rpc.addItem({
         role: 'textline',
         title: '',
         parent_id: page.id,
@@ -62,7 +50,7 @@ export function MainLayout({
   }
 
   const createDatabase = () => {
-    getRpc().addItem({
+    ctx.api.rpc.addItem({
       role: 'database',
       title: '新数据库',
       attributes: { schema: [] },
@@ -75,15 +63,15 @@ export function MainLayout({
   const createManga = async () => {
     let reading_direction = 'rtl'
     try {
-      const config = await getRpc().getConfig(undefined)
+      const config = await ctx.api.rpc.getConfig()
       const entry = config.entries.find(item => item.key === 'sys.config.manga_default_direction')
       if (entry?.value === 'ltr' || entry?.value === 'rtl') {
         reading_direction = entry.value
       }
-    } catch {
-      // 配置读取失败时仍允许创建，使用默认 rtl。
+    } catch (error) {
+      console.warn('manga direction config fallback', error)
     }
-    getRpc().addItem({
+    ctx.api.rpc.addItem({
       role: 'entity',
       kind: 'manga',
       title: '新漫画',
@@ -97,8 +85,8 @@ export function MainLayout({
   const createTag = () => {
     const title = window.prompt('tag 名')
     if (title && title.trim().length > 0) {
-      getRpc().newTag({ title: title.trim() })
-        .then(() => loadTags().then(() => ctx.refresh()))
+      ctx.api.rpc.newTag({ title: title.trim() })
+        .then(() => ctx.tags.load().then(() => ctx.refresh()))
         .catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
     }
   }
@@ -135,7 +123,7 @@ export function MainLayout({
       </aside>
 
       <main className="main">
-        {!tags_ready ? (
+        {!ctx.tags.isLoaded() ? (
           <div className="loading">加载中…</div>
         ) : route.name === 'settings' ? (
           <SettingsView ctx={ctx} />
