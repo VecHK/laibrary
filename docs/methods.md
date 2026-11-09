@@ -174,13 +174,19 @@ const normalizeOrder = Pipe(validateOrder, calcOrderTotal, formatReceipt)
 
 ```ts
 // ❌ 副作用散落：每个函数都各自写一点
-function saveOrder(order: Order) {
+function doSomethingA() {
   log('saving')            // 副作用 1
+}
+// ...
+function doSomethingB(order: Order) {
   db.write(order)          // 副作用 2
-  metrics.inc('orders')    // 副作用 3
+}
+// ...
+function doSomethingC() {
+  otherProcessing()    // 副作用 3
 }
 
-// ✅ 副作用集中：一个地方统一执行，其余是纯的
+// ✅ 副作用集中（如果可以集中)：一个地方统一执行，其余是纯的
 const buildSaveEffects = (order: Order) => [
   () => log('saving'),
   () => db.write(order),
