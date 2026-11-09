@@ -4,7 +4,10 @@ Laibrary 是一个“一切皆 Item”的个人数据基座：结构化数据、
 
 当前是 **v2 POC**：面向单机/局域网、单用户，先完成“文本编辑 + 漫画阅读”的垂直切片，并为百万级 Item 留好索引与存储结构。
 
+- Agent 工作协议：[AGENTS.md](AGENTS.md)
+- 完整文档索引与阅读顺序：[docs/introduction.md](docs/introduction.md)
 - 设计概览与决策：[DESIGN.md](DESIGN.md)
+- 编程方法论（TypeScript 硬规则）：[docs/methods.md](docs/methods.md)
 - 愿景：[docs/vision.md](docs/vision.md)
 - 术语表：[docs/glossary.md](docs/glossary.md)
 - 数据模型：[docs/item/01-data-model.md](docs/item/01-data-model.md)
@@ -105,5 +108,5 @@ OS 环境变量优先于根 `.env`；`.env` 不提交，只提交 [`.env.example
 packages/types   @laibrary/types：类型、zod、RPC 客户端、token parser、blob/thumb URL
 packages/server  @laibrary/server：Koa RPC、drizzle/PG、blob、缩略图、配置服务
 apps/web         @laibrary/web：React 19 + Vite 客户端
-docs             设计、规格、愿景、术语表
+docs             设计、规格、愿景、术语表、方法论
 ```

@@ -70,23 +70,71 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 
 ## 当前实现边界（v2 POC）
 
-已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/textline/image/file/entity/manga、设置页。
+已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/textline/image/file/entity/manga、`/` 插入菜单与 Enter 拆行、设置页。
 
 暂未实现：富文本/marks、大纲/反链、文件柜/SMB、database 高级视图、派生数据库、Gāng、Public Space、鉴权/多用户、Electron、200 万导入。
 
-## 文档地图
+## 推荐阅读顺序
 
-| 文档 | 内容 |
-|---|---|
-| [glossary.md](glossary.md) | **名词表**（统一术语） |
-| [vision.md](vision.md) | 使用愿景（北极星） |
-| [item/01-data-model.md](item/01-data-model.md) | 数据模型 |
-| [item/02-file-system.md](item/02-file-system.md) | blobs/缩略图 |
-| [item/03-repository.md](item/03-repository.md) | 仓储/校验/分页 |
-| [item/04-api.md](item/04-api.md) | API/路由/错误 |
-| [item/05-database.md](item/05-database.md) | schema/索引/迁移 |
-| [item/06-runtime.md](item/06-runtime.md) | 配置/启动/测试 |
-| [../DESIGN.md](../DESIGN.md) | 概览与决策记录 |
+1. [AGENTS.md](../AGENTS.md)：Agent 工作协议、领域契约、提示义务。
+2. [README.md](../README.md)：快速开始、当前能力、暂未实现。
+3. **本文件**：完整文档索引、项目原则和阅读路线。
+4. 按任务读其他文档；写代码前至少读 [methods.md](methods.md) 与 [glossary.md](glossary.md)。
+
+## 完整文档索引
+
+### 入口与决策
+
+| 文档 | 内容 | 什么时候读 |
+|---|---|---|
+| [AGENTS.md](../AGENTS.md) | Agent 工作协议、用户疏漏提示义务、工程/安全/文档规则 | 每个任务开始 |
+| [README.md](../README.md) | 快速开始、配置入口、当前能力、暂未实现 | 了解项目与运行 |
+| [DESIGN.md](../DESIGN.md) | 概览、核心决策、当前状态、文档地图 | 做任何设计判断前 |
+| [glossary.md](glossary.md) | **名词表（术语唯一来源）** | 每个任务；新增术语先改这里 |
+| [vision.md](vision.md) | 使用愿景/北极星 | 理解长期方向；不当作当前规格 |
+
+### 实现规格
+
+| 文档 | 内容 | 什么时候读 |
+|---|---|---|
+| [item/01-data-model.md](item/01-data-model.md) | Item、role/kind、树、tags、itemlink、unity_name | 改数据模型/仓储/前端字段 |
+| [item/02-file-system.md](item/02-file-system.md) | blob 内容寻址、上传/读取、GC、thumbnails | 改文件、图片、缩略图 |
+| [item/03-repository.md](item/03-repository.md) | 创建/更新/删除、listing、排序/keyset、校验 | 改 API 行为或查询 |
+| [item/04-api.md](item/04-api.md) | Action 列表、payload、文件路由、错误码 | 改 API/客户端调用 |
+| [item/05-database.md](item/05-database.md) | schema、索引、迁移、测试库重置 | 改表/索引/迁移 |
+| [item/06-runtime.md](item/06-runtime.md) | bootstrap/runtime 配置、启动、CLI、测试、Web | 改配置/启动/前端交互 |
+
+### 编程方法论：`docs/methods.md`
+
+[docs/methods.md](methods.md) 是 TypeScript 编码硬规则，不是可读可不读的风格文章。它规定“为什么这样写”，并给出 Agent 工作协议。规则效力：文中“必须/不要”是硬规则；偏离要写 `// justify: <节号> <理由>` 并在交付说明列出。
+
+| 节 | 主题 | 建议时机 |
+|---|---|---|
+| 零 | 开工前先查术语表 | 每次写代码前 |
+| 总纲 | 六条代码观：树、组合、显式上下文、副作用、类型、单一所有者 | 先建立判断框架 |
+| 一 | 控制流是树，不用 early return 剪断分支 | 写分支/重构函数 |
+| 二 | 无类、无 this、组合优于封装 | 设计状态/模块 |
+| 三 | 副作用集中、可控；状态单一所有者 | 写 I/O、闭包、状态 |
+| 四 | 循环结构化，不用 continue/break | 写循环/扫描 |
+| 五 | 命名即契约（函数/数据/工厂/作用域） | 命名、评审 |
+| 六 | 类型把约束写进语言（any/!/品牌/可辨识联合/边界 parse） | 设计类型/API |
+| 七 | 函数设计（对象参数、无布尔参数、组合、单一职责） | 写函数签名 |
+| 八 | 模块与边界（组合根、无模块级副作用、无循环依赖） | 拆模块/入口 |
+| 九 | 异步与错误（catch 必须负责、cause、顶层兜底、Result） | 写异步/I/O |
+| 十 | 注释只解释为什么/注意什么 | 写注释/评审 |
+| 十一 | 行为变更必须有测试 | 每次行为改动 |
+| 十二 | 评审自查与 Agent 工作协议 | 开工前/提交前 |
+| 附录 A | 改造速查表 | 重构/自查 |
+
+### 按任务选读
+
+- **改数据模型/仓储**：`DESIGN` → `glossary` → `item/01` → `item/03` → `methods`。
+- **改文件/缩略图/GC**：`item/02` → `item/03` → `methods` §3/§9。
+- **改 API/客户端类型**：`item/04` → `item/01` → `methods` §6/§9。
+- **改数据库/迁移/索引**：`item/05` → `item/01` → `DESIGN` 决策记录。
+- **改配置/启动**：`item/06` → `DESIGN` §7。
+- **改前端交互**：`DESIGN` §9 → `item/06` → `methods`；必须做浏览器验证。
+- **只写文档**：`AGENTS` → 本文件 → 对应规格；术语先查 `glossary`。
 
 ## 术语
 

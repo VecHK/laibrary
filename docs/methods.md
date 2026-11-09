@@ -8,6 +8,8 @@
 > **规则的效力**：文中"必须/不要"是硬规则，"尽量/优先"是默认选择。偏离硬规则只有两种方式：文中写明的例外，或就地写 `// justify: <节号> <理由>` 并在评审/交付说明里列出。没有标注的偏离，一律算违规。
 >
 > **读者**：写代码的人，和替人写代码的 Agent。开工前读第零节和 [glossary.md](glossary.md)；提交前过第十二节。
+>
+> **项目位置**：本文是编码硬规则。Agent 阅读顺序见 [AGENTS.md](../AGENTS.md)，完整文档索引见 [introduction.md](introduction.md)。领域模型、API、配置不在本文；改这些先读对应规格。
 
 > 示例里的 `Order`、`User`、`UserId` 是虚构的；本项目的领域名以 [glossary.md](glossary.md) 为准。
 
@@ -136,7 +138,7 @@ function CreateCounter() {
 
 // 用工厂代替"多方法对象"
 function CreateUserApi(base_url: string) {
-  // base_url 被闭包捕获但只读，按 5.3 不加 __
+  // base_url 被闭包捕获但只读，按 5.4 不加 __
   return {
     getUser(id: UserId) { return fetch(`${base_url}/users/${id}`) },
     listUsers() { return fetch(`${base_url}/users`) },
@@ -144,7 +146,7 @@ function CreateUserApi(base_url: string) {
 }
 
 // 用组合表达管线
-const normalizeOrder = Pipe(validateOrder, calcTotal, formatReceipt)
+const normalizeOrder = Pipe(validateOrder, calcOrderTotal, formatReceipt)
 ```
 
 **一句话**：能不建对象就不建对象；能组合就不继承；能显式传参就不靠 `this`。
@@ -279,13 +281,28 @@ function findNumber(list: number[], target_num: number): null | number {
 
 ### 5.1 函数 vs 数据，命名要区分"角色"
 
-- **函数**表达"动作/能力"：用 **camelCase**，`fetchUser`、`calcTotal`。
+- **函数**表达"动作/能力"：用 **camelCase**，`fetchUser`、`calcOrderTotal`。
 - **数据**表达"值"：用 **snake_case**，`user_name`、`retry_count`、`order_items`。
 - **通用工具函数**（放在 `utils/`，并且要么不引用任何领域类型，要么签名完全由泛型参数化）可以用描述性命名，包括 `findList`、`target_num` 这类带类型后缀的名字——它服务的是"任何集合"，不是某个业务概念。业务代码仍然禁止占位符和类型后缀。
 
 名字一出现，读者就该知道这是"可以调用的"还是"可以读写的值"。
 
-### 5.2 返回函数的函数 → PascalCase
+### 5.2 导出名带模块名，非导出名省略
+
+**看法**：导出的名字离开模块路径也要能读懂；非导出的名字已经活在模块里，模块名是噪音。
+
+**因此**：
+
+- **导出的函数/变量**：名字里要有模块/领域名。泛化谓词/动作直接加前缀：`galleryInEvent`、`galleryCanSubmit`、`galleryInVotingPeriod`、`galleryCountVoteByPhoto`、`galleryMemberIsVoted`、`galleryMemberIsSubmitted`。
+- **非导出的函数/变量**：省略模块名：`inEvent`、`canSubmit`、`inVotingPeriod`、`countVoteByPhoto`、`memberIsVoted`、`memberIsSubmitted`。
+- 名字本身已经含领域名（`fetchUser`、`parseUserId`、`CreateUserApi`）就不重复加前缀；规则是"不能省掉领域名"，不是"必须多一个前缀"。
+- 导出的数据值用 `__GALLERY_MAX_PHOTOS__` 这种形式：双下划线 + 模块名 + 变量名；非导出数据值不加模块名。
+- 常量统一放 `constants.ts`，用命名导出；不要 `export default { ... }`（见 8.1）。
+- 工厂同理：`CreateGalleryStore`，不要只写 `CreateStore`（除非它在 `utils/` 里是通用工具）。
+- ❌ `voteCountByPhoto`、`memberHasVoted`、`memberHasSubmitted`：导出却省了 `gallery`；应改成 `galleryCountVoteByPhoto`、`galleryMemberIsVoted`、`galleryMemberIsSubmitted`。
+- 本条约束导出的函数/变量；类型/接口按 5.6 的 PascalCase 规则，不受这条强制。
+
+### 5.3 返回函数的函数 → PascalCase
 
 **看法**：一个函数如果**产出的是可调用对象**（返回函数，或返回 `{ fn(){}, a(){} }` 这样的方法集合），它本质是**工厂/构造器**。用 PascalCase 让调用处一眼看出"这东西会给我一个能用的对象"。
 
@@ -299,14 +316,14 @@ function Pipe(...fns) { /* 返回函数 */ }
 
 判断标准是**产物**，不是声明形式：用 `const` 声明的可调用物，仍按函数命名；返回函数、返回方法集合、返回"能力元组"（如 `[get, set]`）都算工厂。
 
-### 5.3 作用域可见性写进名字
+### 5.4 作用域可见性写进名字
 
 **看法**：变量的作用域是它最重要的属性之一，应该在名字上就暴露出来，而不是让读者去追踪闭包。
 
 - **普通局部数据**：`var_name`。
 - **被写入的跨作用域状态**：`__var_name`。双下划线是"注意，这个值会被改"的信号。
 - **只读的闭包捕获**：保持普通命名，不加 `__`（`base_url` 就是 `base_url`）。
-- **顶级导出**：`__VAR_NAME__`。只用于导出的**数据值**；导出的函数/工厂按 5.1、5.2 命名，即便用 `const` 声明。
+- **顶级导出**：`__MODULE_VAR_NAME__`。只用于导出的**数据值**；导出的函数/工厂按 5.1、5.3 命名，即便用 `const` 声明；模块名不能省（见 5.2）。
 
 ```ts
 function CreateCounter() {
@@ -317,43 +334,49 @@ function CreateCounter() {
   }
 }
 
-export const __VIEWPORT_WIDTH__ = 1280   // 导出的数据值
+export const __GALLERY_MAX_PHOTOS__ = 30   // 导出的数据值（带模块名）
 ```
 
 **原则**：名字应当回答"这是什么角色、在哪个范围、能不能改"，无需读者去上下文里翻找。
 
-### 5.4 其他
+### 5.5 其他
 
-- 布尔值带 `is_` / `has_` / `can_` / `should_` 前缀，读到名字就知道是判断。
+- 布尔值带 `is` / `has` / `can` / `should` 前缀；状态/角色用 `is`（`is_voted`），拥有/包含用 `has`（`has_children`），读到名字就知道是判断。
 - 命名必须表意，禁止 `data`、`temp`、`obj`、`flag` 这类"占位符"。
 - 变量名不带类型信息（`user_list` → `users`），类型由 TS 表达。
 - 类型/接口用 PascalCase；泛型用 `T` / `TValue` / `TResult`，不要用 `TItem` 这类撞领域术语的名字。
-- 品牌符号（`declare const UserIdBrand: unique symbol`）是类型层的东西，用 PascalCase，不走 `__VAR_NAME__`。
+- 品牌符号（`declare const UserIdBrand: unique symbol`）是类型层的东西，用 PascalCase，不走 `__MODULE_VAR_NAME__` 那套。
 
-### 5.5 命名决策表
+### 5.6 命名决策表
 
-| 导出的东西 | 形态 | 命名 | 例 |
+| 东西 | 形态 | 命名 | 例 |
 |---|---|---|---|
-| 数据值 | 不可调用 | `__VAR_NAME__` | `__VIEWPORT_WIDTH__` |
-| 函数，返回数据 | 动作 | camelCase | `fetchUser` |
-| 工厂，返回可调用物/能力集合 | 能力 | PascalCase | `CreateCounter`、`CreateStore` |
-| React 组件 | 框架约定 | PascalCase | `Card` |
-| Hook | 框架约定 | `useX` | `useOrder` |
+| 导出的数据值 | 不可调用 | `__MODULE_VAR_NAME__` | `__GALLERY_MAX_PHOTOS__` |
+| 导出的函数，返回数据 | 动作 | `moduleAction` | `galleryInEvent` |
+| 导出的工厂，返回可调用物/能力集合 | 能力 | `CreateModuleX` | `CreateGalleryStore` |
+| 非导出函数/数据 | 函数/数据 | 省略模块名 | `inEvent` / `max_photos` |
+| React 组件 | 框架约定 | PascalCase | `GalleryCard` |
+| Hook | 框架约定 | `useX` | `useGalleryVotes` |
 | 类型/接口 | 类型层 | PascalCase | `UserId` |
 | 品牌符号 | 类型层 | PascalCase | `UserIdBrand` |
 | 通用工具函数 | 无领域类型或全泛型、在 `utils/` | 描述性，可用类型后缀 | `findList`、`target_num` |
 | 闭包内被写入的状态 | 所有者 | `__name` | `__count` |
 | 只读捕获/局部数据 | 值 | snake_case | `base_url` |
-| 布尔 | 判断 | `is_` / `has_` / `can_` / `should_` | `is_active` |
+| 布尔 | 判断 | `is` / `has` / `can` / `should` | `is_voted`、`has_children` |
 | 内部哨兵 | 不导出 | `NONE` | `const NONE = Symbol('NONE')` |
 
-### 5.6 `parse` / `is` / `as` / `to`
+### 5.7 `parse` / `check` / `is` / `isNot` / `as` / `to`
 
-- `parseX`：运行时校验，失败抛领域错误（或返回 Result）。
-- `isX`：布尔守卫。
+- `parseX`：把 raw 转成合法的 X，参考 `JSON.parse` 的“转换”含义；**返回值一定满足 `checkX` 的约束**（复用同一组 `isX` / `isNotX` 谓词），但 parse 内部不调用 `checkX`——它在转换过程中把约束落实。失败抛解析错误。
+- `checkX`：**多项**运行时校验，失败抛领域错误；可返回收窄后的类型（如品牌）。用于两类地方：值不是 `parseX` 产出的（DB、其他模块、外部注入）；测试里验证 parse 的契约。内部用 `isX` / `isNotX` 判断，最后统一抛一次。
+- `isX`：布尔守卫，不抛错。
+- `isNotX`：`isX` 的否定，布尔，不抛错；和 `isX` 搭配用在 `checkX` 里。
+- `parseX` 的输出保证能通过 `checkX`；单元测试用 `expect(() => checkX(parseX(raw))).not.toThrow()` 之类固定这个契约。
 - `asX`：不校验的断言，只允许在测试/fixture/已校验的边界内。
-- `toX`：类型层面的转换，不做新校验（可选）。
-- 名字必须诚实：校验的叫 `parse`，不校验的叫 `as`。
+- `toX`：域内转换，输入已经是领域类型；纯函数、总函数，不做校验、不接收 `unknown`（可选）。
+- 名字必须诚实：转换的叫 `parse`，多项校验的叫 `check`，布尔判断的叫 `is` / `isNot`，不校验的断言叫 `as`。
+
+`checkX` 里用 `isX` / `isNotX` 把失败原因收集起来，最后抛一次；不要在每个单项检查里各抛一次。
 
 ---
 
@@ -400,20 +423,34 @@ export function isNone(value: unknown): value is NONE {
 declare const UserIdBrand: unique symbol
 type UserId = string & { readonly [UserIdBrand]: 'UserId' }
 
-function parseUserId(raw: unknown): UserId {
-  if (typeof raw === 'string' && raw.startsWith('u-')) {
-    return raw as UserId
-  } else {
-    throw new ValidationError(`invalid user id: ${String(raw)}`)
-  }
-}
-
 function isUserId(raw: unknown): raw is UserId {
   return typeof raw === 'string' && raw.startsWith('u-')
 }
+
+// parse：用 isX 判断；失败抛解析错误；不调用 checkUserId
+function parseUserId(raw: unknown): UserId {
+  if (isUserId(raw)) {
+    return raw
+  } else {
+    throw new ParseError(`user id 不是合法的字符串: ${String(raw)}`)
+  }
+}
+
+// check：用同一组 isX 判断；失败统一抛一个领域错误
+function checkUserId(value: unknown): UserId {
+  if (isUserId(value)) {
+    return value
+  } else {
+    throw new ValidationError(`invalid user id: ${String(value)}`)
+  }
+}
+
+// 边界直接用 parse 的产物；测试里验证 parse 的输出一定通过 check
+const user_id = parseUserId(raw)
+expect(() => checkUserId(parseUserId(raw))).not.toThrow()
 ```
 
-`as` 只允许出现在 `parseX` 内部（校验之后）或测试/fixture 里；调用点不许 `as`。名字必须诚实：校验的叫 `parse`，不校验的叫 `as`。
+`parseX` 和 `checkX` 复用同一组 `isX` / `isNotX` 谓词；parse 不调用 check，但输出必须通过 check。`as` 只允许出现在测试/fixture 里，或已经过 `isX` 收窄后仍需断言的边界；不要用 `as` 代替 `isX` / `checkX`。
 
 **原则**：品牌类型的价值是"把领域语义写进类型系统"，让错误在编译期暴露。不需要为所有原始类型都套品牌——**只在领域身份重要、容易被混淆的地方用**（id 是典型）。
 
@@ -427,12 +464,12 @@ type LoadState<T> =
   | { status: 'ok'; data: T }
   | { status: 'error'; error: Error }
 
-function assertNever(value: never): never {
+function unreachable(value: never): never {
   throw new Error(`unexpected value: ${String(value)}`)
 }
 ```
 
-新增分支时，`assertNever` 会让编译器提醒你漏了哪一支。可选属性只表达"键可能缺席"；"值可能没有"用 `null`；两者不要混。
+新增分支时，`unreachable` 会让编译器提醒你漏了哪一支。可选属性只表达"键可能缺席"；"值可能没有"用 `null`；两者不要混。
 
 ### 6.4 边界解析：把 `unknown` 变成精确类型
 
@@ -440,10 +477,12 @@ function assertNever(value: never): never {
 
 **因此**：
 
-- 边界处只做一件事：`parseX(raw: unknown): X`，校验 + 收窄 + 产出品牌类型。
+- 边界用 `parseX(raw)` 产出 X。parse 的返回值保证能通过 `checkX`；它用 `isX` / `isNotX` 在转换过程中落实约束，但不调用 `checkX`。
+- `checkX` 用同一组 `isX` / `isNotX` 判断，最后统一抛一次；用于两类地方：值不是 parse 产出的（DB、其他模块、外部注入）；测试里验证 parse 的契约。
+- 单元测试固定契约：`expect(() => checkX(parseX(raw))).not.toThrow()`；非法 raw 在 parse 阶段失败；check 对 parse 的产物失败，说明 parse 违约（bug）。
 - 内部函数信任类型，不再重复判空——这也是消除早返回的来源。
 - 不用 `as` 穿过边界；不用 `!`；不用 `any`。
-- 解析失败抛领域错误（保留 cause）或返回 Result；不要返回半成品。
+- parse 失败抛解析错误，check 失败抛领域错误；都可以用 `{ cause }` 保留根因，或用 Result 表达预期失败；不要返回半成品。
 
 ### 6.5 `readonly` / `as const` / `satisfies`
 
@@ -497,6 +536,36 @@ function Card({ title, cover }: { title: string; cover?: string }) { ... }
 - 不导出可变绑定；不搞模块级单例；配置只在入口读，不散落在各个模块。
 - 内部引用直指源文件，对外才用 barrel（`index.ts`）收口。
 - 避免循环依赖；发现循环先拆模块，不靠延迟 `import` 绕过。
+
+### 8.1 常量：统一位置，命名导出
+
+**看法**：常量是"编译期固定、可共享的值"；它应该能被单独引用、被 tree-shake、被搜索和重构。`export default { ... }` 会把所有常量绑成一个对象，所有引用共享它，按名导入、tree-shake、重构都变差。
+
+**因此**：
+
+- 导出的常量统一放 `constants.ts`（每个包/领域一个；项目只有一个域就一个文件，不要把所有包的常量堆进一个全局文件）。
+- 用**命名导出**，不要 `export default { ... }`：
+
+```ts
+export const __GALLERY_VIEWPORT_MAX_WIDTH__ = 1440
+export const __BASE_PG_RETRY_COUNT__ = 5
+```
+
+- 如果常量是在某个 module 里计算出来的，`constants.ts` 用 re-export 把它收口；调用方只从 `constants.ts` 取，不需要知道生产者在哪：
+
+```ts
+export { __MODULE_CALCULATED__ } from './module'
+```
+
+- 计算必须是纯的、便宜的；依赖运行期配置/时间/随机的值不是常量，走组合根。
+- 被 re-export 的模块不要反向 `import './constants'`，否则形成循环；原始常量下沉到更底层（如 `base-constants.ts`）。
+
+- 名字按 5.2：`__MODULE_VAR_NAME__`；`__FOO__` 这种没有模块名的，只适合演示语法或真正的全局常量，不是有明确归属的合格常量。
+- 只在文件内用的常量留在本地，不必搬进 `constants.ts`；集中是为了共享，不是为了整齐。
+- 对象/数组常量用 `as const`（必要时 `Object.freeze`），不要导出可变对象。
+- 运行期配置不是常量：它由组合根读取/注入（见本节前文），不要塞进 `constants.ts`。
+
+**一句话**：常量按名导出，不按对象打包；一个域一个 `constants.ts`，本地常量留在本地，计算出来的常量在 `constants.ts` 收口。
 
 ---
 
@@ -700,8 +769,10 @@ type Result<T, E = Error> =
 - [ ] **状态有唯一所有者吗？** 有没有模块级 `let`、散落的写操作？
 - [ ] **副作用集中在可数的几个点吗？**
 - [ ] **循环里还有 continue / break 吗？**
-- [ ] **命名对了吗？** 函数 camelCase；工厂 PascalCase；数据 snake_case；被写入的捕获 `__name`；导出数据值 `__VAR_NAME__`；通用工具才有类型后缀例外。
-- [ ] **类型契约还在吗？** 无 `any`、无 `!`、导出有返回类型；边界数据是 `parse` 出来的，不是 `as` 出来的；该用品牌类型的地方用了吗？
+- [ ] **命名对了吗？** 导出的函数/变量带模块名（`galleryInEvent` / `__GALLERY_MAX_PHOTOS__`），非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；被写入的捕获 `__name`；通用工具才有类型后缀例外。
+- [ ] **常量放对地方了吗？** 导出的常量在 `constants.ts`、用命名导出吗？计算出来的常量是否 re-export 收口？调用方是否只从 `constants.ts` 取？有没有 `export default { ... }` 或可变对象？
+- [ ] **类型契约还在吗？** 无 `any`、无 `!`、导出有返回类型；边界数据由 `parse` 产出（输出保证通过 `check`），不是 `as` 出来的；该用品牌类型的地方用了吗？
+- [ ] **check 内部是 `isX` / `isNotX` 吗？** 有没有在每个单项检查里各抛一次？`checkX` 应该收集/判断，最后统一抛一次。
 - [ ] **空值统一吗？** 默认 `null`；`undefined` 只出现在语言强加处；`NONE` 只在内部、不参与 JSON。
 - [ ] **可选参数/默认值合规吗？** 位置参数没有 `?`（错误构造器透传 `ErrorOptions` 除外）；默认值有真实的"默认模式"语义；对象参数属性可选。
 - [ ] **catch 都负责了吗？** 要么包装并保留 `cause`，要么判别后真处理，要么根本没 catch；有没有 `catch { return null }` / `return []`？
@@ -744,15 +815,21 @@ type Result<T, E = Error> =
 | 循环里 `break` / `continue` | `find` / 抽查找函数 / `if` 包裹 | 第四节 |
 | `catch { return null }` / `return []` | 包装 + cause / 判别后处理 / Result | 9.1 |
 | `catch (e) { log(e); throw e }` | 删掉 log，让兜底记一次 | 9.2 |
-| `any` | `unknown` + `parse` | 第六节 |
-| 外部数据上 `as Foo` | `parseFoo` | 6.4 |
+| `any` | `unknown` + `parse` + `check` | 第六节 |
+| 外部数据上 `as Foo` | `parseFoo`（产出）/ `checkFoo`（验证） | 6.4 |
+| `parseX` 调用 `checkX` 兜底 | parse 自己保证输出合法；check 用同一组 isX 验证 | 5.7 |
+| 每个单项检查各自 throw | 改成 `isX` / `isNotX` 判断，由 `checkX` 最后抛一次 | 5.7 |
 | `!` | 显式判空 | 第六节 |
 | `enum` | 联合字面量 + `as const` | 第六节 |
 | `x?: T` 位置参数 | 对象参数（属性可选）或 `T \| null` | 第七节 |
 | 只为少传参数的默认值 | 必填，调用方显式传；默认值只在有真实默认模式时保留 | 第七节 |
 | 模块级 `let` | 单一所有者闭包 / 显式传入 | 3.1 |
-| `export const foo = 1` | `__FOO__`（数据值） | 5.3 |
-| `export const createFoo = () => ...` | `CreateFoo`（返回可调用物） | 5.2 |
+| `export const foo = 1` | `__GALLERY_FOO__`（导出数据值带模块名） | 5.2 / 5.4 |
+| `export const createFoo = () => ...` | `CreateGalleryFoo`（返回可调用物） | 5.3 |
+| 导出的 `inEvent` / `canSubmit` | `galleryInEvent` / `galleryCanSubmit` | 5.2 |
+| 非导出的 `galleryInEvent` | `inEvent` | 5.2 |
+| `export default { __FOO__ }` | `export const __MODULE_FOO__ = ...`（`constants.ts` 命名导出） | 5.2 / 8.1 |
+| 调用方绕过 constants 直接 import 计算模块 | `constants.ts` 里 `export { __CALCULATED__ } from './module'`，调用方只从 constants.ts 取 | 8.1 |
 | 手工品牌字段 | `unique symbol` 品牌 | 6.2 |
 | `null` / `undefined` 混用 | 默认 `null`，边界归一 | 6.1 |
 | 通用工具里用 `Item` | 泛型 `T` / `entry` / `value` | 第零节 |

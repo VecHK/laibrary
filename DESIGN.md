@@ -117,7 +117,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 packages/types   @laibrary/types：类型、zod、action schemas、RPC client、token parser、blob/thumb URL
 packages/server  @laibrary/server：Koa RPC、drizzle/PG、blob store、thumbnail service、config service、GC CLI
 apps/web         @laibrary/web：React 19 + Vite
-docs             规格、愿景、名词表、重构记录
+docs             规格、愿景、名词表、方法论、重构记录
 ```
 
 技术栈：Node 24、PostgreSQL 18、drizzle-orm、Koa、zod、sharp、React 19、Vite 8、Vitest。
@@ -162,8 +162,11 @@ docs             规格、愿景、名词表、重构记录
 
 | 文档 | 内容 |
 |---|---|
+| [AGENTS.md](AGENTS.md) | Agent 工作协议、提示义务、工程/安全规则 |
+| [README.md](README.md) | 快速开始、能力与配置入口 |
+| [docs/introduction.md](docs/introduction.md) | **完整文档索引**、愿景/原则、阅读路线 |
 | [docs/glossary.md](docs/glossary.md) | 名词表 |
-| [docs/introduction.md](docs/introduction.md) | 愿景/原则 |
+| [docs/methods.md](docs/methods.md) | TypeScript 编码硬规则、自查与 Agent 协议 |
 | [docs/vision.md](docs/vision.md) | 使用愿景（北极星） |
 | [docs/item/01-data-model.md](docs/item/01-data-model.md) | 数据模型 |
 | [docs/item/02-file-system.md](docs/item/02-file-system.md) | blobs/缩略图 |
