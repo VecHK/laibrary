@@ -34,7 +34,7 @@ export async function createImageItem(
     role: 'image',
     title: file.name,
     parent_id,
-    order_index,
+    ...(order_index === undefined ? {} : { order_index }),
     blob_id: blob.id,
     attributes: { filename: file.name },
   })
@@ -50,7 +50,7 @@ export async function createFileItem(
     role: 'file',
     title: file.name,
     parent_id,
-    order_index,
+    ...(order_index === undefined ? {} : { order_index }),
     blob_id: blob.id,
     attributes: { filename: file.name },
   })

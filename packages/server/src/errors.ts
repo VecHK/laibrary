@@ -63,7 +63,7 @@ export function pgErrorCode(err: unknown): string | undefined {
   for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
     if (typeof current === 'object' && 'code' in current) {
       const code = (current as { code?: unknown }).code
-      if (typeof code === 'string') return code
+      if (typeof code === 'string') {return code}
     }
     current = (current as { cause?: unknown }).cause
   }

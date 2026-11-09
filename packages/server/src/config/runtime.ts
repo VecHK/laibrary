@@ -1,8 +1,9 @@
 import { and, eq, max } from 'drizzle-orm'
+import type {
+  ConfigEntry, ConfigSnapshot, ConfigValueType, DatabaseFieldDef, ItemID,
+} from '@laibrary/types'
 import {
-  ConfigEntry, ConfigSnapshot, ConfigValueType, DatabaseFieldDef,
-  ItemID, SYSTEM_CONFIG_UNITY_NAME, SYSTEM_UNITY_PREFIX,
-  zDatabaseAttributes,
+  SYSTEM_CONFIG_UNITY_NAME, SYSTEM_UNITY_PREFIX, zDatabaseAttributes,
 } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items, type ItemRow } from '../db/schema'
@@ -14,7 +15,7 @@ import {
 function encodeValue(type: ConfigValueType, value: unknown): string {
   switch (type) {
     case 'string':
-      if (typeof value !== 'string') throw validationError('配置值需要字符串')
+      if (typeof value !== 'string') {throw validationError('配置值需要字符串')}
       return value
     case 'number':
       if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -22,7 +23,7 @@ function encodeValue(type: ConfigValueType, value: unknown): string {
       }
       return String(value)
     case 'boolean':
-      if (typeof value !== 'boolean') throw validationError('配置值需要布尔值')
+      if (typeof value !== 'boolean') {throw validationError('配置值需要布尔值')}
       return value ? 'true' : 'false'
     case 'json':
       return JSON.stringify(value)
@@ -38,12 +39,12 @@ function decodeValue(type: ConfigValueType, raw: unknown): unknown {
       return raw
     case 'number': {
       const value = Number(raw)
-      if (!Number.isFinite(value)) throw validationError(`配置值不是数字: ${raw}`)
+      if (!Number.isFinite(value)) {throw validationError(`配置值不是数字: ${raw}`)}
       return value
     }
     case 'boolean':
-      if (raw === 'true') return true
-      if (raw === 'false') return false
+      if (raw === 'true') {return true}
+      if (raw === 'false') {return false}
       throw validationError(`配置值不是布尔值: ${raw}`)
     case 'json':
       return JSON.parse(raw) as unknown
@@ -55,6 +56,31 @@ function typeOf(raw: unknown): ConfigValueType {
     return raw
   }
   return 'json'
+}
+
+function toConfigEntry(row: ItemRow): ConfigEntry | null {
+  if (row.kind !== null) {
+    return null
+  } else {
+    const unity_name = row.unity_name
+    if (unity_name === null) {
+      return null
+    } else {
+      const attrs = row.attributes as Record<string, unknown>
+      const type = typeOf(attrs['type'])
+      try {
+        return {
+          key: unity_name,
+          title: row.title,
+          type,
+          value: decodeValue(type, attrs['value']),
+        }
+      } catch {
+        // 解码失败的行不进入快照；继续读下一行。
+        return null
+      }
+    }
+  }
 }
 
 export class ConfigService {
@@ -128,30 +154,31 @@ export class ConfigService {
         .from(items)
         .where(eq(items.unity_name, def.key))
         .limit(1)
-      if (existing.length !== 0) continue
-
-      order_index += 1
-      try {
-        await this.db.insert(items).values({
-          role: 'page',
-          unity_name: def.key,
-          title: def.title,
-          parent_id: database_id,
-          order_index,
-          attributes: {
-            value: encodeValue(def.type, def.value),
-            type: def.type,
-          },
-        })
-      } catch (err) {
-        if (pgErrorCode(err) === '23505') continue
-        throw err
+      if (existing.length === 0) {
+        order_index += 1
+        try {
+          await this.db.insert(items).values({
+            role: 'page',
+            unity_name: def.key,
+            title: def.title,
+            parent_id: database_id,
+            order_index,
+            attributes: {
+              value: encodeValue(def.type, def.value),
+              type: def.type,
+            },
+          })
+        } catch (err) {
+          if (pgErrorCode(err) !== '23505') {
+            throw err
+          }
+        }
       }
     }
   }
 
   async load(force: boolean = false): Promise<ConfigSnapshot> {
-    if (this.cache !== null && !force) return this.cache
+    if (this.cache !== null && !force) {return this.cache}
 
     await this.ensure()
     const database_id = this.getSystemDatabaseId()
@@ -164,34 +191,22 @@ export class ConfigService {
     const seen = new Set<string>()
 
     for (const row of rows) {
-      if (row.kind !== null) continue
-      const unity_name = row.unity_name
-      if (unity_name === null) continue
-      const attrs = row.attributes as Record<string, unknown>
-      const type = typeOf(attrs['type'])
-      let value: unknown
-      try {
-        value = decodeValue(type, attrs['value'])
-      } catch {
-        continue
+      const entry = toConfigEntry(row)
+      if (entry !== null) {
+        entries.push(entry)
+        seen.add(entry.key)
       }
-      entries.push({
-        key: unity_name,
-        title: row.title,
-        type,
-        value,
-      })
-      seen.add(unity_name)
     }
 
     for (const def of DEFAULT_CONFIG) {
-      if (seen.has(def.key)) continue
-      entries.push({
-        key: def.key,
-        title: def.title,
-        type: def.type,
-        value: def.value,
-      })
+      if (!seen.has(def.key)) {
+        entries.push({
+          key: def.key,
+          title: def.title,
+          type: def.type,
+          value: def.value,
+        })
+      }
     }
 
     entries.sort((a, b) => a.key.localeCompare(b.key))
@@ -218,7 +233,7 @@ export class ConfigService {
       .where(eq(items.unity_name, key))
       .limit(1)
     const row = rows[0]
-    if (row === undefined) throw notFound(`配置项不存在: ${key}`)
+    if (row === undefined) {throw notFound(`配置项不存在: ${key}`)}
 
     const attrs = row.attributes as Record<string, unknown>
     const type = def?.type ?? typeOf(attrs['type'])

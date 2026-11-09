@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  closeDb, prepareTestBlobs, prepareTestDb, truncateAll,
+  closeDb, defined, prepareTestBlobs, prepareTestDb, truncateAll,
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
@@ -68,7 +68,7 @@ describe('system config', () => {
 
     const database = await getItemByUnityName(db, 'sys.config')
     expect(database).not.toBeNull()
-    await expect(updateItem(db, database!.id, { title: 'hack' }, blobs)).rejects.toThrow('系统 item')
+    await expect(updateItem(db, defined(database).id, { title: 'hack' }, blobs)).rejects.toThrow('系统 item')
     await expect(createItem(db, {
       role: 'page',
       title: 'sys item',

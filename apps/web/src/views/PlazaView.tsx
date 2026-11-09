@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Item, Role } from '@laibrary/types'
+import type { FilterRule, Item, Role } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { resolveModule } from '../modules/registry'
 import { openItem } from '../lib/open-item'
@@ -28,9 +28,9 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   const [loading, setLoading] = useState(false)
   const [page_size, setPageSize] = useState(50)
 
-  const buildRules = (filter: Filter | undefined): import('@laibrary/types').FilterRule[] => {
-    if (filter === undefined) return []
-    const rules: import('@laibrary/types').FilterRule[] = []
+  const buildRules = (filter: Filter | undefined): FilterRule[] => {
+    if (filter === undefined) {return []}
+    const rules: FilterRule[] = []
     if (filter.roles !== undefined) {
       rules.push({ name: 'role', input: filter.roles, logic: 'and' })
     }
@@ -67,14 +67,15 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   useEffect(loadFirstPage, [filter_idx, page_size])
 
   const loadMore = () => {
-    if (items.length === 0) return
+    const last_item = items[items.length - 1]
+    if (last_item === undefined) {return}
     const filter = FILTERS[filter_idx]
     setLoading(true)
     getRpc().listing({
       limit: page_size,
       sort_by: 'update_date',
       desc: true,
-      after_id: items[items.length - 1]!.id,
+      after_id: last_item.id,
       filter_rules: buildRules(filter),
     }).then(page => {
       setItems(prev => [...prev, ...page])

@@ -27,7 +27,7 @@ export class ThumbnailService {
       .where(and(eq(thumbnails.image_id, image_id), eq(thumbnails.size, size)))
       .limit(1)
     const row = rows[0]
-    if (row === undefined) return null
+    if (row === undefined) {return null}
     return this.blobs.requireMeta(row.blob_id as never)
   }
 
@@ -40,11 +40,11 @@ export class ThumbnailService {
     }
 
     const existing = await this.getExisting(image_id, size)
-    if (existing !== null) return existing
+    if (existing !== null) {return existing}
 
     const key = `${image_id}:${size}`
     const running = this.in_flight.get(key)
-    if (running !== undefined) return running
+    if (running !== undefined) {return running}
 
     const task = this.generate(image_id, size).finally(() => {
       this.in_flight.delete(key)
@@ -60,7 +60,7 @@ export class ThumbnailService {
       .where(eq(items.id, image_id))
       .limit(1)
     const image = image_rows[0]
-    if (image === undefined) throw notFound(`item(id=${image_id}) not found`)
+    if (image === undefined) {throw notFound(`item(id=${image_id}) not found`)}
     if (image.role !== 'image') {
       throw validationError(`item(id=${image_id}) 并不是 image`)
     }
@@ -69,7 +69,7 @@ export class ThumbnailService {
     }
 
     const source = await this.blobs.getMeta(image.blob_id as never)
-    if (source === null) throw notFound(`blob(${image.blob_id}) not found`)
+    if (source === null) {throw notFound(`blob(${image.blob_id}) not found`)}
     if (!(await this.blobs.exists(source.id))) {
       throw notFound(`blob(${source.id}) 文件不存在`)
     }
@@ -108,7 +108,7 @@ export class ThumbnailService {
     }
 
     const saved = await this.getExisting(image_id, size)
-    if (saved !== null) return saved
+    if (saved !== null) {return saved}
     return thumb.blob
   }
 }

@@ -2,10 +2,12 @@ import {
   and, asc, desc, eq, inArray, isNull, max, or, sql, type SQL,
 } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
-import {
+import type {
   AddItemForm, BlobID, DatabaseFieldDef, FilterGroup, FilterRule,
-  Item, ItemID, ListingParams, Role, SYSTEM_UNITY_PREFIX,
-  UpdateItemForm, buildRowValidator, checkAttributes, extractItemTokenIds,
+  Item, ItemID, ListingParams, Role, UpdateItemForm,
+} from '@laibrary/types'
+import {
+  SYSTEM_UNITY_PREFIX, buildRowValidator, checkAttributes, extractItemTokenIds,
   zDatabaseAttributes, zKind, zRole, zUnityName,
 } from '@laibrary/types'
 import type { DbLike } from '../db/client'
@@ -37,9 +39,9 @@ export async function findDatabaseSchema(
   db: DbLike,
   parent_id: ItemID | null,
 ): Promise<DatabaseFieldDef[] | null> {
-  if (parent_id === null) return null
+  if (parent_id === null) {return null}
   const parent = await getItemRow(db, parent_id)
-  if (parent.role !== 'database') return null
+  if (parent.role !== 'database') {return null}
   const attrs = zDatabaseAttributes.parse(parent.attributes)
   return attrs.schema
 }
@@ -73,8 +75,8 @@ async function findAncestorIds(
   let count = 0
   while (current !== null) {
     const row = await findItemRow(db, current)
-    if (row === null) break
-    if (row.parent_id !== null) ancestors.push(row.parent_id)
+    if (row === null) {break}
+    if (row.parent_id !== null) {ancestors.push(row.parent_id)}
     current = row.parent_id
     count += 1
     if (count > limit) {
@@ -86,7 +88,7 @@ async function findAncestorIds(
 
 async function validateTagIds(db: DbLike, tag_ids: ItemID[]): Promise<ItemID[]> {
   const ids = unique(tag_ids)
-  if (ids.length === 0) return []
+  if (ids.length === 0) {return []}
   const rows = await db
     .select({ id: items.id, role: items.role })
     .from(items)
@@ -127,12 +129,12 @@ async function validateBlob(
 ): Promise<BlobID | null> {
   const needs_blob = role === 'file' || role === 'image'
   if (!needs_blob) {
-    if (blob_id !== undefined) throw badRequest(`role=${role} 不允许 blob_id`)
+    if (blob_id !== undefined) {throw badRequest(`role=${role} 不允许 blob_id`)}
     return null
   }
-  if (blob_id === undefined) throw badRequest(`role=${role} 必须提供 blob_id`)
+  if (blob_id === undefined) {throw badRequest(`role=${role} 必须提供 blob_id`)}
   const meta = await blobs_service.getMeta(blob_id)
-  if (meta === null) throw notFound(`blob(${blob_id}) not found`)
+  if (meta === null) {throw notFound(`blob(${blob_id}) not found`)}
   if (role === 'image') {
     if (!meta.mime.startsWith('image/') || meta.width === null || meta.height === null) {
       throw badRequest(`blob(${blob_id}) 不是有效图片`)
@@ -142,7 +144,7 @@ async function validateBlob(
 }
 
 function assertUnityWritable(unity_name: string | undefined, allow_system: boolean): void {
-  if (unity_name === undefined) return
+  if (unity_name === undefined) {return}
   if (!allow_system && isSystemUnityName(unity_name)) {
     throw badRequest(`unity_name 使用了系统保留前缀: ${SYSTEM_UNITY_PREFIX}`)
   }
@@ -150,10 +152,10 @@ function assertUnityWritable(unity_name: string | undefined, allow_system: boole
 
 function roleKindCheck(role: Role, kind: string | undefined): string | null {
   if (role === 'entity') {
-    if (kind === undefined) throw badRequest('entity 必须提供 kind')
+    if (kind === undefined) {throw badRequest('entity 必须提供 kind')}
     return zKind.parse(kind)
   }
-  if (kind !== undefined) throw badRequest('只有 entity 允许 kind')
+  if (kind !== undefined) {throw badRequest('只有 entity 允许 kind')}
   return null
 }
 
@@ -190,12 +192,12 @@ export async function createItem(
   const blob_id = await validateBlob(blobs_service, role, form.blob_id)
 
   if (role === 'itemlink') {
-    if (form.target_id === undefined) throw badRequest('itemlink 必须提供 target_id')
+    if (form.target_id === undefined) {throw badRequest('itemlink 必须提供 target_id')}
   } else if (form.target_id !== undefined) {
     throw badRequest('只有 itemlink 允许 target_id')
   }
   const target_id = form.target_id ?? null
-  if (target_id !== null) await validateTarget(db, target_id)
+  if (target_id !== null) {await validateTarget(db, target_id)}
 
   const tags = await validateTagIds(db, form.tags ?? [])
 
@@ -225,12 +227,12 @@ export async function createItem(
       })
       .returning()
     const row = new_rows[0]
-    if (row === undefined) throw new Error('insert returned no row')
+    if (row === undefined) {throw new Error('insert returned no row')}
     return await getWireItem(db, row.id)
   } catch (err) {
     const code = pgErrorCode(err)
-    if (code === '23505') throw conflict('unity_name 或 tag 名重复')
-    if (code === '23503') throw conflict('父项或 blob 引用无效')
+    if (code === '23505') {throw conflict('unity_name 或 tag 名重复')}
+    if (code === '23503') {throw conflict('父项或 blob 引用无效')}
     throw err
   }
 }
@@ -272,9 +274,9 @@ export async function updateItem(
 
   if (parent_changed && new_parent_id !== null) {
     await assertParent(db, new_parent_id)
-    if (new_parent_id === id) throw badRequest('parent 不能指向自己')
+    if (new_parent_id === id) {throw badRequest('parent 不能指向自己')}
     const ancestors = await findAncestorIds(db, new_parent_id)
-    if (ancestors.includes(id)) throw conflict('不能移动到自己的后代之下')
+    if (ancestors.includes(id)) {throw conflict('不能移动到自己的后代之下')}
   }
 
   const schema = await findDatabaseSchema(db, new_parent_id)
@@ -288,7 +290,7 @@ export async function updateItem(
   let target_id = prev.target_id
   if (role === 'itemlink') {
     target_id = data.target_id ?? prev.target_id
-    if (target_id === null) throw badRequest('itemlink 必须提供 target_id')
+    if (target_id === null) {throw badRequest('itemlink 必须提供 target_id')}
     await validateTarget(db, target_id, id)
   } else if (data.target_id !== undefined) {
     throw badRequest('只有 itemlink 允许 target_id')
@@ -318,11 +320,11 @@ export async function updateItem(
       .where(eq(items.id, id))
       .returning()
     const row = updated[0]
-    if (row === undefined) throw notFound(`item(id=${id}) not found`)
+    if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
     return await getWireItem(db, row.id)
   } catch (err) {
     const code = pgErrorCode(err)
-    if (code === '23503') throw conflict('父项或引用无效')
+    if (code === '23503') {throw conflict('父项或引用无效')}
     throw err
   }
 }
@@ -386,9 +388,9 @@ function groupToCondition(group: FilterGroup): SQL | undefined {
   const conds = group.rules
     .map(ruleToCondition)
     .filter((cond): cond is SQL => cond !== undefined)
-  if (conds.length === 0) return undefined
+  if (conds.length === 0) {return undefined}
   const combined = group.logic === 'and' ? and(...conds) : or(...conds)
-  if (combined === undefined) return undefined
+  if (combined === undefined) {return undefined}
   return group.invert ? sql`NOT (${combined})` : combined
 }
 
@@ -405,19 +407,20 @@ export function buildFilterCondition(
   const or_conds: SQL[] = []
   for (const group of groups) {
     const cond = groupToCondition(group)
-    if (cond === undefined) continue
-    if (group.logic === 'and') and_conds.push(cond)
-    else or_conds.push(cond)
+    if (cond !== undefined) {
+      if (group.logic === 'and') {and_conds.push(cond)}
+      else {or_conds.push(cond)}
+    }
   }
 
   const final_conds: SQL[] = [...and_conds]
   if (or_conds.length !== 0) {
     const combined = or(...or_conds)
-    if (combined !== undefined) final_conds.push(combined)
+    if (combined !== undefined) {final_conds.push(combined)}
   }
 
-  if (final_conds.length === 0) return undefined
-  if (final_conds.length === 1) return final_conds[0]
+  if (final_conds.length === 0) {return undefined}
+  if (final_conds.length === 1) {return final_conds[0]}
   return and(...final_conds)
 }
 
@@ -508,12 +511,15 @@ export async function listItems(
     .from(items)
     .leftJoin(blobs, eq(items.blob_id, blobs.id))
 
-  if (conds.length !== 0) {
-    query.where(conds.length === 1 ? conds[0]! : and(...conds))
+  if (conds.length === 1) {
+    const first_cond = conds[0]
+    if (first_cond !== undefined) {query.where(first_cond)}
+  } else if (conds.length > 1) {
+    query.where(and(...conds))
   }
 
   query.orderBy(order_clause, desc_order ? desc(items.id) : asc(items.id))
-  if (limit !== 0) query.limit(limit)
+  if (limit !== 0) {query.limit(limit)}
 
   const rows = await query
   return rows.map(row => toWireItem(row.item, row.blob))

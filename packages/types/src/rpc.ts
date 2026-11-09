@@ -1,11 +1,13 @@
-import type { BlobID, BlobMeta, ConfigSnapshot, Item, ItemID } from './roles'
+import type {
+  AddItemForm, BlobID, BlobMeta, ConfigSnapshot, Item, ItemID, UpdateItemForm,
+} from './roles'
 import type { ListingParams } from './filter'
 
 export interface ActionTable {
-  addItem(form: import('./roles').AddItemForm): Promise<Item>
+  addItem(form: AddItemForm): Promise<Item>
   getItem(payload: { id: ItemID }): Promise<Item>
   getItems(ids: ItemID[]): Promise<Item[]>
-  updateItem(payload: { id: ItemID; data: import('./roles').UpdateItemForm }): Promise<{ message: 'done' }>
+  updateItem(payload: { id: ItemID; data: UpdateItemForm }): Promise<{ message: 'done' }>
   deleteItem(payload: { id: ItemID }): Promise<{ message: 'done' }>
   listing(payload: ListingParams): Promise<Item[]>
   getItemByUnityName(payload: { unity_name: string }): Promise<Item | null>

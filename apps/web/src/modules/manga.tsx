@@ -17,8 +17,8 @@ type MangaPage = {
 
 function explicitDirectionOf(item: Item): 'rtl' | 'ltr' | null {
   const attrs = item.attributes as Record<string, unknown>
-  if (attrs['reading_direction'] === 'ltr') return 'ltr'
-  if (attrs['reading_direction'] === 'rtl') return 'rtl'
+  if (attrs['reading_direction'] === 'ltr') {return 'ltr'}
+  if (attrs['reading_direction'] === 'rtl') {return 'rtl'}
   return null
 }
 
@@ -136,7 +136,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const updateVisibility = () => {
     const container = container_ref.current
-    if (container === null || pages === null) return
+    if (container === null || pages === null) {return}
     const rect = container.getBoundingClientRect()
     const over = rect.width * 2
     const imgs = container.querySelectorAll<HTMLImageElement>('img.manga-page')
@@ -144,7 +144,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const new_srcs = { ...loaded_srcs }
     imgs.forEach(img => {
       const page_id = Number(img.dataset['pageId'])
-      if (loaded_ref.current.has(page_id)) return
+      if (loaded_ref.current.has(page_id)) {return}
       const ir = img.getBoundingClientRect()
       if (ir.right > rect.left - over && ir.left < rect.right + over) {
         const page = pages.find(p => p.id === page_id)
@@ -155,11 +155,11 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         }
       }
     })
-    if (changed) setLoadedSrcs(new_srcs)
+    if (changed) {setLoadedSrcs(new_srcs)}
   }
 
   useEffect(() => {
-    if (pages === null) return
+    if (pages === null) {return}
     const container = container_ref.current
     if (container !== null) {
       const index = Math.min(readProgress(item), Math.max(0, pages.length - 1))
@@ -176,7 +176,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const container = container_ref.current
-      if (container === null) return
+      if (container === null) {return}
       const step = window.innerWidth * 0.9
       if (ev.key === 'ArrowRight') {
         container.scrollBy({ left: direction === 'rtl' ? -step : step })
@@ -205,10 +205,10 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const swapOrder = (page_id: number, other_id: number) => {
-    if (pages === null) return
+    if (pages === null) {return}
     const a = pages.find(p => p.id === page_id)
     const b = pages.find(p => p.id === other_id)
-    if (a === undefined || b === undefined) return
+    if (a === undefined || b === undefined) {return}
     Promise.all([
       getRpc().updateItem({ id: a.id, data: { order_index: b.order_index } }),
       getRpc().updateItem({ id: b.id, data: { order_index: a.order_index } }),
@@ -216,7 +216,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const page_width = (page: MangaPage): number => {
-    if (page.height <= 0 || page.width <= 0) return 0
+    if (page.height <= 0 || page.width <= 0) {return 0}
     return window.innerHeight * (page.width / page.height)
   }
 
@@ -224,8 +224,8 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     <div className="manga-reader-wrap">
       <div className="manga-toolbar">
         <button className="button" onClick={() => {
-          if (item.parent_id !== null) ctx.navigate(item.parent_id)
-          else ctx.navigate({ name: 'plaza' })
+          if (item.parent_id !== null) {ctx.navigate(item.parent_id)}
+          else {ctx.navigate({ name: 'plaza' })}
         }}>← 返回</button>
         <span className="manga-title">{item.title}</span>
         <button className="button" onClick={() => file_input_ref.current?.click()}>
@@ -262,14 +262,14 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         ref={container_ref}
         onScroll={ev => {
           updateVisibility()
-          if (pages === null || pages.length === 0) return
+          if (pages === null || pages.length === 0) {return}
           const container = ev.currentTarget
           const mid = container.scrollLeft + container.clientWidth / 2
           let best = 0
           let best_dist = Infinity
           pages.forEach((page, index) => {
             const img = container.querySelector<HTMLImageElement>(`img[data-page-id="${page.id}"]`)
-            if (img === null) return
+            if (img === null) {return}
             const center = img.offsetLeft + img.clientWidth / 2
             const dist = Math.abs(center - mid)
             if (dist < best_dist) {
@@ -305,12 +305,18 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
                 <button
                   className="tool-button light"
                   disabled={idx === 0}
-                  onClick={() => swapOrder(page.id, pages[idx - 1]!.id)}
+                  onClick={() => {
+                    const prev_page = pages[idx - 1]
+                    if (prev_page !== undefined) {swapOrder(page.id, prev_page.id)}
+                  }}
                 >←</button>
                 <button
                   className="tool-button light"
                   disabled={idx === pages.length - 1}
-                  onClick={() => swapOrder(page.id, pages[idx + 1]!.id)}
+                  onClick={() => {
+                    const next_page = pages[idx + 1]
+                    if (next_page !== undefined) {swapOrder(page.id, next_page.id)}
+                  }}
                 >→</button>
                 <button
                   className="tool-button light"
@@ -332,7 +338,6 @@ export const mangaModule: ItemModule = {
     card: (item, ctx) => <MangaCard item={item} ctx={ctx} />,
     full: (item, ctx) => <MangaReader item={item} ctx={ctx} />,
   },
-  Block: undefined,
   inlineIcon: (item) => <MangaInline item={item} />,
   inlineMeta: () => <>漫画</>,
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import {
-  DatabaseFieldDef, Item, zDatabaseAttributes,
-} from '@laibrary/types'
+import type { DatabaseFieldDef, Item } from '@laibrary/types'
+import { zDatabaseAttributes } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { cycleSortState, type FieldSortState } from '../lib/order'
 import type { ItemModule, ViewerCtx } from './types'
@@ -34,8 +33,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     getRpc().listing({
       limit: 0,
       sort_by: 'order_index',
-      sort_field: sort ?? undefined,
-      desc: sort?.desc,
+      ...(sort === null ? {} : { sort_field: sort, desc: sort.desc }),
       filter_rules: [{ name: 'parent', input: item.id, logic: 'and' }],
     }).then(setRows).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
@@ -59,14 +57,14 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     let unity_name: string | undefined
     if (unity_field !== undefined) {
       const value = window.prompt(`请输入 ${unity_field.name}（全局唯一）`)
-      if (value === null || value.trim().length === 0) return
+      if (value === null || value.trim().length === 0) {return}
       unity_name = value.trim()
     }
     getRpc().addItem({
       role: 'page',
       title: '',
       parent_id: item.id,
-      unity_name,
+      ...(unity_name === undefined ? {} : { unity_name }),
     }).then(() => refresh()).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Item } from '@laibrary/types'
+import type { Item } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { getTagTitle, loadTags } from '../lib/tags'
 import { resolveModule } from '../modules/registry'
@@ -98,9 +98,9 @@ export function ItemView({
     setNotFound(false)
     setItem(prev => prev?.id === item_id ? prev : null)
     getRpc().getItem({ id: item_id }).then(next => {
-      if (alive) setItem(next)
+      if (alive) {setItem(next)}
     }).catch(err => {
-      if (!alive) return
+      if (!alive) {return}
       setNotFound(true)
       ctx.showError(err instanceof Error ? err.message : String(err))
     })

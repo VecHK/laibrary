@@ -7,7 +7,7 @@ import { blobs, items, type BlobRow, type ItemRow } from '../db/schema'
 import { notFound } from '../errors'
 
 export function blobRowToMeta(row: BlobRow | null): BlobMeta | null {
-  if (row === null) return null
+  if (row === null) {return null}
   return {
     id: row.id as BlobID,
     size: row.size,
@@ -38,7 +38,7 @@ export function toWireItem(row: ItemRow, blob: BlobRow | null): Item {
 export async function getItemRow(db: DbLike, id: ItemID): Promise<ItemRow> {
   const rows = await db.select().from(items).where(eq(items.id, id)).limit(1)
   const row = rows[0]
-  if (row === undefined) throw notFound(`item(id=${id}) not found`)
+  if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
   return row
 }
 
@@ -50,7 +50,7 @@ export async function getItemRowForUpdate(db: DbLike, id: ItemID): Promise<ItemR
     .limit(1)
     .for('update')
   const row = rows[0]
-  if (row === undefined) throw notFound(`item(id=${id}) not found`)
+  if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
   return row
 }
 
@@ -79,7 +79,7 @@ async function selectWithBlob(db: DbLike, id: ItemID) {
     .where(eq(items.id, id))
     .limit(1)
   const row = rows[0]
-  if (row === undefined) throw notFound(`item(id=${id}) not found`)
+  if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
   return row
 }
 
@@ -89,7 +89,7 @@ export async function getWireItem(db: DbLike, id: ItemID): Promise<Item> {
 }
 
 export async function getWireItems(db: DbLike, ids: ItemID[]): Promise<Item[]> {
-  if (ids.length === 0) return []
+  if (ids.length === 0) {return []}
   const rows = await db
     .select({ item: items, blob: blobs })
     .from(items)
@@ -98,7 +98,7 @@ export async function getWireItems(db: DbLike, ids: ItemID[]): Promise<Item[]> {
   const map = new Map(rows.map(row => [row.item.id, row]))
   return ids.map(id => {
     const row = map.get(id)
-    if (row === undefined) throw notFound(`item(id=${id}) not found`)
+    if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
     return toWireItem(row.item, row.blob)
   })
 }
@@ -108,6 +108,6 @@ export async function getWireItemByUnityName(
   unity_name: string,
 ): Promise<Item | null> {
   const row = await findItemRowByUnityName(db, unity_name)
-  if (row === null) return null
+  if (row === null) {return null}
   return getWireItem(db, row.id)
 }

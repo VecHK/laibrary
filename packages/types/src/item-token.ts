@@ -47,7 +47,7 @@ export function parseItemTokens(text: string): ItemToken[] {
 export function extractItemTokenIds(text: string): ItemID[] {
   const ids = new Set<ItemID>()
   for (const token of parseItemTokens(text)) {
-    if (token.type === 'item') ids.add(token.target_id)
+    if (token.type === 'item') {ids.add(token.target_id)}
   }
   return [...ids]
 }

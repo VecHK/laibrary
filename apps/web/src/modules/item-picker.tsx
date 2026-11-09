@@ -33,7 +33,7 @@ export function ItemPicker({
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') onClose()
+      if (ev.key === 'Escape') {onClose()}
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -38,8 +38,8 @@ function InlineItemLink({
   useEffect(() => {
     let alive = true
     getRpc().getItem({ id: target_id })
-      .then(item => { if (alive) setTitle(item.title) })
-      .catch(() => { if (alive) setTitle(null) })
+      .then(item => { if (alive) {setTitle(item.title)} })
+      .catch(() => { if (alive) {setTitle(null)} })
     return () => { alive = false }
   }, [target_id])
 
@@ -114,7 +114,7 @@ function TextLineEditor({
     alive_ref.current = true
     return () => {
       alive_ref.current = false
-      if (timer_ref.current !== null) clearTimeout(timer_ref.current)
+      if (timer_ref.current !== null) {clearTimeout(timer_ref.current)}
     }
   }, [])
 
@@ -140,19 +140,19 @@ function TextLineEditor({
 
   const resize = () => {
     const node = textarea_ref.current
-    if (node === null) return
+    if (node === null) {return}
     node.style.height = '0px'
     node.style.height = `${node.scrollHeight}px`
   }
 
   useEffect(() => {
-    if (is_active) resize()
+    if (is_active) {resize()}
   }, [value, is_active])
 
   useEffect(() => {
-    if (!is_active || focus_request === null) return
+    if (!is_active || focus_request === null) {return}
     const node = textarea_ref.current
-    if (node === null) return
+    if (node === null) {return}
     const caret = focus_request.caret
     node.focus()
     skip_blur_save_ref.current = false
@@ -163,7 +163,7 @@ function TextLineEditor({
     resize()
     // Controlled textarea 的值更新可能发生在 focus 之后，用 macrotask 再落一次 caret。
     const settle_timer = window.setTimeout(() => {
-      if (!alive_ref.current) return
+      if (!alive_ref.current) {return}
       const settled = caret === 'end'
         ? node.value.length
         : Math.max(0, Math.min(caret, node.value.length))
@@ -212,7 +212,7 @@ function TextLineEditor({
   }
 
   const pickCommand = (command: SlashCommand) => {
-    if (busy_ref.current) return
+    if (busy_ref.current) {return}
     setSlashQuery(null)
     if (command.id === 'text') {
       clearLine()
@@ -220,7 +220,7 @@ function TextLineEditor({
       textarea_ref.current?.focus()
       return
     }
-    if (onSlashCommand === undefined) return
+    if (onSlashCommand === undefined) {return}
     clearLine()
     skip_blur_save_ref.current = true
     busy_ref.current = true
@@ -232,9 +232,9 @@ function TextLineEditor({
   }
 
   const handleSplit = async () => {
-    if (onSplit === undefined || busy_ref.current) return
+    if (onSplit === undefined || busy_ref.current) {return}
     const node = textarea_ref.current
-    if (node === null) return
+    if (node === null) {return}
     busy_ref.current = true
     const { left, right } = splitTextLine(value_ref.current, node.selectionStart, node.selectionEnd)
     cancelTimer()
@@ -307,7 +307,7 @@ function TextLineEditor({
         }}
         onKeyDown={ev => {
           const composing = composing_ref.current || (ev.nativeEvent as KeyboardEvent).isComposing
-          if (composing) return
+          if (composing) {return}
 
           if (slash_query !== null) {
             if (ev.key === 'ArrowDown') {
@@ -327,7 +327,7 @@ function TextLineEditor({
             if ((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Tab') {
               ev.preventDefault()
               const command = commands[selected_index]
-              if (command !== undefined) pickCommand(command)
+              if (command !== undefined) {pickCommand(command)}
               return
             }
             if (ev.key === 'Escape') {
@@ -338,7 +338,7 @@ function TextLineEditor({
           }
 
           if (ev.key === 'Enter' && !ev.shiftKey) {
-            if (onSplit === undefined) return
+            if (onSplit === undefined) {return}
             ev.preventDefault()
             void handleSplit()
             return
@@ -359,7 +359,7 @@ function TextLineEditor({
         onSelect={ev => {
           if (slash_query !== null) {
             const query = detectSlashQuery(value, ev.currentTarget.selectionStart)
-            if (query === null) setSlashQuery(null)
+            if (query === null) {setSlashQuery(null)}
           }
         }}
       />

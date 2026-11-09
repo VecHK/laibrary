@@ -39,7 +39,7 @@ function EntityBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
 function EntityCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const module = item.kind === null ? undefined : getKindModule(item.kind)
-  if (module !== undefined) return <>{module.Presenter.card(item, ctx)}</>
+  if (module !== undefined) {return <>{module.Presenter.card(item, ctx)}</>}
   return (
     <div className="card entity-card">
       <div className="card-icon">❓</div>
@@ -51,7 +51,7 @@ function EntityCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
 function EntityFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const module = item.kind === null ? undefined : getKindModule(item.kind)
-  if (module !== undefined) return <>{module.Presenter.full(item, ctx)}</>
+  if (module !== undefined) {return <>{module.Presenter.full(item, ctx)}</>}
   return (
     <div className="panel">
       <div className="panel-title">没有合适的打开方式</div>

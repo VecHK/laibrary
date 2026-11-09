@@ -24,8 +24,8 @@ function useTarget(item: Item) {
 }
 
 function targetLabel(item: Item, target: Item | null, missing: boolean): string {
-  if (missing) return '链接失效'
-  if (target === null) return '加载中…'
+  if (missing) {return '链接失效'}
+  if (target === null) {return '加载中…'}
   return target.title || `#${target.id}`
 }
 
@@ -55,7 +55,7 @@ function ItemLinkCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     <div
       className="card link-card"
       onClick={() => {
-        if (item.target_id !== null) openItemById(item.target_id, ctx)
+        if (item.target_id !== null) {openItemById(item.target_id, ctx)}
       }}
     >
       <div className="card-icon">{missing ? '⚠️' : '🔗'}</div>
@@ -67,12 +67,13 @@ function ItemLinkCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
 function ItemLinkFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const { target, missing } = useTarget(item)
+  const target_id = item.target_id
   return (
     <div className="panel">
       <div className="panel-title">链接</div>
       <p className="empty-hint">{targetLabel(item, target, missing)}</p>
-      {item.target_id !== null && (
-        <button className="button" onClick={() => openItemById(item.target_id!, ctx)}>
+      {target_id !== null && (
+        <button className="button" onClick={() => openItemById(target_id, ctx)}>
           打开目标
         </button>
       )}

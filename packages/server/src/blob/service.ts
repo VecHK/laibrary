@@ -1,9 +1,11 @@
+import type { Stats } from 'node:fs'
 import { eq } from 'drizzle-orm'
 import type { BlobID, BlobMeta } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { blobs, type BlobRow } from '../db/schema'
 import { notFound, storageError } from '../errors'
-import { BlobStore, type StoredBlob } from './store'
+import type { BlobStore } from './store'
+import { type StoredBlob } from './store'
 
 export type PutBlobResult = {
   blob: BlobMeta
@@ -86,7 +88,7 @@ export class BlobService {
 
   async requireMeta(id: BlobID): Promise<BlobMeta> {
     const meta = await this.getMeta(id)
-    if (meta === null) throw notFound(`blob(${id}) not found`)
+    if (meta === null) {throw notFound(`blob(${id}) not found`)}
     return meta
   }
 
@@ -107,7 +109,7 @@ export class BlobService {
     return this.store.exists(id)
   }
 
-  async stat(id: BlobID): Promise<import('node:fs').Stats> {
+  async stat(id: BlobID): Promise<Stats> {
     return this.store.stat(id)
   }
 

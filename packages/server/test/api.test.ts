@@ -11,6 +11,7 @@ import type { BlobService } from '../src/blob/service'
 import { ConfigService } from '../src/config/runtime'
 import { createApi } from '../src/api'
 import type { BootstrapConfig } from '../src/config/bootstrap'
+import type { ConfigSnapshot } from '@laibrary/types'
 import type { ThumbnailService } from '../src/thumbnails/service'
 import { ThumbnailService as Thumbnails } from '../src/thumbnails/service'
 
@@ -117,7 +118,8 @@ describe('RPC API', () => {
     expect(updated.status).toBe(200)
 
     const after = await action('getConfig', undefined)
-    expect(after.body.entries.find((e: any) => e.key === 'sys.config.manga_default_direction').value)
+    const snapshot: ConfigSnapshot = after.body
+    expect(snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')?.value)
       .toBe('ltr')
 
     const bad_type = await action('updateConfig', {

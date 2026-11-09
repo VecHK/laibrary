@@ -3,7 +3,8 @@ import Router from '@koa/router'
 import cors from '@koa/cors'
 import { bodyParser } from '@koa/bodyparser'
 import { ZodError } from 'zod'
-import { ActionTable, zActionPayloads } from '@laibrary/types'
+import type { ActionTable } from '@laibrary/types'
+import { zActionPayloads } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
 import type { DB } from '../db/client'
 import type { BlobService } from '../blob/service'
@@ -96,7 +97,7 @@ export async function createApi(
       ctx.body = result
     } catch (err) {
       const { status, body } = errorBody(err)
-      if (status >= 500) console.error(`[action:${name}]`, err)
+      if (status >= 500) {console.error(`[action:${name}]`, err)}
       ctx.status = status
       ctx.type = 'application/json'
       ctx.body = body

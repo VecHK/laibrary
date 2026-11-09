@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import Router from '@koa/router'
+import Router, { type RouterContext } from '@koa/router'
+import type { Context } from 'koa'
 import { koaBody } from 'koa-body'
 import { zBlobID } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
@@ -8,13 +9,13 @@ import type { BlobService } from '../blob/service'
 import { AppError, badRequest, notFound, storageError } from '../errors'
 import { initDirectorySync } from '../utils/directory'
 
-function json(ctx: any, status: number, body: unknown): void {
+function json(ctx: Context, status: number, body: unknown): void {
   ctx.status = status
   ctx.type = 'application/json'
   ctx.body = body
 }
 
-function errorJson(ctx: any, err: unknown): void {
+function errorJson(ctx: Context, err: unknown): void {
   if (err instanceof AppError) {
     json(ctx, err.status, { message: err.message, code: err.code })
     return
@@ -23,29 +24,29 @@ function errorJson(ctx: any, err: unknown): void {
   json(ctx, 500, { message, code: 'INTERNAL' })
 }
 
-function detectSingleFile(ctx: any): any {
+function detectSingleFile(ctx: Context) {
   const { files } = ctx.request
-  if (files === undefined) throw badRequest('upload failure: missing files')
+  if (files === undefined) {throw badRequest('upload failure: missing files')}
   if (Object.keys(files).length > 1) {
     throw badRequest("upload failure: only 'file' field is allowed")
   }
   const file = files['file']
-  if (file === undefined) throw badRequest("upload failure: require 'file' field")
-  if (Array.isArray(file)) throw badRequest('upload failure: single upload required')
+  if (file === undefined) {throw badRequest("upload failure: require 'file' field")}
+  if (Array.isArray(file)) {throw badRequest('upload failure: single upload required')}
   return file
 }
 
 function parseRange(range: string | undefined, size: number): { start: number, end: number } | null {
-  if (range === undefined) return null
+  if (range === undefined) {return null}
   const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
-  if (match === null) return null
+  if (match === null) {return null}
   const [, start_raw, end_raw] = match
-  if (start_raw === '' && end_raw === '') return null
+  if (start_raw === '' && end_raw === '') {return null}
   let start: number
   let end: number
   if (start_raw === '') {
     const suffix = Number.parseInt(end_raw as string, 10)
-    if (!Number.isFinite(suffix) || suffix <= 0) return null
+    if (!Number.isFinite(suffix) || suffix <= 0) {return null}
     start = Math.max(0, size - suffix)
     end = size - 1
   } else {
@@ -83,7 +84,7 @@ export function createBlobRouter(
       allowEmptyFiles: false,
       keepExtensions: true,
       uploadDir: config.upload_temp_path,
-      filter: (part: any) => part.name === 'file',
+      filter: (part) => part.name === 'file',
     },
   })
 
@@ -111,17 +112,17 @@ export function createBlobRouter(
       if ((err as { code?: string }).code === 'LIMIT_FILE_SIZE') {
         json(ctx, 413, { message: '上传文件过大', code: 'PAYLOAD_TOO_LARGE' })
       } else {
-        if ((err as { name?: string }).name === 'AppError') errorJson(ctx, err)
-        else errorJson(ctx, storageError('upload failure', err))
+        if ((err as { name?: string }).name === 'AppError') {errorJson(ctx, err)}
+        else {errorJson(ctx, storageError('upload failure', err))}
       }
     }
   })
 
-  const readBlob = async (ctx: any) => {
+  const readBlob = async (ctx: RouterContext) => {
     try {
       const parsed = zBlobID.parse(ctx.params.blob_id)
       const meta = await blobs_service.getMeta(parsed)
-      if (meta === null) throw notFound(`blob(${parsed}) not found`)
+      if (meta === null) {throw notFound(`blob(${parsed}) not found`)}
       if (!(await blobs_service.exists(parsed))) {
         throw notFound(`blob(${parsed}) 文件不存在`)
       }

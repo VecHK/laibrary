@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { THUMB_SIZES } from '@laibrary/types'
 import {
-  closeDb, prepareTestBlobs, prepareTestDb, testPng, truncateAll,
+  closeDb, defined, prepareTestBlobs, prepareTestDb, testPng, truncateAll,
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
@@ -58,7 +58,7 @@ describe('thumbnails', () => {
     expect(rows).toHaveLength(4)
     expect(rows.map(row => row.size).sort((a, b) => a - b)).toEqual([...THUMB_SIZES])
 
-    const row = rows[0]!
+    const row = defined(rows[0])
     expect(await blobs.exists(row.blob_id as never)).toBe(true)
   })
 

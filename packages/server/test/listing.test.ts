@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  closeDb, prepareTestBlobs, prepareTestDb, truncateAll,
+  closeDb, defined, prepareTestBlobs, prepareTestDb, truncateAll,
 } from './helpers'
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
@@ -43,8 +43,8 @@ describe('listing', () => {
   it('默认按 id 升序 / keyset 不重不漏', async () => {
     const ids = await fillPages()
     const page1 = await listItems(db, { limit: 10 })
-    const page2 = await listItems(db, { limit: 10, after_id: page1[9]!.id })
-    const page3 = await listItems(db, { limit: 10, after_id: page2[9]!.id })
+    const page2 = await listItems(db, { limit: 10, after_id: defined(page1[9]).id })
+    const page3 = await listItems(db, { limit: 10, after_id: defined(page2[9]).id })
     expect([...page1, ...page2, ...page3].map(item => item.id)).toEqual(ids)
   })
 
@@ -135,8 +135,8 @@ describe('listing', () => {
     })
     expect(rows.map(item => item.title)).toEqual(['a', 'b', 'bad', 'empty'])
     expect(rows.slice(0, 2).map(item => item.id)).toEqual([a.id, b.id])
-    expect(rows.at(-2)!.id).toBe(bad.id)
-    expect(rows.at(-1)!.id).toBe(empty.id)
+    expect(defined(rows.at(-2)).id).toBe(bad.id)
+    expect(defined(rows.at(-1)).id).toBe(empty.id)
   })
 
   it('sort_field keyset 不重不漏（含 null 尾巴）', async () => {
@@ -159,9 +159,9 @@ describe('listing', () => {
         sort_field: { name: 'score', type: 'number' },
         after_id: after,
       })
-      if (rows.length === 0) break
+      if (rows.length === 0) {break}
       collected.push(...rows.map(item => item.id))
-      after = rows.at(-1)!.id
+      after = defined(rows.at(-1)).id
     }
     expect(collected.sort()).toEqual([...ids].sort())
   })

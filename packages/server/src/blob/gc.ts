@@ -11,7 +11,7 @@ export async function collectReferencedBlobIds(db: DB): Promise<Set<string>> {
     .select({ blob_id: items.blob_id })
     .from(items)
   for (const row of item_rows) {
-    if (row.blob_id !== null) refs.add(row.blob_id)
+    if (row.blob_id !== null) {refs.add(row.blob_id)}
   }
   const thumb_rows = await db.execute(sql`
     SELECT blob_id FROM thumbnails
@@ -47,7 +47,7 @@ export async function cleanUnreferencedBlobs(
       LIMIT ${batch_size}
     `)
     const rows = (result as unknown as { rows: Array<{ id: string }> }).rows
-    if (rows.length === 0) break
+    if (rows.length === 0) {break}
 
     const ids = rows.map(row => row.id)
     scanned += ids.length
@@ -62,7 +62,7 @@ export async function cleanUnreferencedBlobs(
       }
     }
 
-    if (rows.length < batch_size) break
+    if (rows.length < batch_size) {break}
   }
 
   return { scanned, deleted }

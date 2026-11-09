@@ -1,3 +1,4 @@
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   bigint,
   bigserial,
@@ -34,7 +35,7 @@ export const items = pgTable('items', {
   title: text('title').notNull().default(''),
   attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}),
   tags: bigint('tags', { mode: 'number' }).array().notNull().default(sql`'{}'`),
-  parent_id: bigint('parent_id', { mode: 'number' }).references((): any => items.id),
+  parent_id: bigint('parent_id', { mode: 'number' }).references((): AnyPgColumn => items.id),
   order_index: doublePrecision('order_index').notNull().default(0),
   blob_id: text('blob_id').references(() => blobs.id),
   target_id: bigint('target_id', { mode: 'number' }),

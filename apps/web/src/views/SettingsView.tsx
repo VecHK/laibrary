@@ -5,22 +5,22 @@ import { getBaseUrl, clearBaseUrl } from '../lib/settings'
 import type { ViewerCtx } from '../modules/types'
 
 function displayValue(entry: ConfigEntry): string {
-  if (entry.type === 'json') return JSON.stringify(entry.value, null, 2)
+  if (entry.type === 'json') {return JSON.stringify(entry.value, null, 2)}
   return String(entry.value)
 }
 
 function parseValue(entry: ConfigEntry, raw: string): unknown {
   if (entry.type === 'number') {
     const value = Number(raw)
-    if (!Number.isFinite(value)) throw new Error('需要数字')
+    if (!Number.isFinite(value)) {throw new Error('需要数字')}
     return value
   }
   if (entry.type === 'boolean') {
-    if (raw === 'true') return true
-    if (raw === 'false') return false
+    if (raw === 'true') {return true}
+    if (raw === 'false') {return false}
     throw new Error('需要 true / false')
   }
-  if (entry.type === 'json') return JSON.parse(raw) as unknown
+  if (entry.type === 'json') {return JSON.parse(raw) as unknown}
   return raw
 }
 

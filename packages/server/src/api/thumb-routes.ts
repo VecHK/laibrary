@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import Router from '@koa/router'
+import type { Context } from 'koa'
 import { THUMB_SIZES } from '@laibrary/types'
 import type { BlobService } from '../blob/service'
 import type { ThumbnailService } from '../thumbnails/service'
 import { AppError, validationError } from '../errors'
 
-function errorJson(ctx: any, err: unknown): void {
+function errorJson(ctx: Context, err: unknown): void {
   if (err instanceof AppError) {
     ctx.status = err.status
     ctx.type = 'application/json'

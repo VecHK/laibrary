@@ -57,7 +57,7 @@ function useDebouncedTitle(item: Item, ctx: ViewerCtx) {
   const scheduleSave = (new_value: string) => {
     setValue(new_value)
     value_ref.current = new_value
-    if (timer_ref.current !== null) clearTimeout(timer_ref.current)
+    if (timer_ref.current !== null) {clearTimeout(timer_ref.current)}
     timer_ref.current = setTimeout(() => {
       timer_ref.current = null
       getRpc().updateItem({ id: item.id, data: { title: value_ref.current } })
@@ -165,13 +165,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const insertChild = (child: Item) => {
-    if (children_ref.current.some(existing => existing.id === child.id)) return
+    if (children_ref.current.some(existing => existing.id === child.id)) {return}
     syncChildren([...children_ref.current, child])
   }
 
   const removeChild = (id: number) => {
     syncChildren(children_ref.current.filter(child => child.id !== id))
-    if (active_block_id === id) setActiveBlockId(null)
+    if (active_block_id === id) {setActiveBlockId(null)}
   }
 
   const appendOrder = (): number => (
@@ -197,14 +197,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     show_loading: boolean = false,
     auto_focus_first: boolean = false,
   ) => {
-    if (show_loading) setChildren(null)
+    if (show_loading) {setChildren(null)}
     try {
       const list = await getRpc().listing({
         limit: 0,
         sort_by: 'order_index',
         filter_rules: [{ name: 'parent', input: item.id, logic: 'and' }],
       })
-      if (!alive_ref.current) return
+      if (!alive_ref.current) {return}
       syncChildren(list)
       const first = list[0]
       if (
@@ -288,7 +288,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       return
     }
 
-    if (value.length !== 0) return
+    if (value.length !== 0) {return}
 
     try {
       await getRpc().deleteItem({ id: current.id })
@@ -316,11 +316,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handleDrop = (dragged_id: number, target_id: number) => {
     const dragged = children_ref.current.find(child => child.id === dragged_id)
     const target = children_ref.current.find(child => child.id === target_id)
-    if (dragged === undefined || target === undefined) return
+    if (dragged === undefined || target === undefined) {return}
 
     syncChildren(children_ref.current.map(child => {
-      if (child.id === dragged.id) return { ...child, order_index: target.order_index }
-      if (child.id === target.id) return { ...child, order_index: dragged.order_index }
+      if (child.id === dragged.id) {return { ...child, order_index: target.order_index }}
+      if (child.id === target.id) {return { ...child, order_index: dragged.order_index }}
       return child
     }))
 
@@ -398,7 +398,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           removeChild(anchor.id)
         }
         insertChild(created)
-        if (first_created === null) first_created = created
+        if (first_created === null) {first_created = created}
         anchor = created
       } catch (err) {
         ctx.showError(err instanceof Error ? err.message : String(err))
@@ -415,7 +415,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handleUploadChange = (kind: UploadKind, files: File[]) => {
     const pending = pending_upload_ref.current
     pending_upload_ref.current = null
-    if (files.length === 0) return
+    if (files.length === 0) {return}
     const placeholder = pending?.kind === kind ? pending.placeholder : null
     void insertUploadedFiles(kind, placeholder, files)
   }
@@ -471,7 +471,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         onChange={ev => scheduleTitle(ev.target.value)}
         onBlur={saveTitle}
         onKeyDown={ev => {
-          if (ev.key === 'Enter') ev.currentTarget.blur()
+          if (ev.key === 'Enter') {ev.currentTarget.blur()}
         }}
       />
 

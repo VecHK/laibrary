@@ -106,7 +106,7 @@ export class BlobStore {
     try {
       await fs.promises.unlink(this.pathFor(id))
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {throw err}
     }
   }
 
@@ -148,7 +148,7 @@ export class BlobStore {
     try {
       await fs.promises.rename(temp_path, final_path)
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err
+      if ((err as NodeJS.ErrnoException).code !== 'EXDEV') {throw err}
       await fs.promises.copyFile(temp_path, final_path)
       await fsyncFile(final_path)
       await fs.promises.unlink(temp_path).catch(() => undefined)
@@ -172,7 +172,7 @@ export class BlobStore {
       return { ...stored, mime }
     } catch (err) {
       await fs.promises.unlink(temp_path).catch(() => undefined)
-      if (err instanceof Error && err.name === 'AppError') throw err
+      if (err instanceof Error && err.name === 'AppError') {throw err}
       throw storageError('写入 blob 失败', err)
     }
   }
@@ -200,7 +200,7 @@ export class BlobStore {
       return { ...stored, mime }
     } catch (err) {
       await fs.promises.unlink(temp_path).catch(() => undefined)
-      if (err instanceof Error && err.name === 'AppError') throw err
+      if (err instanceof Error && err.name === 'AppError') {throw err}
       throw storageError('写入 blob 失败', err)
     }
   }

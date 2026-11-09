@@ -55,6 +55,14 @@ export async function closeDb(db: DB): Promise<void> {
   await (db as unknown as { $client: { end(): Promise<void> } }).$client.end()
 }
 
+export function defined<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected value to be defined')
+  } else {
+    return value
+  }
+}
+
 export const TEST_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 

@@ -19,7 +19,7 @@ export type BootstrapConfig = {
 const zBoolean = z
   .union([z.boolean(), z.string()])
   .transform(value => {
-    if (typeof value === 'boolean') return value
+    if (typeof value === 'boolean') {return value}
     return !['false', '0', 'no', 'off', ''].includes(value.toLowerCase())
   })
 
@@ -36,7 +36,7 @@ const zBootstrapEnv = z.object({
 /** Load the repository-root .env without overriding existing environment variables. */
 export function loadRootEnv(): void {
   const env_path = path.join(REPO_ROOT, '.env')
-  if (!existsSync(env_path)) return
+  if (!existsSync(env_path)) {return}
   process.loadEnvFile(env_path)
 }
 

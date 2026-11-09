@@ -1,7 +1,6 @@
 import { asc, eq, sql } from 'drizzle-orm'
-import {
-  Item, ItemID, checkAttributes,
-} from '@laibrary/types'
+import type { Item, ItemID } from '@laibrary/types'
+import { checkAttributes } from '@laibrary/types'
 import type { DbLike } from '../db/client'
 import { items, type ItemRow } from '../db/schema'
 import { badRequest, conflict, notFound, pgErrorCode } from '../errors'
@@ -32,7 +31,7 @@ export async function newTag(
   title: string,
   attributes: Record<string, unknown> = {},
 ): Promise<Item> {
-  if (title.length === 0) throw badRequest('不能设置空 tag 名')
+  if (title.length === 0) {throw badRequest('不能设置空 tag 名')}
   const parsed_attrs = checkAttributes('tag', attributes)
 
   await db.execute(sql`
@@ -43,7 +42,7 @@ export async function newTag(
   `)
 
   const found = await getTagByTitle(db, title)
-  if (found === null) throw new Error('newTag 失败')
+  if (found === null) {throw new Error('newTag 失败')}
   return found
 }
 
@@ -53,10 +52,10 @@ export async function updateTag(
   data: { title?: string, attributes?: Record<string, unknown> },
 ): Promise<Item> {
   const prev = await getItemRowForUpdate(db, id)
-  if (prev.role !== 'tag') throw badRequest(`item(id=${id}) 并不是 tag`)
+  if (prev.role !== 'tag') {throw badRequest(`item(id=${id}) 并不是 tag`)}
 
   const new_title = data.title ?? prev.title
-  if (new_title.length === 0) throw badRequest('不能设置空 tag 名')
+  if (new_title.length === 0) {throw badRequest('不能设置空 tag 名')}
 
   if (data.title !== undefined) {
     const dup_rows = await db
@@ -64,7 +63,7 @@ export async function updateTag(
       .from(items)
       .where(sql`${items.role} = 'tag' and lower(${items.title}) = lower(${new_title}) and ${items.id} <> ${id}`)
       .limit(1)
-    if (dup_rows.length !== 0) throw conflict(`重复的 tag 名: ${new_title}`)
+    if (dup_rows.length !== 0) {throw conflict(`重复的 tag 名: ${new_title}`)}
   }
 
   const new_attrs = data.attributes !== undefined
@@ -82,7 +81,7 @@ export async function updateTag(
       .where(eq(items.id, id))
       .returning()
     const row = updated[0]
-    if (row === undefined) throw notFound(`item(id=${id}) not found`)
+    if (row === undefined) {throw notFound(`item(id=${id}) not found`)}
     return await getWireItem(db, row.id)
   } catch (err) {
     if (pgErrorCode(err) === '23505') {
@@ -94,7 +93,7 @@ export async function updateTag(
 
 export async function deleteTag(db: DbLike, id: ItemID): Promise<void> {
   const found = await getItemRowForUpdate(db, id)
-  if (found.role !== 'tag') throw badRequest(`item(id=${id}) 并不是 tag`)
+  if (found.role !== 'tag') {throw badRequest(`item(id=${id}) 并不是 tag`)}
 
   const child_rows = await db
     .select({ id: items.id })
@@ -124,7 +123,7 @@ export async function searchTag(
     .where(sql`${items.role} = 'tag' and ${items.title} ilike ${`%${name}%`}`)
     .orderBy(asc(items.title))
 
-  if (limit !== 0) query.limit(Math.min(limit, 1000))
+  if (limit !== 0) {query.limit(Math.min(limit, 1000))}
   const rows = await query
   return rows.map(row => tagWire(row.item))
 }

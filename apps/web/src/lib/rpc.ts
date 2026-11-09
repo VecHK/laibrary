@@ -1,4 +1,5 @@
-import { createRpcClient, RpcClient } from '@laibrary/types'
+import type { RpcClient } from '@laibrary/types'
+import { createRpcClient } from '@laibrary/types'
 
 export type { RpcClient }
 

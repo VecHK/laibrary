@@ -44,7 +44,7 @@ function ImageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           className="button"
           onClick={ev => {
             ev.stopPropagation()
-            if (item.parent_id !== null) ctx.navigate(item.parent_id)
+            if (item.parent_id !== null) {ctx.navigate(item.parent_id)}
           }}
         >返回</button>
       </div>

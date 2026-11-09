@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Item } from '@laibrary/types'
+import type { Item } from '@laibrary/types'
 import { getRpc } from '../lib/rpc'
 import { invalidateTags, loadTags } from '../lib/tags'
 import type { ItemModule, ViewerCtx } from './types'
