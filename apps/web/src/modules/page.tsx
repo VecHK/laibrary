@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
-import { createFileItem, createImageItem } from '../lib/blob'
+import { zItemID } from '@laibrary/types'
+import { createFileItem, createImageItem, mediaKindForFile } from '../lib/blob'
 import { orderAfter } from '../lib/order'
 import { blockCanDelete, blockCanDuplicate } from '../lib/page-blocks'
 import { mergeTextLine, type SlashCommand } from '../lib/textline-editor'
@@ -371,6 +372,77 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const insertDroppedFiles = async (
+    files: File[],
+    target_id: ItemID | null,
+    position: 'before' | 'after',
+  ) => {
+    const list = children_ref.current
+    const target_index = target_id === null
+      ? -1
+      : list.findIndex(child => child.id === target_id)
+    const insert_index = target_index >= 0
+      ? target_index + (position === 'after' ? 1 : 0)
+      : list.length
+    let previous = list[insert_index - 1]
+    const next = list[insert_index]
+    let last_created: Item | undefined
+    let upload_failed = false
+    for (const file of files) {
+      if (upload_failed) {
+        // 出错后停止后续文件，保留已经成功的 block。
+      } else {
+        const order_index = previous === undefined
+          ? (next === undefined ? appendOrder() : next.order_index - 1)
+          : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+        try {
+          const kind = mediaKindForFile(file)
+          const created = kind === 'image'
+            ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
+            : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
+          insertChild(created)
+          previous = created
+          last_created = created
+        } catch (err) {
+          upload_failed = true
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
+        }
+      }
+    }
+    if (last_created !== undefined) {
+      await createTextlineAfter(last_created)
+    }
+  }
+
+  const handlePageDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (event.dataTransfer.types.includes('Files')) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  const handlePageDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    setDropIndicator(null)
+    if (event.dataTransfer.files.length !== 0) {
+      event.preventDefault()
+      const files = [...event.dataTransfer.files]
+      const block = event.target instanceof Element
+        ? event.target.closest<HTMLElement>('.page-block')
+        : null
+      const parsed_id = block === null
+        ? null
+        : zItemID.safeParse(Number(block.dataset['blockId']))
+      if (block !== null && parsed_id !== null && parsed_id.success) {
+        const rect = block.getBoundingClientRect()
+        const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        void insertDroppedFiles(files, parsed_id.data, position)
+      } else {
+        void insertDroppedFiles(files, null, 'after')
+      }
+    }
+  }
+
   const handleUploadChange = (kind: UploadKind, files: File[]) => {
     const pending = pending_upload_ref.current
     pending_upload_ref.current = null
@@ -419,7 +491,12 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   return (
-    <div className="page-full">
+    <div
+      className="page-full"
+      onDragEnter={handlePageDragOver}
+      onDragOver={handlePageDragOver}
+      onDrop={handlePageDrop}
+    >
       <div className="page-header">
         <ItemIconButton item={item} ctx={ctx} />
         <input

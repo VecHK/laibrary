@@ -43,7 +43,7 @@ CREATE TABLE items (
 | page | NULL | 自由 record，可含 `icon` | 页面/block 容器 |
 | entity | **非空** | 自由 record | 插件/复合内容 |
 | textline | NULL | 自由 record（预留） | title 是内容 |
-| image | NULL | `{ filename, display_width?, align?, caption? }` | blob 必须是图片；display_width 80–1440px |
+| image | NULL | `{ filename, display_width?, align?, caption? }` | blob 必须是图片；新建默认 display_width=480px，范围 80–1440px |
 | file | NULL | `{ filename }` | 任意 blob |
 | itemlink | NULL | 自由 record，可含 `icon` | target_id |
 | tag | NULL | 自由 record | title 唯一 |

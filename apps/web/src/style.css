@@ -2551,3 +2551,7 @@ button {
 .side-peek .page-block.drop-after::after {
   left: 38px;
 }
+
+.page-full {
+  position: relative;
+}

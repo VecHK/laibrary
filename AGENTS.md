@@ -122,6 +122,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 文本输入不调用全局 `ctx.refresh()`；`ItemView` 只在切换 item 时显示 loading，后台刷新不得清空当前 item。
 - 页面编辑器不设置固定插入工具栏；插入走 `/`；block 控件只在 hover 时出现。
 - 侧边栏树只包含 page/database/itemlink；只有 page 可展开，database/itemlink 是叶子。节点 `+` / `···` 按侧边栏规格实现；Trash 未实现前 Remove 只能永久删除空容器。
+- 页面接受 OS 文件拖入：按 MIME/扩展名判断 image 或 file，不能把所有文件都建成同一种 role。
 - 保持焦点、caret 和滚动位置；不要因为保存/父级刷新让 textline 重新挂载或跳回末尾。
 - `/` 打开插入菜单（文本/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
 - Enter 在当前光标处拆行并聚焦新行；Shift+Enter 软换行；空行 Backspace 删除，行首 Backspace 合并到上一条 textline。

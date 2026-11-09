@@ -43,6 +43,7 @@ export function PageBlock({
 
   return (
     <div
+      data-block-id={String(item.id)}
       className={[
         'page-block',
         menu_open ? 'menu-open' : '',
@@ -65,10 +66,17 @@ export function PageBlock({
         }
       }}
       onDragOver={ev => {
-        ev.preventDefault()
-        ev.dataTransfer.dropEffect = 'move'
-        const rect = ev.currentTarget.getBoundingClientRect()
-        onDragOverBlock(ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+        if (ev.dataTransfer.types.includes('Files')) {
+          ev.preventDefault()
+          ev.dataTransfer.dropEffect = 'copy'
+          const rect = ev.currentTarget.getBoundingClientRect()
+          onDragOverBlock(ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+        } else {
+          ev.preventDefault()
+          ev.dataTransfer.dropEffect = 'move'
+          const rect = ev.currentTarget.getBoundingClientRect()
+          onDragOverBlock(ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+        }
       }}
       onDragLeave={ev => {
         if (ev.relatedTarget instanceof Node && ev.currentTarget.contains(ev.relatedTarget)) {
@@ -84,14 +92,18 @@ export function PageBlock({
         onDragEndBlock()
       }}
       onDrop={ev => {
-        ev.preventDefault()
-        const dragged = zItemID.safeParse(Number(ev.dataTransfer.getData('text/laibrary-block')))
-        const rect = ev.currentTarget.getBoundingClientRect()
-        const position = ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
-        if (dragged.success && dragged.data !== item.id) {
-          onDropBlock(dragged.data, item.id, position)
+        if (ev.dataTransfer.types.includes('Files')) {
+          // 文件交给 PageFull 统一上传。
         } else {
-          onDragEndBlock()
+          ev.preventDefault()
+          const dragged = zItemID.safeParse(Number(ev.dataTransfer.getData('text/laibrary-block')))
+          const rect = ev.currentTarget.getBoundingClientRect()
+          const position = ev.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+          if (dragged.success && dragged.data !== item.id) {
+            onDropBlock(dragged.data, item.id, position)
+          } else {
+            onDragEndBlock()
+          }
         }
       }}
     >

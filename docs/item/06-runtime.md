@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 38、types 18、web 30。
+- 当前：server 38、types 18、web 32。
 
 ## 7. Web
 
@@ -105,6 +105,8 @@ npm run web   # Vite 5173
 - hash 路由：`#/plaza`、`#/item/:id`、`#/settings`。
 - page block 编辑器：无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行、inline itemlink；hover gutter + block 菜单；文本编辑本地更新，不整页刷新；entity/manga、设置页。
 - 图片 block：左右拖拽等比缩放（80–1440px）、Alignment/Caption/Expand/Download 浮层、双击/Expand 打开 lightbox、放大预加载高一级缩略图；拖动有 before/after 插入线。
+- 页面接受 OS 文件拖入：`image/*` → image，其他 → file；多文件按目标 block 的 before/after 插入，空白处追加到末尾，并补空 textline；拖拽时只显示插入线，不显示整页覆盖提示。
+- 新建 image 默认显示宽度 480px（后续可用两侧 bar 调整，硬上限 1440px）。
 - 侧边栏：page/database/itemlink 树；page 才可展开，database/itemlink 不展开。节点 hover 显示 `+`（page/database，以及 target=page 的 itemlink）和 page/database 的 `···` 菜单。
 - 侧边栏菜单：Copy link、Rename、Move to、Remove、Open in new tab、Open in side peek；显示 Last edited / Created Date。Trash 未实现，非空容器暂不允许 Remove。
 - 页面/数据库/ Itemlink 的 emoji 图标存 `attributes.icon`；缺省回退 📄/🗄️/🔗。

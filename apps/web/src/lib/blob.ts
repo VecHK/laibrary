@@ -12,6 +12,16 @@ export function thumbUrl(base_url: string, image_id: ItemID, size: ThumbSize): s
   return createThumbUrl(base_url, image_id, size)
 }
 
+export function mediaKindForFile(file: File): 'image' | 'file' {
+  if (file.type.startsWith('image/')) {
+    return 'image'
+  } else if (file.type.length === 0 && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.name)) {
+    return 'image'
+  } else {
+    return 'file'
+  }
+}
+
 export async function uploadBlobFile(api: ApiContext, file: File): Promise<{
   id: BlobID
   size: number
@@ -40,7 +50,7 @@ export async function createImageItem({
     parent_id,
     order_index,
     blob_id: blob.id,
-    attributes: { filename: file.name },
+    attributes: { filename: file.name, display_width: 480 },
   })
 }
 
@@ -54,6 +64,6 @@ export async function createFileItem({
     parent_id,
     order_index,
     blob_id: blob.id,
-    attributes: { filename: file.name },
+    attributes: { filename: file.name, display_width: 480 },
   })
 }
