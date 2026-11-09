@@ -103,7 +103,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 
 - React 19 + Vite；hash 路由 `#/plaza`、`#/item/:id`、`#/settings`。
 - 连接页设置 API baseurl（localStorage）。
-- page block 编辑器：textline / image / file / itemlink / entity；拖拽排序。
+- page block 编辑器：textline / image / file / itemlink / entity；`/` 插入菜单、Enter 拆行、Shift+Enter 软换行；拖拽排序；文本编辑不触发整页刷新。
 - textline：纯文本、inline token、Enter 新 block、Backspace 删除空行；无富文本。
 - image/file：blob/thumb URL；file 下载。
 - entity：整行 block；插件 inlineIcon；kind registry；manga reader。
@@ -133,7 +133,7 @@ docs             规格、愿景、名词表、重构记录
 - 统一 open resolver；kind registry（manga）。
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
 - 漫画阅读器；局域网可运行。
-- 测试：server 38、types 11、web 11；lint/typecheck/build 通过。
+- 测试：server 38、types 11、web 16；lint/typecheck/build 通过。
 
 待做：
 

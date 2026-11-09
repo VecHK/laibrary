@@ -5,9 +5,11 @@ import { getRpc } from '../lib/rpc'
 export function ItemPicker({
   onSelect,
   onClose,
+  exclude_ids,
 }: {
   onSelect: (item: Item) => void
   onClose: () => void
+  exclude_ids?: number[]
 }) {
   const [items, setItems] = useState<Item[]>([])
   const [query, setQuery] = useState('')
@@ -29,6 +31,16 @@ export function ItemPicker({
     load('')
   }, [])
 
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const visible_items = items.filter(item => !exclude_ids?.includes(item.id))
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={ev => ev.stopPropagation()}>
@@ -45,8 +57,8 @@ export function ItemPicker({
         />
         <div className="picker-list">
           {loading && <div className="loading">加载中…</div>}
-          {!loading && items.length === 0 && <div className="empty-hint">没有结果</div>}
-          {items.map(item => (
+          {!loading && visible_items.length === 0 && <div className="empty-hint">没有结果</div>}
+          {visible_items.map(item => (
             <button
               key={item.id}
               className="picker-row"

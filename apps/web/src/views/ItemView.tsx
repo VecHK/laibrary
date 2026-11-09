@@ -5,7 +5,13 @@ import { getTagTitle, loadTags } from '../lib/tags'
 import { resolveModule } from '../modules/registry'
 import type { ViewerCtx } from '../modules/types'
 
-function TagBar({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+function TagBar({
+  item, ctx, onChange,
+}: {
+  item: Item
+  ctx: ViewerCtx
+  onChange: (item: Item) => void
+}) {
   const [input_value, setInputValue] = useState('')
 
   const addTag = (title: string) => {
@@ -20,12 +26,13 @@ function TagBar({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           tag = await getRpc().newTag({ title: trimmed })
           await loadTags()
         }
+        const next_tags = [...new Set([...item.tags, tag.id])]
         await getRpc().updateItem({
           id: item.id,
-          data: { tags: [...new Set([...item.tags, tag.id])] },
+          data: { tags: next_tags },
         })
         setInputValue('')
-        ctx.refresh()
+        onChange({ ...item, tags: next_tags })
       } catch (err) {
         ctx.showError(err instanceof Error ? err.message : String(err))
       }
@@ -36,7 +43,9 @@ function TagBar({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     getRpc().updateItem({
       id: item.id,
       data: { tags: item.tags.filter(id => id !== tag_id) },
-    }).then(() => ctx.refresh()).catch(err => {
+    }).then(() => {
+      onChange({ ...item, tags: item.tags.filter(id => id !== tag_id) })
+    }).catch(err => {
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
   }
@@ -85,12 +94,17 @@ export function ItemView({
   const [not_found, setNotFound] = useState(false)
 
   useEffect(() => {
+    let alive = true
     setNotFound(false)
-    setItem(null)
-    getRpc().getItem({ id: item_id }).then(setItem).catch(err => {
+    setItem(prev => prev?.id === item_id ? prev : null)
+    getRpc().getItem({ id: item_id }).then(next => {
+      if (alive) setItem(next)
+    }).catch(err => {
+      if (!alive) return
       setNotFound(true)
       ctx.showError(err instanceof Error ? err.message : String(err))
     })
+    return () => { alive = false }
   }, [item_id, refresh_key])
 
   if (not_found) {
@@ -124,7 +138,7 @@ export function ItemView({
       <div className="item-content">
         {module.Presenter.full(item, ctx)}
       </div>
-      <TagBar item={item} ctx={ctx} />
+      <TagBar item={item} ctx={ctx} onChange={setItem} />
     </div>
   )
 }

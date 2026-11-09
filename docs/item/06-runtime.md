@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 38、types 11、web 11。
+- 当前：server 38、types 11、web 16。
 
 ## 7. Web
 
@@ -103,7 +103,7 @@ npm run web   # Vite 5173
 
 - 连接页保存 API baseurl 到 localStorage。
 - hash 路由：`#/plaza`、`#/item/:id`、`#/settings`。
-- page block 编辑器、inline itemlink、entity/manga、设置页。
+- page block 编辑器：`/` 插入菜单、Enter 拆行、Shift+Enter 软换行、inline itemlink；文本编辑本地更新，不整页刷新；entity/manga、设置页。
 - 构建：`npm run build -w @laibrary/web`。
 
 ## 8. 部署（当前）

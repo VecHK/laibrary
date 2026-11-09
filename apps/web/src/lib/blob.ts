@@ -27,12 +27,14 @@ export async function uploadBlobFile(file: File): Promise<{
 export async function createImageItem(
   file: File,
   parent_id: ItemID | null,
+  order_index?: number,
 ): Promise<Item> {
   const blob = await uploadBlobFile(file)
   return getRpc().addItem({
     role: 'image',
     title: file.name,
     parent_id,
+    order_index,
     blob_id: blob.id,
     attributes: { filename: file.name },
   })
@@ -41,12 +43,14 @@ export async function createImageItem(
 export async function createFileItem(
   file: File,
   parent_id: ItemID | null,
+  order_index?: number,
 ): Promise<Item> {
   const blob = await uploadBlobFile(file)
   return getRpc().addItem({
     role: 'file',
     title: file.name,
     parent_id,
+    order_index,
     blob_id: blob.id,
     attributes: { filename: file.name },
   })

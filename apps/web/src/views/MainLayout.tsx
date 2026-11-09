@@ -45,12 +45,20 @@ export function MainLayout({
     }
   }, [refresh_key])
 
-  const createPage = () => {
-    getRpc().addItem({ role: 'page', title: '新页面' })
-      .then(item => {
-        ctx.refresh()
-        ctx.navigate(item.id)
-      }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
+  const createPage = async () => {
+    try {
+      const page = await getRpc().addItem({ role: 'page', title: '新页面' })
+      await getRpc().addItem({
+        role: 'textline',
+        title: '',
+        parent_id: page.id,
+        order_index: 1,
+      })
+      ctx.refresh()
+      ctx.navigate(page.id)
+    } catch (err) {
+      ctx.showError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const createDatabase = () => {

@@ -88,7 +88,7 @@ OS 环境变量优先于根 `.env`；`.env` 不提交，只提交 [`.env.example
 
 - role：`page / entity / textline / image / file / itemlink / tag / database`
 - kind：仅 entity，例如 `manga`
-- 文本：页面 block、纯文本 textline、inline `[[item:123]]`、块级 itemlink、图片/附件
+- 文本：页面 block、纯文本 textline、`/` 插入菜单、Enter 拆行、Shift+Enter 软换行、inline `[[item:123]]`、块级 itemlink、图片/附件
 - 漫画：`entity + kind=manga` + image children，阅读器（RTL/LTR、懒加载、本地进度）
 - 文件：内容寻址 blob、去重、Range 读取、GC
 - 缩略图：96/384/800/1440 AVIF，惰性生成

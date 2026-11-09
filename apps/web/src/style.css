@@ -954,3 +954,244 @@ button {
   border-radius: 4px;
   padding: 6px 8px;
 }
+
+/* editor v3: notion-like text flow */
+.page-toolbar-hint {
+  margin-left: auto;
+  align-self: center;
+  color: #b8b7b4;
+  font-size: 12px;
+}
+
+.block-gutter {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  padding-top: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.page-block:hover .block-gutter {
+  opacity: 1;
+}
+
+.block-drag-handle {
+  opacity: 1;
+  padding-top: 0;
+  width: 16px;
+  text-align: center;
+  line-height: 20px;
+}
+
+.block-add {
+  border: none;
+  background: transparent;
+  color: #b8b7b4;
+  width: 18px;
+  height: 20px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 18px;
+  padding: 0;
+}
+
+.block-add:hover {
+  background: #e8e8e6;
+  color: #37352f;
+}
+
+.textline-block {
+  position: relative;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 4px;
+  min-height: 30px;
+}
+
+.textline-block.is-active {
+  background: #fff;
+  box-shadow: inset 2px 0 0 #d9d9d6;
+}
+
+.textline-view {
+  min-height: 26px;
+  padding: 2px 0;
+  cursor: text;
+}
+
+.textline-placeholder {
+  color: #c2c1be;
+}
+
+.textline-textarea {
+  display: block;
+  width: 100%;
+  min-height: 26px;
+  resize: none;
+  overflow: hidden;
+  padding: 2px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.textline-block.is-active .textline-textarea::placeholder {
+  color: #c2c1be;
+}
+
+.empty-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  border: 1px dashed #dcdcd9;
+  border-radius: 6px;
+  background: transparent;
+  color: #9b9a97;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+}
+
+.empty-editor:hover {
+  border-color: #b9b8b4;
+  background: #fbfbfa;
+  color: #37352f;
+}
+
+.empty-editor small {
+  color: #b8b7b4;
+  font-size: 12px;
+}
+
+.page-footer {
+  color: #c2c1be;
+  font-size: 12px;
+  padding: 18px 2px 24px;
+}
+
+/* slash command menu */
+.slash-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 3px);
+  left: -6px;
+  width: min(380px, calc(100vw - 80px));
+  max-height: 320px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e8e8e6;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15, 15, 15, 0.14), 0 2px 8px rgba(15, 15, 15, 0.06);
+  padding: 6px;
+}
+
+.slash-menu-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px 7px;
+  color: #9b9a97;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.slash-menu-query {
+  color: #b8b7b4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  padding: 7px 8px;
+  text-align: left;
+  font: inherit;
+  color: #37352f;
+}
+
+.slash-menu-item.selected,
+.slash-menu-item:hover {
+  background: #f1f1ef;
+}
+
+.slash-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 5px;
+  background: #f7f7f5;
+  border: 1px solid #e8e8e6;
+  font-size: 14px;
+}
+
+.slash-menu-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.slash-menu-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.slash-menu-desc {
+  color: #9b9a97;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-menu-role {
+  color: #b8b7b4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.slash-menu-empty {
+  color: #9b9a97;
+  font-size: 12px;
+  padding: 16px 10px;
+  text-align: center;
+}
+
+.page-toolbar {
+  flex-wrap: wrap;
+}
+
+.page-toolbar .button {
+  white-space: nowrap;
+}
+
+.page-toolbar-hint {
+  white-space: nowrap;
+}
+
+.slash-menu.up {
+  top: auto;
+  bottom: calc(100% + 3px);
+}
