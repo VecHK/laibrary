@@ -1,4 +1,6 @@
 export * from './roles'
+export * from './as'
+export * from './is'
 export * from './filter'
 export * from './rpc'
 export * from './rpc-client'

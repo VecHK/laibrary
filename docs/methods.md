@@ -377,6 +377,7 @@ function findNumber(list: number[], target_num: number): null | number {
 - 导出的数据值用 `__GALLERY_MAX_PHOTOS__` 这种形式：双下划线 + 模块名 + 变量名；非导出数据值不加模块名。
 - 常量统一放 `constants.ts`，用命名导出；不要 `export default { ... }`（见 8.1）。
 - 工厂同理：`CreateGalleryStore`，不要只写 `CreateStore`（除非它在 `utils/` 里是通用工具）。
+- `as<T>` / `Is<T>` 是通用工具（像 `Pipe`），不加模块前缀；放在 `packages/types`。
 - ❌ `voteCountByPhoto`、`memberHasVoted`、`memberHasSubmitted`：导出却省了 `gallery`；应改成 `galleryCountVoteByPhoto`、`galleryMemberIsVoted`、`galleryMemberIsSubmitted`。
 - 本条约束导出的函数/变量；类型/接口按 5.6 的 PascalCase 规则，不受这条强制。
 
@@ -443,18 +444,107 @@ export const __GALLERY_MAX_PHOTOS__ = 30   // 导出的数据值（带模块名�
 | 布尔 | 判断 | `is` / `has` / `can` / `should` | `is_voted`、`has_children` |
 | 内部哨兵 | 不导出 | `NONE` | `const NONE = Symbol('NONE')` |
 
-### 5.7 `parse` / `check` / `is` / `isNot` / `as` / `to`
+### 5.7 `parse` / `check` / `is` / `as` / `to`
 
-- `parseX`：把 raw 转成合法的 X，参考 `JSON.parse` 的“转换”含义；**返回值一定满足 `checkX` 的约束**（复用同一组 `isX` / `isNotX` 谓词），但 parse 内部不调用 `checkX`——它在转换过程中把约束落实。失败抛解析错误。
-- `checkX`：**多项**运行时校验，失败抛领域错误；可返回收窄后的类型（如品牌）。用于两类地方：值不是 `parseX` 产出的（DB、其他模块、外部注入）；测试里验证 parse 的契约。内部用 `isX` / `isNotX` 判断，最后统一抛一次。
-- `isX`：布尔守卫，不抛错。
-- `isNotX`：`isX` 的否定，布尔，不抛错；和 `isX` 搭配用在 `checkX` 里。
+外部输入先过 zod（见 6.4）；下面的 `parseX` / `checkX` 只处理 zod 之后的领域转换/不变量，或内部可信数据，不用它们做外部形状的入口。
+
+**已有实现，直接 import，不要重写**：
+
+| 工具 | 来源 | 用法 |
+|---|---|---|
+| `as<T>` | [`packages/types/src/as.ts`](../packages/types/src/as.ts) | `import { as } from '@laibrary/types'` |
+| `Is<T>` | [`packages/types/src/is.ts`](../packages/types/src/is.ts) | `import { Is } from '@laibrary/types'` |
+
+下面代码块只是签名/行为说明；业务代码不要复制成新的 `Is` / `as`。
+
+- `parseX`：把已过 zod（或内部可信）的 raw 转成合法的 X，参考 `JSON.parse` 的“转换”含义；**返回值一定满足 `checkX` 的约束**（复用同一组具体守卫，如 `isUserId` / `isBlobID`），但 parse 内部不调用 `checkX`——它在转换过程中把约束落实。失败抛解析错误。
+- `checkX`：**多项**运行时校验，失败抛领域错误；可返回收窄后的类型（如品牌）。用于 zod 之后的领域不变量、内部可信数据，或测试里验证 parse 的契约。内部用具体守卫 + `!guard()` 判断，最后统一抛一次。
+- `is<Domain>`：**类型谓词** `value is X`，不是普通 boolean；必须做真实运行时检查（`typeof` / `in` / 正则 / schema）。具体写 `isGallery`、`isBlob`、`isBlobID`，不写一个对所有类型通用的守卫。用于内部/可信数据或 zod 之后的领域谓词；外部形状先过 zod。
+
+具体守卫长这样：
+
+```ts
+function isBlobID(value: unknown): value is BlobID {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)
+}
+```
+
+用 `Is<T>` 把 boolean 检查包成类型谓词：
+
+```ts
+// 现有实现：packages/types/src/is.ts；业务代码从 @laibrary/types 导入
+export function Is<T>(check: (value: unknown) => boolean): (value: unknown) => value is T {
+  return (value): value is T => check(value)
+}
+```
+
+用法：
+
+```ts
+const isGallery = Is<Gallery>(maybe_gallery => {
+  return typeof maybe_gallery === 'object'
+    && maybe_gallery !== null
+    && 'id' in maybe_gallery
+    && 'name' in maybe_gallery
+})
+
+const maybe_gallery = receiveGallery()
+if (isGallery(maybe_gallery)) {
+  // maybe_gallery 收窄为 Gallery
+}
+```
+
+`T` 必须显式给：`Is(maybe_gallery => ...)` 会得到 `(v: unknown) => v is unknown`；也可以给变量加 `(v: unknown) => v is Gallery` 注解。否定一律 `!isGallery(value)`；不定义否定版守卫。
+
 - `parseX` 的输出保证能通过 `checkX`；单元测试用 `expect(() => checkX(parseX(raw))).not.toThrow()` 之类固定这个契约。
-- `asX`：不校验的断言，只允许在测试/fixture/已校验的边界内。
-- `toX`：域内转换，输入已经是领域类型；纯函数、总函数，不做校验、不接收 `unknown`（可选）。
-- 名字必须诚实：转换的叫 `parse`，会抛出错误的校验的叫 `check`，布尔判断的叫 `is` / `isNot`，不校验的断言叫 `as`。
+- `as<T>`：唯一的无校验断言，不再写 `asGallery` / `asBlob`。用 `AsInput<T>` 约束输入类别：
 
-`checkX` 里用 `isX` / `isNotX` 把失败原因收集起来，最后抛一次；不要在每个单项检查里各抛一次。
+```ts
+// 现有实现：packages/types/src/as.ts；业务代码从 @laibrary/types 导入
+export type AsInput<T> =
+  [T] extends [number] ? number :
+  [T] extends [string] ? string :
+  [T] extends [boolean] ? boolean :
+  [T] extends [bigint] ? bigint :
+  [T] extends [symbol] ? symbol :
+  [T] extends [object] ? object :
+  never
+
+export function as<T>(value: AsInput<T>): T {
+  return value as T
+}
+```
+
+用法：
+
+```ts
+const raw_object: object = getRawObject()
+const gallery = as<Gallery>(raw_object)        // raw_object 必须是 object
+const raw_number: number = getRawNumber()
+const id = as<GalleryID>(raw_number)           // raw_number 必须是 number
+```
+
+- `as` 的入参不是 `unknown`；raw 先走 `parse` / `check` / 具体守卫，收窄到 object/number/string 等类别后再 `as`；`as<Gallery>(raw_unknown)` 会编译失败。
+- `as` 只挡类别/空值，不校验形状、字面量、品牌业务约束；`as<Gallery>({})` 也能过。它不是 `parse` / `check`；只用于测试/fixture、或 zod/check 之后的边界。
+
+| 调用 | 结果 |
+|---|---|
+| `as<GalleryID>(123)` | ✅ |
+| `as<GalleryID>(undefined)` | ❌ 编译错误 |
+| `as<GalleryID>(null)` | ❌ 编译错误 |
+| `as<GalleryID>('x')` | ❌ 编译错误 |
+| `as<BlobID>('a'.repeat(64))` | ✅ |
+| `as<BlobID>(123)` | ❌ 编译错误 |
+| `as<Gallery>({ id, name })` | ✅ |
+| `as<Gallery>(123)` | ❌ 编译错误 |
+| `as<Gallery>({})` | ✅ 但不校验形状 |
+| `as<Gallery \| null>(null)` | ❌；先显式处理 null |
+| `as<Role>('bad')` | ✅；字面量不校验 |
+
+- `toX`：域内转换，输入已经是领域类型；纯函数、总函数，不做校验、不接收 `unknown`（可选）。
+- 名字必须诚实：转换的叫 `parse`，会抛出错误的校验的叫 `check`，具体类型谓词叫 `isGallery` / `isBlob`，高阶构造器叫 `Is`，否定写 `!isGallery()`，不校验的断言叫 `as`。
+
+`checkX` 里用具体守卫 + `!guard()` 把失败原因收集起来，最后抛一次；不要在每个单项检查里各抛一次。
 
 ---
 
@@ -505,7 +595,7 @@ function isUserId(raw: unknown): raw is UserId {
   return typeof raw === 'string' && raw.startsWith('u-')
 }
 
-// parse：用 isX 判断；失败抛解析错误；不调用 checkUserId
+// parse：用 isUserId 判断；失败抛解析错误；不调用 checkUserId
 function parseUserId(raw: unknown): UserId {
   if (isUserId(raw)) {
     return raw
@@ -514,7 +604,7 @@ function parseUserId(raw: unknown): UserId {
   }
 }
 
-// check：用同一组 isX 判断；失败统一抛一个领域错误
+// check：用同一组 isUserId 判断；失败统一抛一个领域错误
 function checkUserId(value: unknown): UserId {
   if (isUserId(value)) {
     return value
@@ -528,7 +618,9 @@ const user_id = parseUserId(raw)
 expect(() => checkUserId(parseUserId(raw))).not.toThrow()
 ```
 
-`parseX` 和 `checkX` 复用同一组 `isX` / `isNotX` 谓词；parse 不调用 check，但输出必须通过 check。`as` 只允许出现在测试/fixture 里，或已经过 `isX` 收窄后仍需断言的边界；不要用 `as` 代替 `isX` / `checkX`。
+`parseX` 和 `checkX` 复用同一组具体守卫（如 `isUserId`）；parse 不调用 check，但输出必须通过 check。`as` 运算符只允许出现在 `as<T>` helper 内部或测试/fixture；调用点写 `as<T>(value)`，不要写 `value as X`；不要用 `as` 代替具体守卫或 `checkX`。
+
+外部 raw 先过 zod（见 6.4）；上面的 `parseUserId` / `checkUserId` 是 zod 之后的领域校验/演示，不是外部形状的入口。
 
 **原则**：品牌类型的价值是"把领域语义写进类型系统"，让错误在编译期暴露。不需要为所有原始类型都套品牌——**只在领域身份重要、容易被混淆的地方用**（id 是典型）。
 
@@ -549,18 +641,36 @@ function unreachable(value: never): never {
 
 新增分支时，`unreachable` 会让编译器提醒你漏了哪一支。可选属性只表达"键可能缺席"；"值可能没有"用 `null`；两者不要混。
 
-### 6.4 边界解析：把 `unknown` 变成精确类型
+### 6.4 边界解析：外部输入先过 zod
 
-**看法**：外部数据（JSON、env、HTTP、文件）在运行时是 `unknown`。`as` 只是让编译器闭嘴，不会让数据变对。
+**看法**：外部数据（HTTP body/query/params、JSON、env、文件、第三方 API）在运行时是 `unknown`。静态类型只是编译期契约，不会让数据变对；`as` 只是让编译器闭嘴。外部输入必须先过 zod 运行时校验，zod 的输出才是可信的静态类型。
 
 **因此**：
 
-- 边界用 `parseX(raw)` 产出 X。parse 的返回值保证能通过 `checkX`；它用 `isX` / `isNotX` 在转换过程中落实约束，但不调用 `checkX`。
-- `checkX` 用同一组 `isX` / `isNotX` 判断，最后统一抛一次；用于两类地方：值不是 parse 产出的（DB、其他模块、外部注入）；测试里验证 parse 的契约。
-- 单元测试固定契约：`expect(() => checkX(parseX(raw))).not.toThrow()`；非法 raw 在 parse 阶段失败；check 对 parse 的产物失败，说明 parse 违约（bug）。
-- 内部函数信任类型，不再重复判空——这也是消除早返回的来源。
-- 不用 `as` 穿过边界；不用 `!`；不用 `any`。
-- parse 失败抛解析错误，check 失败抛领域错误；都可以用 `{ cause }` 保留根因，或用 Result 表达预期失败；不要返回半成品。
+- 外部输入用 zod schema 解析；类型由 `z.infer` 产出，不手写 interface 再 `as`：
+
+```ts
+import { z } from 'zod'
+
+const zGallery = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
+type Gallery = z.infer<typeof zGallery>
+
+const gallery = zGallery.parse(raw) // raw: unknown
+```
+
+- `parse` 用于边界抛错；`safeParse` 用于可预期失败，返回 Result，不吞掉。
+- zod 之后的值才进入业务；内部函数信任静态类型，不再重复判空。
+- 不要把 `as`、手写 `parseX`、手写具体守卫当作外部形状的入口；它们没有运行时证据。`parseX` / `checkX` 只做 zod 之后的领域不变量/转换（跨字段、品牌、业务规则）或内部可信数据。
+- 静态类型只在**可信、可控**时信任：
+  - 信任：zod `parse` / `safeParse` 的输出、内部函数参数/返回值、常量、测试 fixture、我们自己的代码造出来的值。
+  - 不信任：`JSON.parse`、`request.body` / `query` / `params`、`process.env`、`fetch` / 第三方响应、文件内容、`localStorage`、URL 参数；DB row 除非由 schema/迁移保证，否则也按边界数据对待。
+- 不用 `as` 穿过外部边界；不用 `!`；不用 `any`。
+- zod schema 放边界模块；一个外部形状一个 schema，别在每个函数里重复 parse。
+- 失败处理：zod 失败按 §9 走——边界抛错由兜底/HTTP 映射，或 `safeParse` 转 Result；不要吞掉。
 
 ### 6.5 `readonly` / `as const` / `satisfies`
 
@@ -997,8 +1107,12 @@ type Result<T, E> =
 - [ ] **循环里还有 continue / break 吗？**
 - [ ] **命名对了吗？** 导出的函数/变量带模块名（`galleryInEvent` / `__GALLERY_MAX_PHOTOS__`），非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；被写入的捕获 `__name`；通用工具才有类型后缀例外。
 - [ ] **常量放对地方了吗？** 导出的常量在 `constants.ts`、用命名导出吗？计算出来的常量是否 re-export 收口？调用方是否只从 `constants.ts` 取？有没有 `export default { ... }` 或可变对象？
-- [ ] **类型契约还在吗？** 无 `any`、无 `!`、导出有返回类型；边界数据由 `parse` 产出（输出保证通过 `check`），不是 `as` 出来的；该用品牌类型的地方用了吗？
-- [ ] **check 内部是 `isX` / `isNotX` 吗？** 有没有在每个单项检查里各抛一次？`checkX` 应该收集/判断，最后统一抛一次。
+- [ ] **类型契约还在吗？** 无 `any`、无 `!`、导出有返回类型；外部输入由 zod 产出，zod 之后才用 `parse`/`check` 处理领域不变量；不是 `as` 出来的；该用品牌类型的地方用了吗？
+- [ ] **外部输入过 zod 了吗？** `JSON.parse` / `request.body` / `request.query` / `env` / `fetch` / 文件有没有直接 `as` 或信任静态类型？zod 输出才进入业务。
+- [ ] **check 内部是具体守卫 + `!guard()` 吗？** 有没有在每个单项检查里各抛一次？`checkX` 应该收集/判断，最后统一抛一次。
+- [ ] **有没有一堆 `asX`？** 用 `as<T>` 收口；`as<X>(undefined)` 被 `AsInput` 挡住了吗？
+- [ ] **有没有重复造 `as` / `Is`？** 先 import `@laibrary/types` 的现有实现；来源见 5.7。
+- [ ] **具体守卫是 `value is X` 类型谓词吗？** `Is<T>` 有没有显式给 `T`？
 - [ ] **空值统一吗？** 默认 `null`；`undefined` 只出现在语言强加处；`NONE` 只在内部、不参与 JSON。
 - [ ] **可选参数/默认值合规吗？** 位置参数没有 `?`（错误构造器透传 `ErrorOptions` 除外）；默认值有真实的"默认模式"语义；对象参数属性可选。
 - [ ] **catch 都负责了吗？** 要么包装并保留 `cause`，要么判别后真处理，要么根本没 catch；有没有 `catch { return null }` / `return []`？
@@ -1045,9 +1159,16 @@ type Result<T, E> =
 | `catch { return null }` / `return []` | 包装 + cause / 判别后处理 / Result | 9.1 |
 | `catch (e) { log(e); throw e }` | 删掉 log，让兜底记一次 | 9.2 |
 | `any` | `unknown` + `parse` + `check` | 第六节 |
-| 外部数据上 `as Foo` | `parseFoo`（产出）/ `checkFoo`（验证） | 6.4 |
-| `parseX` 调用 `checkX` 兜底 | parse 自己保证输出合法；check 用同一组 isX 验证 | 5.7 |
-| 每个单项检查各自 throw | 改成 `isX` / `isNotX` 判断，由 `checkX` 最后抛一次 | 5.7 |
+| 外部数据上 `as Foo` / 手写 `parseFoo` | 先过 `zFoo.parse(raw)`；类型用 `z.infer`；zod 之后才用 parse/check | 6.4 |
+| `request.body as Body` / `JSON.parse(x) as Foo` / `process.env as Env` | 先过 zod schema；静态类型只在可信/可控时信任 | 6.4 |
+| 只靠 TS 类型接收外部 JSON | 运行时 zod 校验；`z.infer` 产出类型 | 6.4 |
+| `parseX` 调用 `checkX` 兜底 | parse 自己保证输出合法；check 用同一组具体守卫验证 | 5.7 |
+| 每个单项检查各自 throw | 改成具体守卫 + `!guard()` 判断，由 `checkX` 最后抛一次 | 5.7 |
+| `asUserId` / `asGallery` | `as<UserID>` / `as<Gallery>`（只测试/已校验边界） | 5.7 |
+| 临时写 `function Is` / `function as` | 从 `@laibrary/types` 导入；来源 `packages/types/src/is.ts` / `as.ts` | 5.7 |
+| `as<GalleryID>(undefined)` | `AsInput<T>` 挡住；先处理 null/undefined | 5.7 |
+| `isGallery(v): boolean` | `isGallery(v): v is Gallery`；用 `Is<T>` 或具体谓词 | 5.7 |
+| `Is(...)` 不写 `<T>` | 写 `Is<Gallery>(...)`；否则收窄成 unknown | 5.7 |
 | `!` | 显式判空 | 第六节 |
 | `enum` | 联合字面量 + `as const` | 第六节 |
 | `x?: T` 位置参数 | 对象参数（属性可选）或 `T \| null` | 第七节 |
