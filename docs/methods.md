@@ -11,9 +11,7 @@
 >
 > **项目位置**：本文是编码硬规则。Agent 阅读顺序见 [AGENTS.md](../AGENTS.md)，完整文档索引见 [introduction.md](introduction.md)。领域模型、API、配置不在本文；改这些先读对应规格。
 
-> 示例里的 `Order`、`User`、`UserId` 是虚构的；本项目的领域名以 [glossary.md](glossary.md) 为准。
-
-**目录**：零、开工前 · 总纲 · 一、控制流 · 二、无类 · 三、副作用 · 四、循环 · 五、命名 · 六、类型 · 七、函数 · 八、模块 · 九、异步与错误 · 十、注释 · 十一、测试 · 十二、自查与 Agent · 附录 A
+> 示例里的 `Order`、`User`、`UserId` 是虚构的；本项目的术语/领域词汇以 [glossary.md](glossary.md) 为准。
 
 ---
 
@@ -87,7 +85,7 @@ function getStatus(order: Order | null) {
 }
 ```
 
-**为什么有时必须写 `else { if }`，而不是平级的 `else if`**
+**为什么有时必须写 `else { if }`，而不是平级的 `else if`**？
 
 `else if` 表示**同一个判断的多个互斥取值**——它们是同一层的兄弟。`else { if }` 表示**上一层成立后才有资格问的子问题**——它们是父子。把子问题写成 `else if`，会在视觉上把它抬到和父问题同级，读者会以为三个条件是同一层的选项，丢掉"先有 order，才谈 status"这层信息。
 
@@ -179,7 +177,36 @@ const normalizeOrder = Pipe(validateOrder, calcOrderTotal, formatReceipt)
 
 **命名/位置**：返回函数的工厂按 5.3 用 PascalCase（`CreateLogger`、`CreateComparator`）；只是当前调用点的内联适配，直接用箭头函数，不要专门命名。绑定点在入口/适配器，不在模块顶层。
 
-**一句话**：能不建对象就不建对象；能组合就不继承；能显式传参就不靠 `this`；让状态和修改权保持内聚，让模块之间保持低耦合；偏应用/柯里化只在白名单里用。
+### 2.2 不走重度函数式：实用主义
+
+**看法**：我们运用函数式编程的**思想**——纯函数、组合、不可变、`Result` 联合类型——但不引入一整套类型级抽象。业务代码首先要让普通 TS 读者能读懂，而不是先学 functor/monad/effect。
+
+**因此**：
+
+- 不引入 `ts-effect`、`fp-ts`、Effect、IO monad、do notation、monad transformer、free monad 这类重型工具。
+- 错误用 `throw` / `Result` 联合类型（见 9.4），不需要把每个函数都变成 `Either` / `Effect`；`Result` 可以有小型 helper，但不要做成一套 monad 体系。
+- 状态用单一所有者的闭包/对象（见 3.1），不用 State monad / STM。
+- 依赖用参数/回调注入（见 7.1），不用 Reader monad / Effect layer。
+- 异步用 `async` / `await` + `Promise.all`（见 9.4），不用 Task/Effect。
+- 不可变用 `readonly` / 结构共享 / 局部替换，不要求每个函数都纯到没有副作用；该用 `for`、局部 `let`、`try` 时就用。
+- 允许的轻量函数式：`map` / `filter` / `reduce`、`Pipe`、`Result` 联合类型、`ts-pattern`、可辨识联合 + `switch` + `unreachable`、纯函数。
+- 判断标准：如果一个抽象需要读者先学一套类型级概念才能读懂业务，就不引入；业务代码要能用普通 TS 读懂。
+
+### 2.3 不用 getter/setter，也不用 Proxy
+
+**看法**：`obj.name` 看起来是读数据，但 getter 可能在背后计算、抛错、改状态、返回新对象；`Proxy` 更狠，连属性是否存在、赋值、删除都能被拦截。两者都把“实际发生了什么”藏到属性访问后面，违背显式数据流和局部推理。
+
+**因此**：
+
+- 不写 `get name() {}` / `set name(v) {}`，也不写 `Object.defineProperty(obj, 'name', { get, set })`；属性访问只读数据，不执行逻辑。
+- 不用 `Proxy`；需要拦截/反应式/懒加载，用显式函数、`Signal` / `Memo`（见 8.2）、普通回调或 `Map`。
+- 计算值用纯函数：`fullName(user)`，不要 `user.full_name` getter。
+- 修改值用所有者的显式操作：`updateName(user, name)` / owner 的 `set`，不要 `user.name = x` 的 setter。
+- 校验用 `parseX` / `checkX`（见 5.7 / 6.4），不要 setter 里偷偷校验。
+- 消费第三方对象上的 getter / Proxy 不算；我们只约束自己写的代码。
+- 如果确实遇到必须用 Proxy 的场景（目前没遇到），先停下来讨论，并写 `// justify: 2.3 <理由>`；不要默认用。
+
+**一句话**：能不建对象就不建对象；能组合就不继承；能显式传参就不靠 `this`；让状态和修改权保持内聚，让模块之间保持低耦合；偏应用/柯里化只在白名单里用；借函数式的工具，不借它的教条，像 Rust 那样实用；属性访问只读数据，不用 getter/setter/Proxy。
 
 ---
 
@@ -242,6 +269,7 @@ function runEffects(effects: Array<() => void>) {
 
 - 一份状态源只有一个所有者；不是整个应用共用一个，而是每份状态各自有主人。
 - 状态跟着所有者一起出现、一起消失；数据库是持久化的地方，内存里的是它的副本。
+- 需要跨模块订阅一个值的变更时，用 `vait` 的 `Memo` / `ChangedSignal`（见 8.2），并在订阅者销毁时调用返回的 `off`；普通状态仍然用闭包变量，不要为了订阅把所有状态都换成 Memo。
 - 所有者管的是"状态怎么换"，不是"业务怎么做"；业务逻辑放在纯函数里，所有者只负责应用转换、替换引用。`CreateCounter` 这种一行转换可以直接写；逻辑一长就抽出去。
 - 对外可以有多个操作（`addItem` / `removeItem` / `rename`），但它们最后都走同一个修改入口；关键不是"只有一个函数"，而是"没人能绕过所有者改"。
 - 私有但有两个内部写点，仍然是两个写点；"只有一份数据"和"只有一处能改"是两件事。
@@ -547,6 +575,32 @@ const config = {
 } satisfies RetryConfig
 ```
 
+### 6.6 模式匹配：用 `ts-pattern`
+
+**看法**：可辨识联合一旦有 3 个以上分支（`Result`、`LoadState`、领域事件），`if/else` 或 `switch` 会越写越长；用 `ts-pattern` 的 `match(...).with(...).exhaustive()`，分支读起来像数据形状，编译器还能检查漏分支。
+
+**因此**：
+
+- **3 个以上分支，或需要按对象形状/嵌套字段匹配时，用 `ts-pattern`。**
+- **2 个分支（如 `Result` 的 ok/error）直接用 `if (result.ok) { ... } else { ... }`**；不要为了用库而用库。
+- 简单 `switch` + `unreachable` 也可以；`ts-pattern` 在嵌套/多字段/守卫时更清楚。
+- `ts-pattern` 是轻量模式匹配工具，不是重度函数式；它属于 2.2 允许的轻量工具。
+- 不要用 `ts-pattern` 包裹所有 `if`；热路径/极简分支用普通控制流。
+
+```ts
+import { match } from 'ts-pattern'
+
+const view = match(state)
+  .with({ status: 'loading' }, () => 'loading')
+  .with({ status: 'ok' }, ({ data }) => render(data))
+  .with({ status: 'error' }, ({ error }) => error.message)
+  .exhaustive()
+```
+
+**一句话**：多分支可辨识联合用 `ts-pattern` 做穷尽匹配；两个分支就用 `if/else`，别把简单分支也包成匹配。
+
+参考：[ts-pattern 文档](https://github.com/gvergnaud/ts-pattern)。
+
 ---
 
 ## 七、函数设计
@@ -656,11 +710,66 @@ export { __MODULE_CALCULATED__ } from './module'
 
 **一句话**：常量按名导出，不按对象打包；一个域一个 `constants.ts`，本地常量留在本地，计算出来的常量在 `constants.ts` 收口。
 
+### 8.2 事件与订阅：用 `vait` 的 `Signal()`
+
+**看法**：跨模块的通知不要用字符串事件名 `emit('order.created')`——字符串没有类型，改名/改 payload 编译器不会提醒。用 `vait` 的 `Signal<P>()` 定义事件，订阅走 `signals.sig_name.receive(...)`，类型由事件表保证。
+
+**因此**：
+
+- 先定义事件表：每个 `sig_*` 对应一个 `Signal<Payload>`；无 payload 用 `Signal()`（即 `Signal<void>`）。
+- 订阅：`const off = signals.sig_order_created.receive((order_id) => { ... })`；`off()` 取消订阅。
+- 发布：`signals.sig_order_created.trigger(order_id)`；不要 `emit('order.created', ...)`。
+- 事件名就是属性名，`sig_` 前缀；改名/改 payload 由类型检查兜底。
+- 事件用于“通知”，不用于“请求/响应”：需要返回值/可能失败，用函数 + `Result`（见 9.5），不要用事件回传。
+- **Signal 的订阅必须及时卸载**：`receive(...)` 返回的 `off()` 要在组件卸载/模块销毁/任务结束时调用；忘记调用，handler 和它捕获的对象会一直被 signal 引用，造成内存泄漏。
+- **不要重复订阅不取消**：每次 render/每次调用都 `receive` 而不 `off`，会叠加 handler，既泄漏又重复执行。
+- 订阅回调里的错误按 §9 处理；不要让一个订阅者的异常静默消失。
+- 如果 `signals` 要跨模块导出，按 5.2 带模块名（如 `__ORDER_SIGNALS__`）；`sig_` 前缀标记事件。
+
+```ts
+import { Memo, Signal } from 'vait'
+
+type OrderSignals = {
+  sig_order_created: Signal<OrderID>
+  sig_order_paid: Signal<Order>
+}
+
+const signals: OrderSignals = {
+  sig_order_created: Signal<OrderID>(),
+  sig_order_paid: Signal<Order>(),
+}
+
+const cancelReceive = signals.sig_order_created.receive((order_id) => {
+  // ...
+})
+
+signals.sig_order_created.trigger(order_id)
+cancelReceive() // 组件卸载 / 任务结束时必须调用
+```
+
+**Memo 的订阅**：`vait` 的 `Memo` 是带订阅的状态容器，`Memo.watch(memo, fn)` 能订阅变更；`ChangedSignal(memo)` 能把变更转成 Signal。**两者的订阅都必须卸载**：`Memo.watch` 返回的 `off`、`ChangedSignal` 的 subscribe 返回的 `off`，都要在订阅者销毁时调用；否则 memo 会一直持有 watcher，watcher 捕获的对象无法回收。`Memo` 比闭包变量要更重：**能用闭包变量 + 显式回调解决，就不要上 Memo**；只有确实需要“跨模块订阅一个值的变更”时才用。
+
+```ts
+const memo = Memo(0)
+const [get, set] = memo
+const off = Memo.watch(memo, (value) => {
+  // ...
+})
+set(1)
+off() // 订阅者销毁时必须调用
+```
+
+**一句话**：事件用类型化的 `Signal`（`receive` 订阅、`trigger` 发布），不用字符串 `emit`；`Memo` 只在一个值真的需要被订阅时用，普通状态继续用闭包变量；两者的订阅都必须及时 `off`，否则会泄漏。
+
+参考：vait 没有正式文档；[Signal 源码](https://github.com/TorzoClub/vait/blob/master/src/signal.ts)、[Memo 源码](https://github.com/TorzoClub/vait/blob/master/src/memo.ts)。
+
 ---
 
 ## 九、异步与错误：catch 必须负责，兜底统一，保留 cause
 
-### 9.1 错误到了这一层，只有三种选择
+### 9.1 异常到了这一层，只有三种选择
+
+这一节讲 `throw` / `try-catch` 这条通道；`Result` 是另一条，见 9.5。
 
 **看法**：catch 不是"我接住了"的证明，而是"我决定对这条错误负责"的声明。接住却不处理，比不接住更糟——错误被藏起来，调用方以为一切正常。
 
@@ -697,12 +806,14 @@ async function fetchWithRetry(url: string, remain: number): Promise<Response> {
   }
 }
 
-// ✅ 交给调用方：失败以 Result 显式返回，由调用方分支（定义见 9.4）
-async function readCache(key: string): Promise<Result<string | null, CacheError>> {
+// ✅ 交给调用方：失败以 Result 显式返回，由调用方分支（定义见 9.4/9.5）
+type CacheFailure = { code: 'CACHE_UNAVAILABLE'; key: string; cause: unknown }
+
+async function readCache(key: string): Promise<Result<string | null, CacheFailure>> {
   try {
     return { ok: true, data: await cache.get(key) }
   } catch (err: unknown) {
-    return { ok: false, error: new CacheError(`cache read failed: ${key}`, { cause: err }) }
+    return { ok: false, error: { code: 'CACHE_UNAVAILABLE', key, cause: err } }
   }
 }
 ```
@@ -795,17 +906,37 @@ try {
 - **超时/取消用 `AbortSignal`**，不要把超时塞进业务判断。
 - **流式处理用 `for await`**，不要把流先攒成数组再处理。
 
-**Result 形态**：可预期的业务失败用 Result，异常只留给意外。
+**Result 形态**：可预期的**业务**失败用 Result；异常留给意外。Result 的 `E` 是**失败数据**，不是 `Error` 子类。
 
 ```ts
-type Result<T, E = Error> =
+type Result<T, E> =
   | { readonly ok: true, readonly data: T }
   | { readonly ok: false, readonly error: E }
 ```
 
-- 校验不过、找不到、余额不足 → Result。
+- 业务规则拒绝、找不到、余额不足 → Result。
+- 边界解析/校验（`parseX` / `checkX`）失败 → throw，由 HTTP/CLI 边界映射成 400；这是边界适配，不是业务 Result。
 - 不变量破坏、编程错误、依赖挂了 → throw。
 - 一个函数选定一种，内部不混用；throw ↔ Result 的转换只在边界做一次。
+- `E` 用可辨识联合的失败数据（`{ code: 'NOT_FOUND'; id }`），不要用 `AppError` / `Error` 子类；异常通道的错误类型见 9.1–9.3。
+
+### 9.5 Result 与 try/catch：两条通道
+
+**看法**：`try/catch` 是"跳出去"：异常把栈展开，直到某个 catch 接住；`Result` 是"继续走"：函数把成功数据或失败数据带回来，调用方自己分支。两条通道都合法，但不能在同一条失败上混用。
+
+**因此**：
+
+- **Result 用于可预期的业务失败**：找不到、业务规则拒绝、余额不足。调用方必须处理。
+- **try/catch 用于意外异常**：依赖挂了、编程错误、不变量破坏、第三方库抛错；在边界接住，兜底记录。
+- **Result 的 error 是数据**：可辨识联合（`{ code: 'NOT_FOUND'; id }`），不是 `Error` 子类，不用 `AppError`。它可序列化、可 pattern match、可聚合。
+- **异常的错误是 `Error` 子类**：带 `cause`/栈；只在异常通道用；`AppError` / `ConfigError` 这类只服务 throw。
+- **不要混**：返回 `Result` 的函数不要为预期失败 throw；抛异常的函数不要用 `Result` 表示同一个预期失败。一个函数选定一种，内部不混。
+- **边界转换**：adapter 可以 catch 外部异常，转成 `Result` 的失败数据（或上抛给兜底；`readCache` 见 9.1）；API/UI 把 `Result` 的失败映射成状态码/提示。转换只发生在边界，且只做一次。
+- **边界解析/校验**（`parseX` / `checkX`）可以 throw：它们由 HTTP/CLI 边界接住并映射成 400；它们不是业务 Result 的一部分。
+- **pattern match**：Result 用 `if (result.ok)` 或 `ts-pattern` 分支（见 6.6）；不要用 try/catch 包 Result 的 match。
+- **测试**：Result 分支用断言数据；异常通道用 `expect(...).toThrow()`。
+
+**一句话**：预期失败用 Result 继续走，意外异常用 try/catch 跳出去；两条通道在边界转换，不在函数内部混。
 
 ---
 
@@ -855,9 +986,13 @@ type Result<T, E = Error> =
 - [ ] **树完整吗？** 有没有 early return 剪断分支、有没有该补的 `else`？
 - [ ] **`else if` 和 `else { if }` 分清了吗？** 同级兄弟才用 `else if`，跨层用嵌套。
 - [ ] **有类吗？有 this 吗？** 除了错误类型，新代码都应该没有。
+- [ ] **有 getter/setter/Proxy 吗？** 属性访问里有没有藏计算/校验/副作用？有没有 `Object.defineProperty` 的访问器？
 - [ ] **状态有唯一所有者吗？** 有没有模块级 `let`、散落的写操作？`get` 有没有漏可变引用？异步写串行化了吗？
+- [ ] **跨模块事件用 `Signal()` 了吗？** 有没有 `emit('name')`？`receive` / `watch` / `ChangedSignal` 的取消函数都在卸载/销毁时调用了吗？有没有重复订阅不取消？`Memo` 是不是用得太重？
 - [ ] **控制反转用对了吗？** 需要外部决定的行为是参数/回调吗？有没有把只有一种行为的东西也做成回调/配置对象？
 - [ ] **偏应用/柯里化在白名单里吗？** 被固定的是依赖/配置还是业务数据？调用点更简单了吗？有没有三层以上的柯里化？
+- [ ] **没有引入重度函数式吧？** 业务代码还在用普通 TS 的 `if` / `for` / `try` 吗？有没有为了“纯粹”引入 `fp-ts` / `Effect` / monad 体系？
+- [ ] **多分支可辨识联合用 ts-pattern 了吗？** 3 个以上分支/exhaustive；2 个分支是不是过度用了？
 - [ ] **副作用集中在可数的几个点吗？**
 - [ ] **循环里还有 continue / break 吗？**
 - [ ] **命名对了吗？** 导出的函数/变量带模块名（`galleryInEvent` / `__GALLERY_MAX_PHOTOS__`），非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；被写入的捕获 `__name`；通用工具才有类型后缀例外。
@@ -901,6 +1036,9 @@ type Result<T, E = Error> =
 |---|---|---|
 | `class Foo` | 闭包工厂 / 对象字面量工厂 | 第二节 |
 | `this.` | 显式参数 / 闭包 | 第二节 |
+| `{ get name() {} }` / `{ set name(v) {} }` | 显式函数：`calcName(user)` / `updateName(user, name)` | 2.3 |
+| `Object.defineProperty(obj, 'x', { get, set })` | 显式函数；属性只读数据 | 2.3 |
+| `Proxy` | 显式函数 / `Signal` / `Memo` / `Map`；不要拦截属性访问 | 2.3 |
 | `if (x) return` 后接逻辑 | 完整 `if / else`，或抽函数 | 第一节 |
 | `else if` 压平子层 | `else { if }` 嵌套，或抽命名函数 | 第一节 |
 | 循环里 `break` / `continue` | `find` / 抽查找函数 / `if` 包裹 | 第四节 |
@@ -919,7 +1057,15 @@ type Result<T, E = Error> =
 | 业务数据被偏应用固定 | 把数据显式传参；偏应用只固定依赖/配置 | 2.1 |
 | `f(a)(b)(c)` 多层柯里化 | 改成显式参数/对象参数，或只偏应用一次 | 2.1 |
 | 模块顶层 `export const saveOrder = CreateSaveOrder(globalDb)` | 在入口绑定，通过参数传 | 2.1 |
+| 引入 ts-effect / fp-ts / monad / functor | 用普通 TS：if/for/try + Result 联合类型 | 2.2 |
+| 为了“纯粹”把业务写成 monad chain | 普通控制流；函数式只在降低复杂度时用 | 2.2 |
+| 3+ 分支的 if/switch 链 | `ts-pattern` 的 match + exhaustive；2 分支用 if/else | 6.6 |
+| Result 的 error 用 Error 子类 | 改成失败数据（可辨识联合）；异常错误留在 try/catch 通道 | 9.5 |
+| 在 Result 函数里 throw 预期失败 | 返回 `{ ok: false, error }`；边界转换才 catch | 9.5 |
 | 模块级 `let` | 单一所有者闭包 / 显式传入 | 3.1 |
+| `emit('event name')` | `signals.sig_name.receive(...)`（Signal）；发布用 `trigger` | 8.2 |
+| 用 Memo 当事件总线 / 普通状态 | 事件用 Signal；普通状态用闭包变量，只有需要订阅才用 Memo | 8.2 |
+| `receive` / `watch` 后不取消 | 卸载/销毁时调用返回的 `off`；否则 handler 和闭包泄漏 | 8.2 |
 | `export const foo = 1` | `__GALLERY_FOO__`（导出数据值带模块名） | 5.2 / 5.4 |
 | `export const createFoo = () => ...` | `CreateGalleryFoo`（返回可调用物） | 5.3 |
 | 导出的 `inEvent` / `canSubmit` | `galleryInEvent` / `galleryCanSubmit` | 5.2 |

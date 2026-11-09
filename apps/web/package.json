@@ -12,7 +12,9 @@
   "dependencies": {
     "@laibrary/types": "*",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "ts-pattern": "^5.9.2",
+    "vait": "^4.2.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
