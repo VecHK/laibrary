@@ -34,7 +34,7 @@
 - `entity`：kind 非空；page：kind null。
 - 无 `src`/`cover_src`/`image_width`/`image_height`。
 
-## 3. Actions（14）
+## 3. Actions（16）
 
 ### addItem
 ```text
@@ -61,6 +61,18 @@ getItems: ItemID[] → Item[]（保持输入顺序）
 { id } → { message: 'done' }
 ```
 有子项 409；tag 清扫；image 级联 thumbnails；blob 留给 GC。
+
+### deleteItems
+```text
+ItemID[] → Item[]
+```
+一次物理删除每个目标及其整棵子树，返回完整 Item 快照；tag/system 整批拒绝。blob 保留给 GC。
+
+### restoreItems
+```text
+Item[] → Item[]
+```
+按 parent 从浅到深插回，显式使用快照中的原 Item ID/create_date/update_date/所有字段；ID 冲突、parent/blob 不存在、唯一键冲突会报错。不恢复 thumbnails，图片缩略图懒生成。
 
 ### listing
 ```text
@@ -94,7 +106,7 @@ get-or-create，大小写不敏感；空名 400。
 ```text
 { id } → { message: 'done' }
 ```
-有子项 409；清扫引用。
+有子项 409；清扫引用。批量删除不接受 tag。
 
 ### searchTag
 ```text

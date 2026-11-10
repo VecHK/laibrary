@@ -90,6 +90,8 @@ export async function CreateApi({
     getItems: async payload => actions.getItems(zActionPayloads.getItems.parse(payload)),
     updateItem: async payload => actions.updateItem(zActionPayloads.updateItem.parse(payload)),
     deleteItem: async payload => actions.deleteItem(zActionPayloads.deleteItem.parse(payload)),
+    deleteItems: async payload => actions.deleteItems(zActionPayloads.deleteItems.parse(payload)),
+    restoreItems: async payload => actions.restoreItems(zActionPayloads.restoreItems.parse(payload)),
     listing: async payload => actions.listing(zActionPayloads.listing.parse(payload)),
     getItemByUnityName: async payload => actions.getItemByUnityName(
       zActionPayloads.getItemByUnityName.parse(payload),

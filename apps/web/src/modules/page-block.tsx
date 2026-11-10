@@ -16,6 +16,8 @@ export function PageBlock({
   onDragEndBlock,
   drop_position,
   drag_anywhere,
+  selected,
+  onSelect,
   onDuplicate,
   onMove,
   onDelete,
@@ -33,6 +35,8 @@ export function PageBlock({
   onDragEndBlock: () => void
   drop_position: 'before' | 'after' | null
   drag_anywhere: boolean
+  selected: boolean
+  onSelect: () => void
   onDuplicate: () => void
   onMove: (direction: 'up' | 'down') => void
   onDelete: () => void
@@ -46,6 +50,7 @@ export function PageBlock({
       data-block-id={String(item.id)}
       className={[
         'page-block',
+        selected ? 'selected' : '',
         menu_open ? 'menu-open' : '',
         drop_position === 'before' ? 'drop-before' : '',
         drop_position === 'after' ? 'drop-after' : '',
@@ -137,6 +142,7 @@ export function PageBlock({
           }}
           onClick={ev => {
             ev.stopPropagation()
+            onSelect()
             if (!drag_started_ref.current) {
               setMenuOpen(value => !value)
             }

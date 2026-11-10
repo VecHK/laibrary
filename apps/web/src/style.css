@@ -2555,3 +2555,37 @@ button {
 .page-full {
   position: relative;
 }
+
+.page-full:focus {
+  outline: none;
+}
+
+.page-block.selected {
+  background: #dbeafe;
+  border-radius: 4px;
+}
+
+.page-block.selected .block-gutter {
+  opacity: 1;
+}
+
+.textline-view {
+  user-select: text;
+}
+
+body.marquee-selecting {
+  user-select: none;
+}
+
+.marquee-box {
+  position: fixed;
+  z-index: 300;
+  pointer-events: none;
+  border: 1px solid rgba(35, 131, 226, 0.55);
+  background: rgba(35, 131, 226, 0.12);
+  border-radius: 2px;
+}
+
+.block-gutter {
+  user-select: none;
+}

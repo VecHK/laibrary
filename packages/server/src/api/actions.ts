@@ -7,6 +7,7 @@ import {
   updateItem,
 } from '../repo/items'
 import { listItems } from '../repo/item-listing'
+import { deleteItems, restoreItems } from '../repo/item-batch'
 import {
   deleteTag, getTagByTitle, newTag, searchTag, updateTag,
 } from '../repo/tags'
@@ -36,6 +37,8 @@ export function CreateActionRoute({
       await db.transaction(tx => deleteItem(tx, id))
       return MESSAGE_DONE
     },
+    deleteItems: ids => db.transaction(tx => deleteItems(tx, ids)),
+    restoreItems: snapshots => db.transaction(tx => restoreItems(tx, snapshots)),
     listing: payload => listItems(db, payload),
     getItemByUnityName: ({ unity_name }) => getItemByUnityName(db, unity_name),
     newTag: ({ title, attributes }) => db.transaction(tx => newTag(tx, title, attributes)),

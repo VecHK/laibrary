@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
 import { parseItemTokens } from '@laibrary/types'
 import { InlineText } from './inline-text'
+import { caretAtVisualEdge } from '../lib/caret-edge'
 import {
   detectSlashQuery, filterSlashCommands, splitTextLine,
   type SlashCommand,
@@ -24,6 +25,8 @@ export type TextLineBlockProps = {
   onSplit?: (item: Item, left: string, right: string) => void | Promise<void>
   onBackspace?: (item: Item, value: string) => void | Promise<void>
   onSlashCommand?: (command: SlashCommand, item: Item) => void
+  onMoveBlock?: (direction: 'up' | 'down', item: Item) => void
+  onSelectBlock?: (item: Item) => void
 }
 
 function TextLineEditor({
@@ -37,6 +40,8 @@ function TextLineEditor({
   onSplit,
   onBackspace,
   onSlashCommand,
+  onMoveBlock,
+  onSelectBlock,
 }: TextLineBlockProps) {
   const [value, setValue] = useState(item.title)
   const [slash_query, setSlashQuery] = useState<string | null>(null)
@@ -211,10 +216,17 @@ function TextLineEditor({
     }
   }
 
+  const activateIfNoSelection = () => {
+    const selection = window.getSelection()
+    if (selection === null || selection.isCollapsed || selection.toString().length === 0) {
+      onActivate()
+    }
+  }
+
   const inactive_view = (
     <div
       className={value.length === 0 ? 'textline-block is-empty' : 'textline-block'}
-      onClick={onActivate}
+      onClick={activateIfNoSelection}
     >
       <div className="textline-view">
         {value.length === 0 ? null : <InlineText text={value} ctx={ctx} />}
@@ -294,7 +306,21 @@ function TextLineEditor({
             }
 
             if (!handled) {
-              if (ev.key === 'Enter' && !ev.shiftKey) {
+              if (
+                (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') &&
+                !ev.shiftKey &&
+                !ev.altKey &&
+                !ev.metaKey &&
+                !ev.ctrlKey &&
+                onMoveBlock !== undefined &&
+                caretAtVisualEdge(ev.currentTarget, ev.key === 'ArrowUp' ? 'start' : 'end')
+              ) {
+                ev.preventDefault()
+                onMoveBlock(ev.key === 'ArrowUp' ? 'up' : 'down', item)
+              } else if (ev.key === 'Escape' && onSelectBlock !== undefined) {
+                ev.preventDefault()
+                onSelectBlock(item)
+              } else if (ev.key === 'Enter' && !ev.shiftKey) {
                 if (onSplit !== undefined) {
                   ev.preventDefault()
                   void handleSplit()

@@ -9,6 +9,8 @@ export interface ActionTable {
   getItems(ids: readonly ItemID[]): Promise<Item[]>
   updateItem(payload: { id: ItemID; data: UpdateItemForm }): Promise<{ message: 'done' }>
   deleteItem(payload: { id: ItemID }): Promise<{ message: 'done' }>
+  deleteItems(ids: readonly ItemID[]): Promise<Item[]>
+  restoreItems(items: readonly Item[]): Promise<Item[]>
   listing(payload: ListingParams): Promise<Item[]>
   getItemByUnityName(payload: { unity_name: string }): Promise<Item | null>
   newTag(payload: { title: string; attributes?: Readonly<Record<string, unknown>> | undefined }): Promise<Item>

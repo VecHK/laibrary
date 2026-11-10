@@ -5,6 +5,7 @@ import { createFileItem, createImageItem, mediaKindForFile } from '../lib/blob'
 import { orderAfter } from '../lib/order'
 import { blockCanDelete, blockCanDuplicate } from '../lib/page-blocks'
 import { mergeTextLine, type SlashCommand } from '../lib/textline-editor'
+import { boxFromPoints, boxesIntersect, type Box } from '../lib/marquee'
 import type { ItemModule, ViewerCtx } from './types'
 import { PageBlock } from './page-block'
 import { PageBlockLink, PageCard } from './page-card'
@@ -27,6 +28,11 @@ type DropIndicator = {
   position: 'before' | 'after'
 }
 
+type PageHistoryEntry = {
+  readonly ids: readonly ItemID[]
+  readonly items: readonly Item[]
+}
+
 function sortChildren(items: Item[]): Item[] {
   return [...items].sort((a, b) => (
     a.order_index - b.order_index || a.id - b.id
@@ -40,6 +46,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [focus_request, setFocusRequest] = useState<FocusRequest | null>(null)
   const [picker, setPicker] = useState(false)
   const [drop_indicator, setDropIndicator] = useState<DropIndicator | null>(null)
+  const [selected_ids, setSelectedIds] = useState<readonly ItemID[]>([])
+  const [selection_anchor_id, setSelectionAnchorId] = useState<ItemID | null>(null)
+  const [marquee, setMarquee] = useState<Box | null>(null)
+  const marquee_cleanup_ref = useRef<(() => void) | null>(null)
+  const [undo_stack, setUndoStack] = useState<readonly PageHistoryEntry[]>([])
+  const [redo_stack, setRedoStack] = useState<readonly PageHistoryEntry[]>([])
+  const page_ref = useRef<HTMLDivElement>(null)
+  const history_busy_ref = useRef(false)
   const [link_placeholder, setLinkPlaceholder] = useState<Item | null>(null)
   const [title, scheduleTitle, saveTitle] = usePageTitle(item, ctx)
   const alive_ref = useRef(true)
@@ -87,8 +101,190 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const focusBlock = (id: ItemID, caret: number | 'end') => {
+    setSelectedIds([])
+    setSelectionAnchorId(null)
     setActiveBlockId(id)
     setFocusRequest({ id, request: { caret } })
+  }
+
+  const focusPage = () => {
+    window.requestAnimationFrame(() => {
+      page_ref.current?.focus({ preventScroll: true })
+    })
+  }
+
+  const clearSelection = () => {
+    setSelectedIds([])
+    setSelectionAnchorId(null)
+  }
+
+  const selectOne = (id: ItemID) => {
+    setActiveBlockId(null)
+    setFocusRequest(null)
+    setSelectedIds([id])
+    setSelectionAnchorId(id)
+    focusPage()
+  }
+
+  const selectRange = (anchor_id: ItemID, target_id: ItemID) => {
+    const list = children_ref.current
+    const anchor_index = list.findIndex(child => child.id === anchor_id)
+    const target_index = list.findIndex(child => child.id === target_id)
+    if (anchor_index >= 0 && target_index >= 0) {
+      const start = Math.min(anchor_index, target_index)
+      const end = Math.max(anchor_index, target_index)
+      setSelectedIds(list.slice(start, end + 1).map(child => child.id))
+      setSelectionAnchorId(anchor_id)
+      focusPage()
+    }
+  }
+
+  const deleteSelected = async () => {
+    if (selected_ids.length === 0 || history_busy_ref.current) {
+      // 没有选择或已有历史操作，忽略。
+    } else {
+      history_busy_ref.current = true
+      const ids = [...selected_ids]
+      try {
+        const snapshots = await ctx.api.rpc.deleteItems(ids)
+        for (const id of ids) {
+          removeChild(id)
+        }
+        setUndoStack(prev => [...prev, { ids, items: snapshots }])
+        setRedoStack([])
+        clearSelection()
+        ctx.refreshSidebar()
+      } catch (error) {
+        ctx.showError(error instanceof Error ? error.message : String(error))
+        void loadChildren()
+      } finally {
+        history_busy_ref.current = false
+      }
+    }
+  }
+
+  const undoDelete = async () => {
+    const entry = undo_stack[undo_stack.length - 1]
+    if (entry === undefined || history_busy_ref.current) {
+      // 没有可撤销记录。
+    } else {
+      history_busy_ref.current = true
+      try {
+        const restored = await ctx.api.rpc.restoreItems(entry.items)
+        for (const child of restored) {
+          if (child.parent_id === item.id) {
+            insertChild(child)
+          }
+        }
+        setUndoStack(prev => prev.slice(0, -1))
+        setRedoStack(prev => [...prev, entry])
+        clearSelection()
+        ctx.refreshSidebar()
+      } catch (error) {
+        ctx.showError(error instanceof Error ? error.message : String(error))
+      } finally {
+        history_busy_ref.current = false
+      }
+    }
+  }
+
+  const redoDelete = async () => {
+    const entry = redo_stack[redo_stack.length - 1]
+    if (entry === undefined || history_busy_ref.current) {
+      // 没有可重做记录。
+    } else {
+      history_busy_ref.current = true
+      try {
+        const snapshots = await ctx.api.rpc.deleteItems(entry.ids)
+        for (const id of entry.ids) {
+          removeChild(id)
+        }
+        setRedoStack(prev => prev.slice(0, -1))
+        setUndoStack(prev => [...prev, { ids: entry.ids, items: snapshots }])
+        clearSelection()
+        ctx.refreshSidebar()
+      } catch (error) {
+        ctx.showError(error instanceof Error ? error.message : String(error))
+      } finally {
+        history_busy_ref.current = false
+      }
+    }
+  }
+
+  const handlePageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const modifier = event.metaKey || event.ctrlKey
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      // 文本编辑仍使用原生行为。
+    } else if (modifier && (event.key === 'z' || event.key === 'Z') && (undo_stack.length !== 0 || redo_stack.length !== 0)) {
+      event.preventDefault()
+      if (event.shiftKey) {
+        void redoDelete()
+      } else {
+        void undoDelete()
+      }
+    } else if (selected_ids.length === 0) {
+      // 只有选中模式拦截这些键。
+    } else {
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault()
+        moveSelection(
+          event.key === 'ArrowUp' ? 'up' : 'down',
+          event.shiftKey,
+        )
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        clearSelection()
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        void deleteSelected()
+      }
+    }
+  }
+
+  const focusAdjacentBlock = (direction: 'up' | 'down', current: Item) => {
+    const list = children_ref.current
+    const index = list.findIndex(child => child.id === current.id)
+    const target = direction === 'up' ? list[index - 1] : list[index + 1]
+    if (target !== undefined) {
+      if (target.role === 'textline') {
+        focusBlock(target.id, direction === 'up' ? 'end' : 0)
+      } else {
+        selectOne(target.id)
+      }
+      window.requestAnimationFrame(() => {
+        document.querySelector(`[data-block-id="${target.id}"]`)?.scrollIntoView({ block: 'nearest' })
+      })
+    }
+  }
+
+  const moveSelection = (direction: 'up' | 'down', extend: boolean) => {
+    const list = children_ref.current
+    const selected_indexes = selected_ids
+      .map(id => list.findIndex(child => child.id === id))
+      .filter(index => index >= 0)
+    if (selected_indexes.length !== 0) {
+      const anchor_id = selection_anchor_id
+        ?? selected_ids[selected_indexes.length - 1]
+        ?? null
+      const anchor_index = anchor_id === null ? -1 : list.findIndex(child => child.id === anchor_id)
+      const current_index = (
+        extend ? selected_indexes[selected_indexes.length - 1] : selected_indexes[0]
+      ) ?? -1
+      const next_index = direction === 'up' ? current_index - 1 : current_index + 1
+      if (current_index >= 0 && next_index >= 0 && next_index < list.length) {
+        const next = list[next_index]
+        if (next !== undefined) {
+          if (extend && anchor_index >= 0 && anchor_id !== null) {
+            selectRange(anchor_id, next.id)
+          } else {
+            selectOne(next.id)
+          }
+          window.requestAnimationFrame(() => {
+            document.querySelector(`[data-block-id="${next.id}"]`)?.scrollIntoView({ block: 'nearest' })
+          })
+        }
+      }
+    }
   }
 
   const loadChildren = async (
@@ -123,9 +319,118 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     alive_ref.current = true
     setActiveBlockId(null)
     setFocusRequest(null)
+    setSelectedIds([])
+    setSelectionAnchorId(null)
+    setUndoStack([])
+    setRedoStack([])
     void loadChildren(true, true)
     return () => { alive_ref.current = false }
   }, [item.id])
+  useEffect(() => {
+    const idsInside = (box: Box): ItemID[] => {
+      const blocks = [...document.querySelectorAll<HTMLElement>('.children-list .page-block')]
+      return blocks.flatMap(block => {
+        const raw = block.dataset['blockId']
+        const parsed = raw === undefined ? null : zItemID.safeParse(Number(raw))
+        if (parsed === null || !parsed.success) {
+          return []
+        } else {
+          const rect = block.getBoundingClientRect()
+          const block_box: Box = {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          }
+          return boxesIntersect(box, block_box) ? [parsed.data] : []
+        }
+      })
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null
+      const in_item = target !== null && target.closest('.item-content') !== null
+      const in_page = target !== null && target.closest('.page-full') !== null
+      const in_control = target !== null && target.closest('button, input, textarea, select, a') !== null
+      const has_modifier = event.shiftKey || event.altKey || event.metaKey || event.ctrlKey
+      if (
+        event.button !== 0 ||
+        target === null ||
+        !in_item ||
+        in_page ||
+        in_control ||
+        has_modifier
+      ) {
+        // 文章内容区、控件和修饰键拖拽都交给浏览器。
+      } else {
+        event.preventDefault()
+        marquee_cleanup_ref.current?.()
+        const start_x = event.clientX
+        const start_y = event.clientY
+        let moved = false
+        setSelectedIds([])
+        setSelectionAnchorId(null)
+        setMarquee(boxFromPoints(start_x, start_y, start_x, start_y))
+        focusPage()
+        document.body.classList.add('marquee-selecting')
+        window.getSelection()?.removeAllRanges()
+
+        const update = (current_x: number, current_y: number) => {
+          const box = boxFromPoints(start_x, start_y, current_x, current_y)
+          if (box.width > 4 || box.height > 4) {
+            moved = true
+            setMarquee(box)
+            const ids = idsInside(box)
+            setSelectedIds(ids)
+            setSelectionAnchorId(ids[0] ?? null)
+          }
+        }
+        const cleanup = () => {
+          window.removeEventListener('pointermove', onPointerMove)
+          window.removeEventListener('pointerup', onPointerUp)
+          window.removeEventListener('pointercancel', onPointerCancel)
+          window.removeEventListener('blur', onBlur)
+          window.removeEventListener('scroll', onScroll, true)
+          document.body.classList.remove('marquee-selecting')
+          marquee_cleanup_ref.current = null
+          setMarquee(null)
+        }
+        const onPointerMove = (move_event: PointerEvent) => {
+          update(move_event.clientX, move_event.clientY)
+        }
+        const onPointerUp = (up_event: PointerEvent) => {
+          update(up_event.clientX, up_event.clientY)
+          if (!moved) {
+            setSelectedIds([])
+            setSelectionAnchorId(null)
+          }
+          cleanup()
+        }
+        const onPointerCancel = () => {
+          cleanup()
+        }
+        const onBlur = () => {
+          cleanup()
+        }
+        const onScroll = () => {
+          cleanup()
+        }
+        marquee_cleanup_ref.current = cleanup
+        window.addEventListener('pointermove', onPointerMove)
+        window.addEventListener('pointerup', onPointerUp)
+        window.addEventListener('pointercancel', onPointerCancel)
+        window.addEventListener('blur', onBlur)
+        window.addEventListener('scroll', onScroll, true)
+      }
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      marquee_cleanup_ref.current?.()
+    }
+  }, [item.id])
+
 
   const createTextlineAfter = async (
     after: Item | undefined,
@@ -492,7 +797,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   return (
     <div
+      ref={page_ref}
       className="page-full"
+      tabIndex={-1}
+      onKeyDown={handlePageKeyDown}
       onDragEnter={handlePageDragOver}
       onDragOver={handlePageDragOver}
       onDrop={handlePageDrop}
@@ -557,6 +865,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onSplit={handleSplit}
               onBackspace={handleBackspace}
               onSlashCommand={handleSlashCommand}
+              onMoveBlock={direction => focusAdjacentBlock(direction, child)}
+              onSelectBlock={() => selectOne(child.id)}
             />
           ) : (
             module.Block !== undefined
@@ -581,6 +891,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onDragEndBlock={() => setDropIndicator(null)}
               drop_position={drop_indicator?.id === child.id ? drop_indicator.position : null}
               drag_anywhere={child.role === 'image'}
+              selected={selected_ids.includes(child.id)}
+              onSelect={() => selectOne(child.id)}
               onDuplicate={() => { void duplicateBlock(child) }}
               onMove={direction => moveBlock(child, direction)}
               onDelete={() => { void deleteBlock(child.id) }}
@@ -601,6 +913,18 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           onSelect={target => {
             setPicker(false)
             void handlePickedItem(target)
+          }}
+        />
+      )}
+
+      {marquee !== null && (
+        <div
+          className="marquee-box"
+          style={{
+            left: marquee.left,
+            top: marquee.top,
+            width: marquee.width,
+            height: marquee.height,
           }}
         />
       )}

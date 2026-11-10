@@ -81,6 +81,8 @@ export function CreateRpcClient({
     getItems: async ids => zItems.parse(await request('getItems', ids)),
     updateItem: async payload => zMessage.parse(await request('updateItem', payload)),
     deleteItem: async payload => zMessage.parse(await request('deleteItem', payload)),
+    deleteItems: async ids => zItems.parse(await request('deleteItems', ids)),
+    restoreItems: async items => zItems.parse(await request('restoreItems', items)),
     listing: async payload => zItems.parse(await request('listing', payload)),
     getItemByUnityName: async payload => zItem.nullable().parse(
       await request('getItemByUnityName', payload),
