@@ -3,7 +3,7 @@ import type { DB } from '../db/client'
 import type { BlobService } from '../blob/service'
 import type { ConfigStore } from '../config/store'
 import {
-  createItem, deleteItem, getItem, getItemByUnityName, getItems,
+  convertTextBlock, createItem, deleteItem, getItem, getItemByUnityName, getItems,
   updateItem,
 } from '../repo/items'
 import { listItems } from '../repo/item-listing'
@@ -39,6 +39,9 @@ export function CreateActionRoute({
     },
     deleteItems: ids => db.transaction(tx => deleteItems(tx, ids)),
     restoreItems: snapshots => db.transaction(tx => restoreItems(tx, snapshots)),
+    convertTextBlock: ({ id, role, title }) => db.transaction(tx => (
+      convertTextBlock(tx, id, role, title)
+    )),
     listing: payload => listItems(db, payload),
     getItemByUnityName: ({ unity_name }) => getItemByUnityName(db, unity_name),
     newTag: ({ title, attributes }) => db.transaction(tx => newTag(tx, title, attributes)),

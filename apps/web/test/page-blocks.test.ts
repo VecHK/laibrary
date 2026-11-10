@@ -24,11 +24,11 @@ describe('block actions', () => {
   it('allows duplicating leaves and disallows containers', () => {
     expect(blockCanDuplicate(item('page'))).toBe(false)
     expect(blockCanDuplicate(item('database'))).toBe(false)
-    expect(blockCanDuplicate(item('textline'))).toBe(true)
+    expect(blockCanDuplicate(item('text-block'))).toBe(true)
     expect(blockCanDuplicate(item('entity'))).toBe(true)
     expect(blockCanDuplicate(item('itemlink'))).toBe(true)
     expect(blockCanDelete(item('page'))).toBe(false)
     expect(blockCanDelete(item('database'))).toBe(false)
-    expect(blockCanDelete(item('textline'))).toBe(true)
+    expect(blockCanDelete(item('text-block'))).toBe(true)
   })
 })

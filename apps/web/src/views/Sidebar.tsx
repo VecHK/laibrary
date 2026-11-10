@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
+import { isTextBlockRole } from '@laibrary/types'
 import { zDatabaseAttributes } from '@laibrary/types'
 import type { HashRoute } from '../lib/hash-router'
 import { openItem } from '../lib/open-item'
@@ -232,7 +233,7 @@ export function Sidebar({
       order_index,
     })
     await ctx.api.rpc.addItem({
-      role: 'textline',
+      role: 'text-block',
       title: '',
       parent_id: page.id,
       order_index: 1,
@@ -325,7 +326,7 @@ export function Sidebar({
         filter_rules: [{ name: 'parent', input: item.id, logic: 'and' }],
       })
       const has_content = child_list.some(child => (
-        child.role !== 'textline' || child.title.trim().length !== 0
+        !isTextBlockRole(child.role) || child.title.trim().length !== 0
       ))
       if (has_content) {
         ctx.showError('当前没有回收站；请先移动或清空子项，再删除这个容器。')
@@ -356,7 +357,7 @@ export function Sidebar({
     try {
       const page = await ctx.api.rpc.addItem({ role: 'page', title: '新页面' })
       await ctx.api.rpc.addItem({
-        role: 'textline',
+        role: 'text-block',
         title: '',
         parent_id: page.id,
         order_index: 1,

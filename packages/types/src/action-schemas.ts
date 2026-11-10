@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ActionName } from './rpc-client'
 import {
-  zAddItemForm, zItem, zItemID, zKind, zRole, zUnityName, zUpdateItemForm,
+  zAddItemForm, zItem, zItemID, zKind, zRole, zTextBlockRole, zUnityName, zUpdateItemForm,
 } from './schemas'
 
 const zRuleBase = {
@@ -82,6 +82,11 @@ export const zActionPayloads = {
   deleteItem: z.object({ id: zItemID }).strict(),
   deleteItems: z.array(zItemID).max(1000),
   restoreItems: z.array(zItem).max(1000),
+  convertTextBlock: z.object({
+    id: zItemID,
+    role: zTextBlockRole,
+    title: z.string().max(100_000).optional(),
+  }).strict(),
   listing: zListingParams,
   getItemByUnityName: z.object({ unity_name: zUnityName }).strict(),
   newTag: z.object({

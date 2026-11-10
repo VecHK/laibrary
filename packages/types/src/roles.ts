@@ -1,7 +1,10 @@
 export type Role =
   | 'page'
   | 'entity'
-  | 'textline'
+  | 'text-block'
+  | 'text-heading-1'
+  | 'text-heading-2'
+  | 'text-heading-3'
   | 'image'
   | 'file'
   | 'itemlink'
@@ -43,6 +46,41 @@ export interface ImageAttributes extends FileAttributes {
   readonly caption?: string | undefined
 }
 
+export type TextBlockRole =
+  | 'text-block'
+  | 'text-heading-1'
+  | 'text-heading-2'
+  | 'text-heading-3'
+
+export const __TEXT_BLOCK_ROLES__ = [
+  'text-block',
+  'text-heading-1',
+  'text-heading-2',
+  'text-heading-3',
+] as const satisfies readonly TextBlockRole[]
+
+export function isTextBlockRole(role: Role): role is TextBlockRole {
+  return role === 'text-block' || role === 'text-heading-1' || role === 'text-heading-2' || role === 'text-heading-3'
+}
+
+export type HeadingRole = 'text-heading-1' | 'text-heading-2' | 'text-heading-3'
+
+export function isHeadingRole(role: Role): role is HeadingRole {
+  return role === 'text-heading-1' || role === 'text-heading-2' || role === 'text-heading-3'
+}
+
+export function headingLevelOfRole(role: Role): 1 | 2 | 3 | null {
+  if (role === 'text-heading-1') {
+    return 1
+  } else if (role === 'text-heading-2') {
+    return 2
+  } else if (role === 'text-heading-3') {
+    return 3
+  } else {
+    return null
+  }
+}
+
 export type DatabaseFieldType = 'string' | 'number' | 'unity_name'
 
 export interface DatabaseFieldDef {
@@ -66,7 +104,10 @@ export interface ItemLinkAttributes extends Readonly<Record<string, unknown>> {
 export interface RoleAttributes {
   page: PageAttributes
   entity: Readonly<Record<string, unknown>>
-  textline: Readonly<Record<string, unknown>>
+  'text-block': Readonly<Record<string, unknown>>
+  'text-heading-1': Readonly<Record<string, unknown>>
+  'text-heading-2': Readonly<Record<string, unknown>>
+  'text-heading-3': Readonly<Record<string, unknown>>
   image: ImageAttributes
   file: FileAttributes
   itemlink: ItemLinkAttributes

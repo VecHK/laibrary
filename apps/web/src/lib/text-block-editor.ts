@@ -1,4 +1,8 @@
-export type SlashCommandId = 'text' | 'image' | 'file' | 'itemlink' | 'manga'
+import type { HeadingRole, Role } from '@laibrary/types'
+
+export type SlashCommandId =
+  | 'text' | 'heading-1' | 'heading-2' | 'heading-3'
+  | 'image' | 'file' | 'itemlink' | 'manga'
 export type SlashGroupId = 'suggested' | 'basic'
 
 export type SlashCommand = {
@@ -16,8 +20,32 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     label: '文本',
     description: '普通文本块',
     group: 'basic',
-    role: 'textline',
-    aliases: ['text', 'wenben', 'textline'],
+    role: 'text-block',
+    aliases: ['text', 'wenben', 'text-block'],
+  },
+  {
+    id: 'heading-1',
+    label: '一级标题',
+    description: '大号标题',
+    group: 'basic',
+    role: 'text-heading-1',
+    aliases: ['h1', 'heading1', 'heading-1', 'biaoti1'],
+  },
+  {
+    id: 'heading-2',
+    label: '二级标题',
+    description: '中号标题',
+    group: 'basic',
+    role: 'text-heading-2',
+    aliases: ['h2', 'heading2', 'heading-2', 'biaoti2'],
+  },
+  {
+    id: 'heading-3',
+    label: '三级标题',
+    description: '小号标题',
+    group: 'basic',
+    role: 'text-heading-3',
+    aliases: ['h3', 'heading3', 'heading-3', 'biaoti3'],
   },
   {
     id: 'image',
@@ -98,7 +126,7 @@ export function filterSlashCommands(query: string): readonly SlashCommand[] {
   }
 }
 
-export function splitTextLine(
+export function splitTextBlock(
   value: string,
   selection_start: number,
   selection_end: number,
@@ -111,7 +139,7 @@ export function splitTextLine(
   }
 }
 
-export function mergeTextLine(
+export function mergeTextBlock(
   previous: string,
   current: string,
 ): { title: string, caret: number } {
@@ -119,4 +147,44 @@ export function mergeTextLine(
     title: `${previous}${current}`,
     caret: previous.length,
   }
+}
+
+
+export function detectHeadingShortcut(
+  value: string,
+  role: Role,
+): { role: HeadingRole, title: string } | null {
+  const match = /^(#{1,3}) /.exec(value)
+  if (role !== 'text-block' || match === null) {
+    return null
+  } else {
+    const rest = value.slice(match[0].length)
+    if (rest.trim().length !== 0) {
+      return null
+    } else if (match[1] === '#') {
+      return { role: 'text-heading-1', title: '' }
+    } else if (match[1] === '##') {
+      return { role: 'text-heading-2', title: '' }
+    } else {
+      return { role: 'text-heading-3', title: '' }
+    }
+  }
+}
+
+export function splitTextBlocks(text: string): readonly string[] {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  const blocks: string[] = []
+  let blank_run = 0
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      blank_run += 1
+    } else {
+      if (blocks.length !== 0 && blank_run >= 2) {
+        blocks.push('')
+      }
+      blocks.push(line)
+      blank_run = 0
+    }
+  }
+  return blocks
 }

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Item, ItemID } from '@laibrary/types'
-import { zItemID } from '@laibrary/types'
+import type { Item, ItemID, TextBlockRole } from '@laibrary/types'
+import { zItemID, isTextBlockRole } from '@laibrary/types'
 import { createFileItem, createImageItem, mediaKindForFile } from '../lib/blob'
 import { orderAfter } from '../lib/order'
 import { blockCanDelete, blockCanDuplicate } from '../lib/page-blocks'
-import { mergeTextLine, type SlashCommand } from '../lib/textline-editor'
+import { mergeTextBlock, splitTextBlocks, type SlashCommand } from '../lib/text-block-editor'
 import { boxFromPoints, boxesIntersect, type Box } from '../lib/marquee'
 import type { ItemModule, ViewerCtx } from './types'
 import { PageBlock } from './page-block'
@@ -13,13 +13,13 @@ import { usePageTitle } from './page-title'
 import { ItemPicker } from './item-picker'
 import { ItemIconButton } from './item-icon'
 import {
-  TextLineBlock,
-  type TextLineFocusRequest,
-} from './textline'
+  TextBlock,
+  type TextBlockFocusRequest,
+} from './text-block'
 
 type FocusRequest = {
   id: ItemID
-  request: TextLineFocusRequest
+  request: TextBlockFocusRequest
 }
 
 type UploadKind = 'image' | 'file'
@@ -246,7 +246,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const index = list.findIndex(child => child.id === current.id)
     const target = direction === 'up' ? list[index - 1] : list[index + 1]
     if (target !== undefined) {
-      if (target.role === 'textline') {
+      if (isTextBlockRole(target.role)) {
         focusBlock(target.id, direction === 'up' ? 'end' : 0)
       } else {
         selectOne(target.id)
@@ -304,7 +304,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         if (
           auto_focus_first &&
           list.length === 1 &&
-          first?.role === 'textline' &&
+          first !== undefined && isTextBlockRole(first.role) &&
           first.title.length === 0
         ) {
           focusBlock(first.id, 0)
@@ -432,14 +432,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }, [item.id])
 
 
-  const createTextlineAfter = async (
+  const createTextBlockAfter = async (
     after: Item | undefined,
     title_text: string = '',
   ): Promise<Item | null> => {
     const order_index = after === undefined ? appendOrder() : orderAfterItem(after)
     try {
       const created = await ctx.api.rpc.addItem({
-        role: 'textline',
+        role: 'text-block',
         title: title_text,
         parent_id: item.id,
         order_index,
@@ -453,13 +453,47 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const createTextBlocksAfter = async (
+    current: Item,
+    titles: readonly string[],
+  ): Promise<void> => {
+    let previous = current
+    let last: Item | null = null
+    let failed = false
+    for (const title of titles) {
+      if (failed) {
+        // 保持已经创建成功的 block，后续由 reload 校正。
+      } else {
+        const order_index = orderAfterItem(previous)
+        try {
+          const created = await ctx.api.rpc.addItem({
+            role: 'text-block',
+            title,
+            parent_id: item.id,
+            order_index,
+          })
+          insertChild(created)
+          previous = created
+          last = created
+        } catch (err) {
+          failed = true
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
+        }
+      }
+    }
+    if (last !== null) {
+      focusBlock(last.id, last.title.length === 0 ? 0 : 'end')
+    }
+  }
+
   const handleSplit = async (current: Item, left: string, right: string) => {
     const order_index = orderAfterItem(current)
     patchChild(current.id, { title: left })
     try {
       await ctx.api.rpc.updateItem({ id: current.id, data: { title: left } })
       const created = await ctx.api.rpc.addItem({
-        role: 'textline',
+        role: 'text-block',
         title: right,
         parent_id: item.id,
         order_index,
@@ -477,8 +511,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const index = list.findIndex(child => child.id === current.id)
     const previous = index > 0 ? list[index - 1] : undefined
 
-    if (previous?.role === 'textline') {
-      const merged = mergeTextLine(previous.title, value)
+    if (previous !== undefined && isTextBlockRole(previous.role)) {
+      const merged = mergeTextBlock(previous.title, value)
       try {
         await ctx.api.rpc.updateItem({ id: previous.id, data: { title: merged.title } })
         await ctx.api.rpc.deleteItem({ id: current.id })
@@ -500,9 +534,9 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
-  const createTextlineAtEnd = () => {
+  const createTextBlockAtEnd = () => {
     const last = children_ref.current[children_ref.current.length - 1]
-    void createTextlineAfter(last)
+    void createTextBlockAfter(last)
   }
 
   const deleteBlock = async (block_id: ItemID) => {
@@ -601,7 +635,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       await ctx.api.rpc.deleteItem({ id: placeholder.id })
       removeChild(placeholder.id)
       insertChild(created)
-      await createTextlineAfter(created)
+      await createTextBlockAfter(created)
     } catch (err) {
       ctx.showError(err instanceof Error ? err.message : String(err))
       void loadChildren()
@@ -621,7 +655,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       })
       if (placeholder === null) {
         insertChild(created)
-        await createTextlineAfter(created)
+        await createTextBlockAfter(created)
       } else {
         await replacePlaceholder(placeholder, created)
       }
@@ -673,7 +707,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
 
     if (first_created !== null) {
-      await createTextlineAfter(anchor ?? first_created)
+      await createTextBlockAfter(anchor ?? first_created)
     }
   }
 
@@ -716,12 +750,61 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       }
     }
     if (last_created !== undefined) {
-      await createTextlineAfter(last_created)
+      await createTextBlockAfter(last_created)
+    }
+  }
+
+  const insertDroppedText = async (
+    text: string,
+    target_id: ItemID | null,
+    position: 'before' | 'after',
+  ): Promise<void> => {
+    const blocks = splitTextBlocks(text)
+    const list = children_ref.current
+    const target_index = target_id === null
+      ? -1
+      : list.findIndex(child => child.id === target_id)
+    const insert_index = target_index >= 0
+      ? target_index + (position === 'after' ? 1 : 0)
+      : list.length
+    let previous = list[insert_index - 1]
+    const next = list[insert_index]
+    let last: Item | null = null
+    let failed = false
+    for (const title of blocks) {
+      if (failed) {
+        // 保持已经成功的 block，后续由 reload 校正。
+      } else {
+        const order_index = previous === undefined
+          ? (next === undefined ? appendOrder() : next.order_index - 1)
+          : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+        try {
+          const created = await ctx.api.rpc.addItem({
+            role: 'text-block',
+            title,
+            parent_id: item.id,
+            order_index,
+          })
+          insertChild(created)
+          previous = created
+          last = created
+        } catch (err) {
+          failed = true
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
+        }
+      }
+    }
+    if (last !== null) {
+      focusBlock(last.id, last.title.length === 0 ? 0 : 'end')
     }
   }
 
   const handlePageDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes('Files')) {
+    if (
+      event.dataTransfer.types.includes('Files') ||
+      event.dataTransfer.types.includes('text/plain')
+    ) {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'copy'
     }
@@ -729,21 +812,33 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const handlePageDrop = (event: React.DragEvent<HTMLDivElement>) => {
     setDropIndicator(null)
+    const block = event.target instanceof Element
+      ? event.target.closest<HTMLElement>('.page-block')
+      : null
+    const parsed_id = block === null
+      ? null
+      : zItemID.safeParse(Number(block.dataset['blockId']))
+    const position = block !== null && event.clientY < block.getBoundingClientRect().top + block.getBoundingClientRect().height / 2
+      ? 'before'
+      : 'after'
     if (event.dataTransfer.files.length !== 0) {
       event.preventDefault()
       const files = [...event.dataTransfer.files]
-      const block = event.target instanceof Element
-        ? event.target.closest<HTMLElement>('.page-block')
-        : null
-      const parsed_id = block === null
-        ? null
-        : zItemID.safeParse(Number(block.dataset['blockId']))
       if (block !== null && parsed_id !== null && parsed_id.success) {
-        const rect = block.getBoundingClientRect()
-        const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
         void insertDroppedFiles(files, parsed_id.data, position)
       } else {
         void insertDroppedFiles(files, null, 'after')
+      }
+    } else if (
+      event.dataTransfer.types.includes('text/plain') &&
+      !event.dataTransfer.types.includes('text/laibrary-block')
+    ) {
+      event.preventDefault()
+      const text = event.dataTransfer.getData('text/plain')
+      if (block !== null && parsed_id !== null && parsed_id.success) {
+        void insertDroppedText(text, parsed_id.data, position)
+      } else {
+        void insertDroppedText(text, null, 'after')
       }
     }
   }
@@ -757,6 +852,22 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const convertTextBlock = async (
+    target: Item,
+    role: TextBlockRole,
+    title: string,
+  ): Promise<void> => {
+    try {
+      const converted = await ctx.api.rpc.convertTextBlock({ id: target.id, role, title })
+      patchChild(converted.id, { role: converted.role, title: converted.title })
+      focusBlock(converted.id, 'end')
+      ctx.refreshSidebar()
+    } catch (err) {
+      ctx.showError(err instanceof Error ? err.message : String(err))
+      void loadChildren()
+    }
+  }
+
   const handleSlashCommand = (command: SlashCommand, placeholder: Item) => {
     if (command.id === 'image' || command.id === 'file') {
       openUpload(command.id, placeholder)
@@ -765,6 +876,12 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       setPicker(true)
     } else if (command.id === 'manga') {
       void insertManga(placeholder)
+    } else if (command.id === 'heading-1') {
+      void convertTextBlock(placeholder, 'text-heading-1', '')
+    } else if (command.id === 'heading-2') {
+      void convertTextBlock(placeholder, 'text-heading-2', '')
+    } else if (command.id === 'heading-3') {
+      void convertTextBlock(placeholder, 'text-heading-3', '')
     }
   }
 
@@ -782,7 +899,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       })
       if (placeholder === null) {
         insertChild(created)
-        await createTextlineAfter(created)
+        await createTextBlockAfter(created)
       } else {
         await replacePlaceholder(placeholder, created)
       }
@@ -792,7 +909,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const addAfter = (block: Item) => {
-    void createTextlineAfter(block)
+    void createTextBlockAfter(block)
   }
 
   return (
@@ -847,14 +964,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         {children === null ? (
           <div className="loading">加载中…</div>
         ) : children.length === 0 ? (
-          <button className="empty-editor" onClick={createTextlineAtEnd}>
+          <button className="empty-editor" onClick={createTextBlockAtEnd}>
             <span>点击开始输入</span>
             <small>按 / 插入 block</small>
           </button>
         ) : children.map((child, index) => {
           const module = ctx.modules.resolve(child)
-          const content = child.role === 'textline' ? (
-            <TextLineBlock
+          const content = isTextBlockRole(child.role) ? (
+            <TextBlock
               item={child}
               ctx={ctx}
               is_active={active_block_id === child.id}
@@ -867,6 +984,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onSlashCommand={handleSlashCommand}
               onMoveBlock={direction => focusAdjacentBlock(direction, child)}
               onSelectBlock={() => selectOne(child.id)}
+              onConvertHeading={(target, role, title) => { void convertTextBlock(target, role, title) }}
+              onPasteBlocks={(target, blocks) => { void createTextBlocksAfter(target, blocks) }}
             />
           ) : (
             module.Block !== undefined

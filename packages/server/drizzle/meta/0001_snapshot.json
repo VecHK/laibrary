@@ -1,0 +1,518 @@
+{
+  "id": "658a294d-4ed2-403d-a7ab-813076ea2b6b",
+  "prevId": "00629fec-449e-4293-a998-0bd7d929f357",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.blobs": {
+      "name": "blobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime": {
+          "name": "mime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "create_date": {
+          "name": "create_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "blobs_create_date_idx": {
+          "name": "blobs_create_date_idx",
+          "columns": [
+            {
+              "expression": "create_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.items": {
+      "name": "items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'page'"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unity_name": {
+          "name": "unity_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "attributes": {
+          "name": "attributes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "tags": {
+          "name": "tags",
+          "type": "bigint[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "order_index": {
+          "name": "order_index",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "blob_id": {
+          "name": "blob_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "create_date": {
+          "name": "create_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "update_date": {
+          "name": "update_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "items_parent_idx": {
+          "name": "items_parent_idx",
+          "columns": [
+            {
+              "expression": "parent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_role_idx": {
+          "name": "items_role_idx",
+          "columns": [
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_kind_idx": {
+          "name": "items_kind_idx",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_tags_gin_idx": {
+          "name": "items_tags_gin_idx",
+          "columns": [
+            {
+              "expression": "tags",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "items_create_date_idx": {
+          "name": "items_create_date_idx",
+          "columns": [
+            {
+              "expression": "create_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_update_date_idx": {
+          "name": "items_update_date_idx",
+          "columns": [
+            {
+              "expression": "update_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_blob_id_idx": {
+          "name": "items_blob_id_idx",
+          "columns": [
+            {
+              "expression": "blob_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_target_id_idx": {
+          "name": "items_target_id_idx",
+          "columns": [
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_tag_title_unique_idx": {
+          "name": "items_tag_title_unique_idx",
+          "columns": [
+            {
+              "expression": "lower(\"title\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"items\".\"role\" = 'tag'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "items_unity_name_unique_idx": {
+          "name": "items_unity_name_unique_idx",
+          "columns": [
+            {
+              "expression": "unity_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"items\".\"unity_name\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "items_parent_id_items_id_fk": {
+          "name": "items_parent_id_items_id_fk",
+          "tableFrom": "items",
+          "tableTo": "items",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "items_blob_id_blobs_id_fk": {
+          "name": "items_blob_id_blobs_id_fk",
+          "tableFrom": "items",
+          "tableTo": "blobs",
+          "columnsFrom": [
+            "blob_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "items_role_check": {
+          "name": "items_role_check",
+          "value": "\n    \"items\".\"role\" IN ('page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3', 'image', 'file', 'itemlink', 'tag', 'database')\n  "
+        },
+        "items_entity_kind_check": {
+          "name": "items_entity_kind_check",
+          "value": "\n    (\"items\".\"role\" = 'entity') = (\"items\".\"kind\" IS NOT NULL)\n  "
+        },
+        "items_itemlink_target_check": {
+          "name": "items_itemlink_target_check",
+          "value": "\n    (\"items\".\"role\" = 'itemlink') = (\"items\".\"target_id\" IS NOT NULL)\n  "
+        },
+        "items_blob_role_check": {
+          "name": "items_blob_role_check",
+          "value": "\n    (\"items\".\"role\" IN ('file', 'image')) = (\"items\".\"blob_id\" IS NOT NULL)\n  "
+        },
+        "items_attributes_object_check": {
+          "name": "items_attributes_object_check",
+          "value": "\n    jsonb_typeof(\"items\".\"attributes\") = 'object'\n  "
+        },
+        "items_tags_no_null_check": {
+          "name": "items_tags_no_null_check",
+          "value": "\n    array_position(\"items\".\"tags\", NULL) IS NULL\n  "
+        },
+        "items_order_index_finite_check": {
+          "name": "items_order_index_finite_check",
+          "value": "\n    abs(\"items\".\"order_index\") < 'Infinity'::double precision\n  "
+        },
+        "items_kind_format_check": {
+          "name": "items_kind_format_check",
+          "value": "\n    \"items\".\"kind\" IS NULL OR \"items\".\"kind\" ~ '^[a-z][a-z0-9._-]{0,63}$'\n  "
+        },
+        "items_unity_name_format_check": {
+          "name": "items_unity_name_format_check",
+          "value": "\n    \"items\".\"unity_name\" IS NULL OR \"items\".\"unity_name\" ~ '^[a-z][a-z0-9._-]{0,199}$'\n  "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.thumbnails": {
+      "name": "thumbnails",
+      "schema": "",
+      "columns": {
+        "image_id": {
+          "name": "image_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blob_id": {
+          "name": "blob_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "create_date": {
+          "name": "create_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "thumbnails_blob_id_idx": {
+          "name": "thumbnails_blob_id_idx",
+          "columns": [
+            {
+              "expression": "blob_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "thumbnails_image_id_items_id_fk": {
+          "name": "thumbnails_image_id_items_id_fk",
+          "tableFrom": "thumbnails",
+          "tableTo": "items",
+          "columnsFrom": [
+            "image_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "thumbnails_blob_id_blobs_id_fk": {
+          "name": "thumbnails_blob_id_blobs_id_fk",
+          "tableFrom": "thumbnails",
+          "tableTo": "blobs",
+          "columnsFrom": [
+            "blob_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "thumbnails_image_id_size_pk": {
+          "name": "thumbnails_image_id_size_pk",
+          "columns": [
+            "image_id",
+            "size"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "thumbnails_size_check": {
+          "name": "thumbnails_size_check",
+          "value": "\n    \"thumbnails\".\"size\" IN (96, 384, 800, 1440)\n  "
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

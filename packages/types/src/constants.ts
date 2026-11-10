@@ -6,6 +6,7 @@ export const __RPC_ACTION_NAMES__ = [
   'deleteItem',
   'deleteItems',
   'restoreItems',
+  'convertTextBlock',
   'listing',
   'getItemByUnityName',
   'newTag',

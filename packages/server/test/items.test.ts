@@ -5,7 +5,7 @@ import {
 import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
 import {
-  createItem, deleteItem, getItem, getItemByUnityName, getItems,
+  convertTextBlock, createItem, deleteItem, getItem, getItemByUnityName, getItems,
   updateItem,
 } from '../src/repo/items'
 
@@ -134,17 +134,17 @@ describe('itemlink', () => {
 })
 
 describe('inline item token', () => {
-  it('textline 写入时校验目标，更新时拒绝自指', async () => {
+  it('text-block 写入时校验目标，更新时拒绝自指', async () => {
     const target = await page('target')
     const line = await createItem(db, {
-      role: 'textline',
+      role: 'text-block',
       title: `hello [[item:${target.id}]]`,
       parent_id: target.id,
     }, blobs)
     expect(line.title).toContain('[[item:')
 
     await expect(createItem(db, {
-      role: 'textline', title: 'bad [[item:999999]]',
+      role: 'text-block', title: 'bad [[item:999999]]',
     }, blobs)).rejects.toThrow('not found')
 
     await expect(updateItem(db, line.id, {
@@ -165,7 +165,7 @@ describe('tree / tags / database', () => {
       .rejects.toThrow('后代')
     await expect(deleteItem(db, parent.id)).rejects.toThrow('子项')
     await expect(createItem(db, {
-      role: 'page', parent_id: (await createItem(db, { role: 'textline' }, blobs)).id,
+      role: 'page', parent_id: (await createItem(db, { role: 'text-block' }, blobs)).id,
     }, blobs)).rejects.toThrow('不允许有子项')
   })
 
@@ -214,5 +214,41 @@ describe('tree / tags / database', () => {
     const b = await page('b')
     const items = await getItems(db, [b.id, a.id])
     expect(items.map(item => item.title)).toEqual(['b', 'a'])
+  })
+})
+
+
+describe('text block roles', () => {
+  it('converts text blocks in place without changing id', async () => {
+    const page_item = await page('text roles')
+    const block = await createItem(db, {
+      role: 'text-block',
+      title: 'body',
+      parent_id: page_item.id,
+    }, blobs)
+    const heading = await convertTextBlock(db, block.id, 'text-heading-1', 'Title')
+    expect(heading.id).toBe(block.id)
+    expect(heading.role).toBe('text-heading-1')
+    expect(heading.title).toBe('Title')
+    const body = await convertTextBlock(db, block.id, 'text-block', undefined)
+    expect(body.id).toBe(block.id)
+    expect(body.role).toBe('text-block')
+    expect(body.title).toBe('Title')
+  })
+
+  it('rejects conversion of non-text roles', async () => {
+    const page_item = await page('text role reject')
+    await expect(convertTextBlock(db, page_item.id, 'text-heading-1', undefined)).rejects.toThrow('文本块')
+  })
+
+  it('creates heading roles directly', async () => {
+    const page_item = await page('heading roles')
+    const heading = await createItem(db, {
+      role: 'text-heading-2',
+      title: 'Heading',
+      parent_id: page_item.id,
+    }, blobs)
+    expect(heading.role).toBe('text-heading-2')
+    expect((await getItem(db, heading.id)).role).toBe('text-heading-2')
   })
 })

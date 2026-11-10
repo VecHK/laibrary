@@ -27,7 +27,7 @@ CREATE TABLE items (
 
 ### 约束
 
-- `role IN ('page','entity','textline','image','file','itemlink','tag','database')`
+- `role IN ('page','entity','text-block','text-heading-1','text-heading-2','text-heading-3','image','file','itemlink','tag','database')`
 - `(role='entity') = (kind IS NOT NULL)`
 - `(role='itemlink') = (target_id IS NOT NULL)`
 - `(role IN ('file','image')) = (blob_id IS NOT NULL)`
@@ -42,7 +42,10 @@ CREATE TABLE items (
 |---|---|---|---|
 | page | NULL | 自由 record，可含 `icon` | 页面/block 容器 |
 | entity | **非空** | 自由 record | 插件/复合内容 |
-| textline | NULL | 自由 record（预留） | title 是内容 |
+| text-block | NULL | 自由 record（预留） | title 是内容 |
+| text-heading-1 | NULL | 空 record | 一级标题，与 text-block 共用输入组件 |
+| text-heading-2 | NULL | 空 record | 二级标题 |
+| text-heading-3 | NULL | 空 record | 三级标题 |
 | image | NULL | `{ filename, display_width?, align?, caption? }` | blob 必须是图片；新建默认 display_width=480px，范围 80–1440px |
 | file | NULL | `{ filename }` | 任意 blob |
 | itemlink | NULL | 自由 record，可含 `icon` | target_id |
@@ -78,7 +81,7 @@ type FieldDef = { name: string; type: 'string' | 'number' | 'unity_name' }
 ## 5. 树
 
 - 单父；`parent_id=null` 为根；兄弟按 `order_index` 升序，`id` 决胜。
-- 只有 `page`、`entity`、`database` 允许有子项；textline/image/file/itemlink/tag 是叶子。
+- 只有 `page`、`entity`、`database` 允许有子项；text-block/image/file/itemlink/tag 是叶子。
 - 追加：`max(order_index)+1`；插中间由客户端给小数/中点。
 - 移动：updateItem 改 parent/order；服务端沿父链检测环（上限 1000）。
 - 删除：有子项拒绝；tag 删除时清扫 `tags` 数组；image 删除级联 thumbnails；blob 不立即删。

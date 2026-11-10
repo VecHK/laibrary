@@ -1,7 +1,7 @@
 import type { Role } from '@laibrary/types'
 import type { ItemModule, ItemModuleRegistry } from './types'
 import { __PAGE_MODULE__ } from './page'
-import { __TEXTLINE_MODULE__ } from './textline'
+import { __TEXT_BLOCK_MODULE__ } from './text-block'
 import { __IMAGE_MODULE__ } from './image'
 import { __FILE_MODULE__ } from './file'
 import { __ITEMLINK_MODULE__ } from './itemlink'
@@ -13,7 +13,10 @@ import { __MANGA_MODULE__ } from './manga'
 const role_modules: Record<Role, ItemModule> = {
   page: __PAGE_MODULE__,
   entity: __ENTITY_MODULE__,
-  textline: __TEXTLINE_MODULE__,
+  'text-block': __TEXT_BLOCK_MODULE__,
+  'text-heading-1': __TEXT_BLOCK_MODULE__,
+  'text-heading-2': __TEXT_BLOCK_MODULE__,
+  'text-heading-3': __TEXT_BLOCK_MODULE__,
   image: __IMAGE_MODULE__,
   file: __FILE_MODULE__,
   itemlink: __ITEMLINK_MODULE__,

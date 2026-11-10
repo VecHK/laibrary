@@ -70,7 +70,7 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 
 ## 当前实现边界（v2 POC）
 
-已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/textline/image/file/entity/manga、`/` 插入菜单与 Enter 拆行、设置页。
+已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/text-block/text-heading-1/2/3/image/file/entity/manga、`/` 插入菜单与 Enter 拆行、设置页。
 
 暂未实现：富文本/marks、大纲/反链、文件柜/SMB、database 高级视图、派生数据库、Gāng、Public Space、鉴权/多用户、Electron、200 万导入。
 
@@ -138,7 +138,7 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 
 ## 术语
 
-统一使用 [glossary.md](glossary.md)：Item、Role、Kind、Entity、Page、Textline、Itemlink、Tag、Database、Unity Name、Blob、BlobID、Thumbnail、Opener、Inline Itemlink、Bootstrap/Runtime Config、Gāng、Public Space、File Cabinet。
+统一使用 [glossary.md](glossary.md)：Item、Role、Kind、Entity、Page、Text Block、Text Heading、Itemlink、Tag、Database、Unity Name、Blob、BlobID、Thumbnail、Opener、Inline Itemlink、Bootstrap/Runtime Config、Gāng、Public Space、File Cabinet。
 
 ## 路线图
 

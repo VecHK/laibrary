@@ -1,9 +1,9 @@
 import { eq, inArray, isNull, max, sql } from 'drizzle-orm'
 import type {
-  AddItemForm, BlobID, DatabaseFieldDef, Item, ItemID, Role, UpdateItemForm,
+  AddItemForm, BlobID, DatabaseFieldDef, Item, ItemID, Role, TextBlockRole, UpdateItemForm,
 } from '@laibrary/types'
 import {
-  __SYSTEM_UNITY_PREFIX__, as, itemBuildRowValidator, itemCheckAttributes, extractItemTokenIds,
+  __SYSTEM_UNITY_PREFIX__, as, isTextBlockRole, itemBuildRowValidator, itemCheckAttributes, extractItemTokenIds,
   zDatabaseAttributes, zKind, zRole, zUnityName,
 } from '@laibrary/types'
 import type { DbLike } from '../db/client'
@@ -218,7 +218,7 @@ export async function createItem(
   const tags = await validateTagIds(db, form.tags ?? [])
 
   const title = form.title ?? ''
-  if (role === 'textline') {
+  if (isTextBlockRole(role)) {
     await validateInlineTokens(db, title)
   }
 
@@ -317,7 +317,7 @@ export async function updateItem(
     : prev.tags
 
   const title = data.title ?? prev.title
-  if (role === 'textline' && (data.title !== undefined || data.attributes !== undefined)) {
+  if (isTextBlockRole(role) && (data.title !== undefined || data.attributes !== undefined)) {
     await validateInlineTokens(db, title, id)
   }
 
@@ -342,6 +342,33 @@ export async function updateItem(
     const code = errorsPgCode(err)
     if (code === '23503') {throw errorsConflict('父项或引用无效')}
     throw err
+  }
+}
+
+export async function convertTextBlock(
+  db: DbLike,
+  id: ItemID,
+  role: TextBlockRole,
+  title: string | undefined,
+): Promise<Item> {
+  const prev = await getItemRowForUpdate(db, id)
+  if (!isTextBlockRole(prev.role)) {
+    throw errorsBadRequest(`item(id=${id}) 不是文本块，不能转换 role`)
+  } else if (!isTextBlockRole(role)) {
+    throw errorsBadRequest(`role=${role} 不是文本块`)
+  } else {
+    const next_title = title ?? prev.title
+    if (title !== undefined) {
+      await validateInlineTokens(db, next_title, id)
+    }
+    const updated = await db
+      .update(items)
+      .set({ role, title: next_title, update_date: new Date() })
+      .where(eq(items.id, id))
+      .returning()
+    const row = updated[0]
+    if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
+    return await getWireItem(db, row.id)
   }
 }
 

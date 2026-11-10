@@ -316,14 +316,14 @@ button {
   cursor: pointer;
 }
 
-/* textline */
-.textline-row {
+/* text block */
+.text-block-row {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.textline-input {
+.text-block-input {
   flex: 1;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -333,25 +333,25 @@ button {
   background: transparent;
 }
 
-.textline-input:hover {
+.text-block-input:hover {
   background: #efefed;
 }
 
-.textline-input:focus {
+.text-block-input:focus {
   background: #fff;
   border-color: #d8d8d5;
 }
 
-.textline-tools {
+.text-block-tools {
   display: none;
   gap: 2px;
 }
 
-.textline-row:hover .textline-tools {
+.text-block-row:hover .text-block-tools {
   display: inline-flex;
 }
 
-.textline-card {
+.text-block-card {
   font-size: 14px;
 }
 
@@ -634,14 +634,14 @@ button {
   min-width: 0;
 }
 
-.textline-block {
+.text-block {
   padding: 4px 8px;
   min-height: 28px;
   border-radius: 4px;
   cursor: text;
 }
 
-.textline-view {
+.text-block-view {
   white-space: pre-wrap;
   line-height: 1.6;
   font-size: 15px;
@@ -651,13 +651,13 @@ button {
   color: #b8b7b4;
 }
 
-.textline-edit-row {
+.text-block-edit-row {
   display: flex;
   align-items: flex-start;
   gap: 4px;
 }
 
-.textline-textarea {
+.text-block-textarea {
   flex: 1;
   width: 100%;
   min-height: 28px;
@@ -1002,7 +1002,7 @@ button {
   color: #37352f;
 }
 
-.textline-block {
+.text-block {
   position: relative;
   padding: 2px 6px;
   margin-left: -6px;
@@ -1010,22 +1010,22 @@ button {
   min-height: 30px;
 }
 
-.textline-block.is-active {
+.text-block.is-active {
   background: #fff;
   box-shadow: inset 2px 0 0 #d9d9d6;
 }
 
-.textline-view {
+.text-block-view {
   min-height: 26px;
   padding: 2px 0;
   cursor: text;
 }
 
-.textline-placeholder {
+.text-block-placeholder {
   color: #c2c1be;
 }
 
-.textline-textarea {
+.text-block-textarea {
   display: block;
   width: 100%;
   min-height: 26px;
@@ -1039,7 +1039,7 @@ button {
   word-break: break-word;
 }
 
-.textline-block.is-active .textline-textarea::placeholder {
+.text-block.is-active .text-block-textarea::placeholder {
   color: #c2c1be;
 }
 
@@ -1399,26 +1399,26 @@ button {
   background: #efefed;
 }
 
-.textline-block {
+.text-block {
   padding: 2px 0;
   margin-left: 0;
   min-height: 30px;
   border-radius: 0;
 }
 
-.textline-block.is-active {
+.text-block.is-active {
   background: transparent;
   box-shadow: none;
 }
 
-.textline-view {
+.text-block-view {
   min-height: 28px;
   padding: 0;
   font-size: 16px;
   line-height: 1.5;
 }
 
-.textline-textarea {
+.text-block-textarea {
   display: block;
   width: 100%;
   min-height: 30px;
@@ -1432,11 +1432,11 @@ button {
   overflow: hidden;
 }
 
-.textline-block.is-active .textline-textarea::placeholder {
+.text-block.is-active .text-block-textarea::placeholder {
   color: #c2c1be;
 }
 
-.textline-block.is-empty {
+.text-block.is-empty {
   min-height: 30px;
 }
 
@@ -2569,7 +2569,7 @@ button {
   opacity: 1;
 }
 
-.textline-view {
+.text-block-view {
   user-select: text;
 }
 
@@ -2588,4 +2588,41 @@ body.marquee-selecting {
 
 .block-gutter {
   user-select: none;
+}
+
+/* text block typography: active and inactive must share the same line box */
+.text-block {
+  padding: 2px 0;
+  min-height: 30px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.text-block-view,
+.text-block-textarea {
+  min-height: 28px;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  box-sizing: border-box;
+}
+
+.text-block.text-heading-1 {
+  font-size: 30px;
+  line-height: 39px;
+  font-weight: 600;
+}
+
+.text-block.text-heading-2 {
+  font-size: 24px;
+  line-height: 31px;
+  font-weight: 600;
+}
+
+.text-block.text-heading-3 {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
 }

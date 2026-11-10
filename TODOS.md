@@ -2,7 +2,7 @@
 
 ## Trash（回收站）
 
-当前 `deleteItem` 是永久删除，页面/数据库容器没有级联删除；侧边栏的 Remove 在本轮只允许删除没有实质内容的页面（仅有空 textline）或空 database。
+当前 `deleteItem` 是永久删除，页面/数据库容器没有级联删除；侧边栏的 Remove 在本轮只允许删除没有实质内容的页面（仅有空 text-block）或空 database。
 
 后续实现方向：
 

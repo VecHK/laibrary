@@ -1,4 +1,5 @@
 import type { Item, ItemID } from '@laibrary/types'
+import { isTextBlockRole } from '@laibrary/types'
 import type { ViewerCtx } from '../modules/types'
 
 const MAX_LINK_DEPTH = 5
@@ -46,7 +47,7 @@ async function openItemDepth(
     } else {
       ctx.navigate(item.id)
     }
-  } else if (item.role === 'textline') {
+  } else if (isTextBlockRole(item.role)) {
     if (item.parent_id !== null) {
       ctx.navigate(item.parent_id)
     } else {

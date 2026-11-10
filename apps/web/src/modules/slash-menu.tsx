@@ -1,12 +1,19 @@
 import { useEffect, useRef } from 'react'
-import type { SlashCommand, SlashCommandId } from '../lib/textline-editor'
-import { groupSlashCommands } from '../lib/textline-editor'
+import type { SlashCommand, SlashCommandId } from '../lib/text-block-editor'
+import { groupSlashCommands } from '../lib/text-block-editor'
 
 function CommandIcon({ id }: { id: SlashCommandId }) {
   if (id === 'text') {
     return (
       <svg viewBox="0 0 20 20" aria-hidden="true">
         <path d="M4 5V4h12v1M10 4v12M7 16h6" />
+      </svg>
+    )
+  } else if (id === 'heading-1' || id === 'heading-2' || id === 'heading-3') {
+    const level = id === 'heading-1' ? '1' : (id === 'heading-2' ? '2' : '3')
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <text x="4" y="15" fontSize="10" fontWeight="700" fill="currentColor">H{level}</text>
       </svg>
     )
   } else if (id === 'image') {

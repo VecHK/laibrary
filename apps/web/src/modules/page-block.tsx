@@ -71,7 +71,10 @@ export function PageBlock({
         }
       }}
       onDragOver={ev => {
-        if (ev.dataTransfer.types.includes('Files')) {
+        const has_files = ev.dataTransfer.types.includes('Files')
+        const has_block = ev.dataTransfer.types.includes('text/laibrary-block')
+        const has_text = ev.dataTransfer.types.includes('text/plain') && !has_block
+        if (has_files || has_text) {
           ev.preventDefault()
           ev.dataTransfer.dropEffect = 'copy'
           const rect = ev.currentTarget.getBoundingClientRect()
@@ -97,9 +100,11 @@ export function PageBlock({
         onDragEndBlock()
       }}
       onDrop={ev => {
-        if (ev.dataTransfer.types.includes('Files')) {
-          // 文件交给 PageFull 统一上传。
-        } else {
+        const has_block = ev.dataTransfer.types.includes('text/laibrary-block')
+        const has_text = ev.dataTransfer.types.includes('text/plain')
+        if (ev.dataTransfer.types.includes('Files') || (has_text && !has_block)) {
+          // 文件和外部文本交给 PageFull 统一处理。
+        } else if (has_block) {
           ev.preventDefault()
           const dragged = zItemID.safeParse(Number(ev.dataTransfer.getData('text/laibrary-block')))
           const rect = ev.currentTarget.getBoundingClientRect()
@@ -109,6 +114,8 @@ export function PageBlock({
           } else {
             onDragEndBlock()
           }
+        } else {
+          ev.preventDefault()
         }
       }}
     >

@@ -5,11 +5,12 @@
 | 术语 | 英文 / 代码 | 定义 |
 |---|---|---|
 | **Item（条目）** | Item | 系统的唯一公共实体。一行 `items` 记录 = id + role + kind + title + attributes + tags + 树位置 + blob/target + 日期。一切用户数据都是 Item。 |
-| **Role（角色）** | `role` | Item 的**存储形态**。闭集：`page` / `entity` / `textline` / `image` / `file` / `itemlink` / `tag` / `database`。服务端理解 role，并用它决定校验、blob、树、tag 等行为。 |
+| **Role（角色）** | `role` | Item 的**存储形态**。闭集：`page` / `entity` / `text-block` / `text-heading-1` / `text-heading-2` / `text-heading-3` / `image` / `file` / `itemlink` / `tag` / `database`。服务端理解 role，并用它决定校验、blob、树、tag 等行为。 |
 | **Kind（类型）** | `kind` | Item 的**语义类型/打开方式**。开集、只有 `role='entity'` 允许且必须有值，例如 `manga`、`novel`。服务端只存字符串和索引，不理解具体 kind；客户端 kind 模块决定外观和 opener。 |
 | **Entity（实体内容）** | `role='entity'` | 带 kind 的复合/插件内容。例子：漫画 = `entity` + `kind=manga` + 若干 `image` 子项。在编辑器中独占一行，可拖拽。 |
 | **Page（页面）** | `role='page'` | 普通页面/block 容器。永远没有 kind，永远用页面编辑器打开。 |
-| **Textline（文本块）** | `role='textline'` | 纯文本 block；内容即 `title`。没有富文本 marks；支持 inline itemlink token。 |
+| **Text Block（文本块）** | `role='text-block'` | 纯文本 block；内容即 `title`。没有富文本 marks；支持 inline itemlink token。 |
+| **Text Heading（文本标题）** | `role='text-heading-1'` 等 | 文本编辑器专用的 heading block；与 text-block 共用输入组件，仅字号与快捷转换不同。 |
 | **Image（图片）** | `role='image'` | 指向一个 blob 的图片 Item；MIME/尺寸来自 blob。 |
 | **File（附件）** | `role='file'` | 指向一个 blob 的普通附件 Item。文件柜不是这个。 |
 | **Itemlink（链接块）** | `role='itemlink'` | 指向另一个 Item 的块级链接；`target_id` 是 ItemID。点击走统一 open resolver。 |
@@ -23,11 +24,11 @@
 | **Thumb Size** | `ThumbSize` | `96 \| 384 \| 800 \| 1440`；最大边，保持比例，不放大。 |
 | **Kind Module（类型模块）** | kind registry | 客户端注册表：`kind → { inlineIcon, inlineMeta, Card, Full }`。决定 entity 的外观和打开方式。 |
 | **Opener（打开器）** | open resolver | 点击 Item 时的统一解析：itemlink 跟随、page 打开页面、entity 按 kind、image/file/database/tag 按 role；找不到提示“没有合适的打开方式”。 |
-| **Inline Itemlink（行内链接）** | `[[item:123]]` | textline 中的纯文本链接 token；不是富文本。可写 `[[item:123\|标签]]`，`\[[` 转义。 |
+| **Inline Itemlink（行内链接）** | `[[item:123]]` | text-* block 中的纯文本链接 token；不是富文本。可写 `[[item:123\|标签]]`，`\[[` 转义。 |
 | **System Config（系统配置）** | `sys.config` | 一个 `database` Item，`unity_name='sys.config'`；配置行是 `page` Item，`unity_name='sys.config.*'`，attributes 存 value/type。 |
 | **Bootstrap Config（启动配置）** | `.env` / env | 连接 DB、端口、存储路径、密钥等**启动前**必须知道的值；只来自环境变量/根 `.env`，不是 Item。 |
 | **Runtime Config（运行时配置）** | ConfigStore | 来自 `sys.config` Item 的可编辑设置；热更新，不接受 env 覆盖。 |
-| **Block（块）** | block | page/entity 的有序子项。textline/image/file/itemlink/entity 都可以是 block；支持拖拽排序。 |
+| **Block（块）** | block | page/entity 的有序子项。text-block/image/file/itemlink/entity 都可以是 block；支持拖拽排序。 |
 | **Open-with（打开方式）** | kind/role opener | 见 Opener。未来 Electron 可接系统 open-with；Web 只做下载/查看。 |
 | **Gāng（纲）** | Gang | 未来的信息治序引擎；当前未实现。 |
 | **Public Space** | — | 未来的共享空间；当前未实现。 |

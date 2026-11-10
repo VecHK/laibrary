@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   zAddItemForm, zBlobID, zDatabaseAttributes, zImageAttributes, zPageAttributes, zUnityName,
   itemBuildRowValidator, itemCheckAttributes,
+  zTextBlockRole,
 } from '../src/schemas'
 import { zActionPayloads } from '../src/action-schemas'
 
@@ -11,6 +12,16 @@ describe('role / kind / blob', () => {
     expect(zAddItemForm.safeParse({ role: 'page', kind: 'manga' }).success).toBe(false)
     expect(zAddItemForm.safeParse({ role: 'entity' }).success).toBe(false)
     expect(zAddItemForm.safeParse({ role: 'entity', kind: 'manga' }).success).toBe(true)
+  })
+
+  it('text roles 使用 text- 前缀，旧 textline 不再接受', () => {
+    expect(zAddItemForm.safeParse({ role: 'text-block' }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'text-heading-1' }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'text-heading-2' }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'text-heading-3' }).success).toBe(true)
+    expect(zAddItemForm.safeParse({ role: 'textline' }).success).toBe(false)
+    expect(zTextBlockRole.safeParse('text-heading-2').success).toBe(true)
+    expect(zTextBlockRole.safeParse('heading-2').success).toBe(false)
   })
 
   it('file/image 必须提供 blob_id，其他 role 不允许', () => {
@@ -103,6 +114,18 @@ describe('attributes and actions', () => {
     }).success).toBe(true)
     expect(zActionPayloads.updateConfig.safeParse({
       key: 'Bad Key', value: 24,
+    }).success).toBe(false)
+  })
+})
+
+
+describe('convertTextBlock payload', () => {
+  it('accepts text roles and optional title', () => {
+    expect(zActionPayloads.convertTextBlock.safeParse({
+      id: 1, role: 'text-heading-1', title: '',
+    }).success).toBe(true)
+    expect(zActionPayloads.convertTextBlock.safeParse({
+      id: 1, role: 'page',
     }).success).toBe(false)
   })
 })

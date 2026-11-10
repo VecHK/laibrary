@@ -14,7 +14,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座。结构化数据、
 | `role` | 存储形态，闭集，见 §2 |
 | `kind` | 语义类型/opener，仅 entity 非空 |
 | `unity_name` | 可选全局唯一机器名，`sys.` 保留 |
-| `title` | 显示名；textline 的内容；tag 的名字 |
+| `title` | 显示名；text-block 的内容；tag 的名字 |
 | `attributes` | JSONB，随 role 变化 |
 | `tags` | tag item id 数组，无 FK，清扫式维护 |
 | `parent_id` | 单父树 |
@@ -25,7 +25,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座。结构化数据、
 
 数据库约束：
 
-- `role ∈ ('page','entity','textline','image','file','itemlink','tag','database')`
+- `role ∈ ('page','entity','text-block','text-heading-1','text-heading-2','text-heading-3','image','file','itemlink','tag','database')`
 - `(role='entity') ⇔ (kind IS NOT NULL)`
 - `(role='itemlink') ⇔ (target_id IS NOT NULL)`
 - `(role IN ('file','image')) ⇔ (blob_id IS NOT NULL)`
@@ -37,7 +37,10 @@ Laibrary 是一个“一切皆 Item”的个人数据基座。结构化数据、
 |---|---|---|
 | `page` | 必须 NULL | 普通页面/block 容器 |
 | `entity` | 必须非空 | 带 kind 的复合/插件内容，如漫画 |
-| `textline` | NULL | 纯文本 block |
+| `text-block` | NULL | 纯文本 block |
+| `text-heading-1` | NULL | 一级标题，文本编辑器专用 |
+| `text-heading-2` | NULL | 二级标题，文本编辑器专用 |
+| `text-heading-3` | NULL | 三级标题，文本编辑器专用 |
 | `image` | NULL | 图片 Item，指向 blob |
 | `file` | NULL | 普通附件 Item，指向 blob |
 | `itemlink` | NULL | 指向另一个 Item 的链接块 |
@@ -51,7 +54,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 ## 3. Itemlink 与 inline token
 
 - 块级：`role='itemlink'`，`target_id` 列；写入时校验目标存在且非自己；目标删除后允许悬空。
-- 行内：textline 的 title 中的 `[[item:123]]` / `[[item:123|标签]]`；纯文本 token，不是富文本；`\[[` 转义；服务端写入时解析校验。
+- 行内：text-block 的 title 中的 `[[item:123]]` / `[[item:123|标签]]`；纯文本 token，不是富文本；`\[[` 转义；服务端写入时解析校验。
 - 统一 open resolver：itemlink 跟随、page 打开页面、entity 按 kind、image/file/database/tag 按 role；找不到提示“没有合适的打开方式”。
 - 不做反向链接、不做大纲缩进。
 
@@ -94,7 +97,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 ## 8. API
 
 - `POST /action`：`{ action, payload }`，成功 JSON，错误 `{ message, code, issues? }`。
-- Actions：`addItem/getItem/getItems/updateItem/deleteItem/deleteItems/restoreItems/listing/getItemByUnityName/newTag/updateTag/deleteTag/searchTag/getTagByTitle/getConfig/updateConfig`。
+- Actions：`addItem/getItem/getItems/updateItem/deleteItem/deleteItems/restoreItems/convertTextBlock/listing/getItemByUnityName/newTag/updateTag/deleteTag/searchTag/getTagByTitle/getConfig/updateConfig`。
 - 文件路由：`POST /blob`、`GET/HEAD /blob/:id`；缩略图 `GET /thumb/:image_id?size=`。
 - CORS 开放；鉴权属未来。
 - 详细规格见 [docs/item/04-api.md](docs/item/04-api.md)。
@@ -103,12 +106,14 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 
 - React 19 + Vite；hash 路由 `#/plaza`、`#/item/:id`、`#/settings`。
 - 连接页设置 API baseurl（localStorage）。
-- page block 编辑器：textline / image / file / itemlink / entity；无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行；hover gutter + block 菜单；文本编辑不触发整页刷新。
+- page block 编辑器：text-block / text-heading-1/2/3 / image / file / itemlink / entity；所有 text-* 共用 TextBlock 输入组件。无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行；hover gutter + block 菜单；文本编辑不触发整页刷新。
 - 页面视觉：正文 `708px` 居中、标题 40px；无每行白框、无常驻删除按钮；左侧 hover 显示 `＋` 和拖拽把手。
-- Block 焦点：textline 首/末视觉行上下键跨 block；Esc/handle 进入选中模式；只在 `.page-full` 外 marquee 框选，内容区内保留普通文本选择；Shift+Arrow 扩展；Del/Backspace 批量删除；不使用 Shift+Click/Cmd+Click 多选。
+- Block 焦点：text-block 首/末视觉行上下键跨 block；Esc/handle 进入选中模式；只在 `.page-full` 外 marquee 框选，内容区内保留普通文本选择；Shift+Arrow 扩展；Del/Backspace 批量删除；不使用 Shift+Click/Cmd+Click 多选。
 - 批量删除 undo/redo 使用 `deleteItems`/`restoreItems` 快照与显式原 ID 恢复；仅页面内存历史，不做 Trash。
 - 图片 block：左右拖拽等比缩放（宽度 80–1440px）、Alignment/Caption/Expand/Download 浮层、双击/Expand 打开 lightbox；放大预加载更高缩略图，缩小不请求更小图。
-- 页面支持从 OS 拖入文件：`image/*` 创建 image，其余创建 file；多文件保持顺序，按目标 block 的 before/after 插入（空白处追加到末尾），并补一条空 textline。
+- 页面支持从 OS 拖入文件：`image/*` 创建 image，其余创建 file；多文件保持顺序，按目标 block 的 before/after 插入（空白处追加到末尾），并补一条空 text-block。
+- 外部纯文本拖入/粘贴：每个非空行一个 text-block；内容行之间 1 个空行忽略，>=2 个空行生成一个空 block；开头/结尾空行忽略；空行按 trim 判断。
+- `# ` / `## ` / `### ` 只在空 text-block 行首转换为 text-heading-1/2/3；`#### ` 不转换。
 - 新建 image 默认 `display_width=480px`；后续可左右拖拽调整。
 - 拖拽 block 显示 before/after 插入线；图片任意位置可作为拖拽源。
 - OS 文件拖入页面时只显示 block 插入线，不再显示整页覆盖提示；在 block 上放下不会被 block 拖拽逻辑吞掉。
@@ -117,7 +122,9 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 - `+`：page 新建子页面，database 新建条目，itemlink 仅在 target 为 page 时新建子页面。
 - Trash 尚未实现，Remove 当前为永久删除；非空容器暂不允许 Remove。详见根目录 [TODOS.md](TODOS.md)。
 - 图标：page/database/itemlink 的 emoji 存在 `attributes.icon`，不新增列；缺省回退 📄/🗄️/🔗。
-- textline：纯文本、inline token、Enter 新 block、Backspace 删除空行；无富文本。
+- text-block：纯文本、inline token、Enter 新 block、Backspace 删除空行；无富文本。
+- text-heading-1/2/3：与 text-block 共用输入组件；Shift+Enter 块内换行；字号 30/24/20。
+- role 数据迁移：旧 `textline` 已迁移为 `text-block`；旧 API role 不再接受。
 - image/file：blob/thumb URL；file 下载。
 - entity：整行 block；插件 inlineIcon；kind registry；manga reader。
 - 漫画：entity kind=manga，image children；RTL/LTR、懒加载、本地进度。
@@ -147,7 +154,7 @@ docs             规格、愿景、名词表、方法论、重构记录
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
 - Server 使用闭包工厂（BlobStore/BlobService/ConfigStore/ThumbnailService）与组合根；Web 使用显式 session/tag store/module registry，无 RPC/标签模块单例。
 - 漫画阅读器；局域网可运行。
-- 测试：server 42、types 18、web 34；lint/typecheck/build 通过。
+- 测试：server 45、types 20、web 40；lint/typecheck/build 通过。
 
 待做：
 
@@ -168,7 +175,7 @@ docs             规格、愿景、名词表、方法论、重构记录
 | unity_name | 全局唯一、不可变；sys. 保留；database 字段类型 |
 | 配置 | bootstrap 在 .env；runtime 在 sys.config Item；runtime 无 env 覆盖 |
 | 关系 | itemlink target_id + inline token；无 links 表；反链延后 |
-| 富文本 | v2 不做；textline 纯文本 block + token |
+| 富文本 | v2 不做；text-block 纯文本 block + token |
 | 数据迁移 | 不做；v2 清库重建 |
 | 权限 | v2 单用户、无鉴权；LAN 使用 |
 

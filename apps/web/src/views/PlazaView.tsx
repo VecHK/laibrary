@@ -10,7 +10,7 @@ type Filter = {
 }
 
 const FILTERS: Filter[] = [
-  { name: '全部', roles: ['page', 'entity', 'textline', 'image', 'file', 'database'] },
+  { name: '全部', roles: ['page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3', 'image', 'file', 'database'] },
   { name: '页面', roles: ['page'] },
   { name: '漫画', kind: 'manga' },
   { name: '图片', roles: ['image'] },

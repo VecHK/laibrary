@@ -30,13 +30,13 @@ describe('deleteItems / restoreItems', () => {
   it('物理删除子树并保持恢复后的 item id', async () => {
     const page = await createItem(db, { role: 'page', title: 'page' }, blobs)
     const first = await createItem(db, {
-      role: 'textline',
+      role: 'text-block',
       title: 'one',
       parent_id: page.id,
       order_index: 1,
     }, blobs)
     const second = await createItem(db, {
-      role: 'textline',
+      role: 'text-block',
       title: 'two',
       parent_id: page.id,
       order_index: 2,

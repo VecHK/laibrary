@@ -34,14 +34,14 @@
 - `entity`：kind 非空；page：kind null。
 - 无 `src`/`cover_src`/`image_width`/`image_height`。
 
-## 3. Actions（16）
+## 3. Actions（17）
 
 ### addItem
 ```text
 { role, kind?, unity_name?, title?, attributes?, tags?, parent_id?, order_index?, blob_id?, target_id? }
 → Item
 ```
-约束见 [03-repository.md](03-repository.md)。role 创建后不可变。
+约束见 [03-repository.md](03-repository.md)。role 创建后不可变；唯一例外是 text-* role 之间通过 `convertTextBlock` 转换。
 
 ### getItem / getItems
 ```text
@@ -73,6 +73,12 @@ ItemID[] → Item[]
 Item[] → Item[]
 ```
 按 parent 从浅到深插回，显式使用快照中的原 Item ID/create_date/update_date/所有字段；ID 冲突、parent/blob 不存在、唯一键冲突会报错。不恢复 thumbnails，图片缩略图懒生成。
+
+### convertTextBlock
+```text
+{ id, role: 'text-block' | 'text-heading-1' | 'text-heading-2' | 'text-heading-3', title? } → Item
+```
+仅允许 text-* role 之间转换；同 ID；title 可选并与 role 原子更新；非文本 role 400。
 
 ### listing
 ```text

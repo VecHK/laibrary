@@ -1,5 +1,5 @@
 import type {
-  AddItemForm, BlobMeta, ConfigSnapshot, Item, ItemID, UpdateItemForm,
+  AddItemForm, BlobMeta, ConfigSnapshot, Item, ItemID, TextBlockRole, UpdateItemForm,
 } from './roles'
 import type { ListingParams } from './filter'
 
@@ -10,6 +10,11 @@ export interface ActionTable {
   updateItem(payload: { id: ItemID; data: UpdateItemForm }): Promise<{ message: 'done' }>
   deleteItem(payload: { id: ItemID }): Promise<{ message: 'done' }>
   deleteItems(ids: readonly ItemID[]): Promise<Item[]>
+  convertTextBlock(payload: {
+    id: ItemID
+    role: TextBlockRole
+    title?: string | undefined
+  }): Promise<Item>
   restoreItems(items: readonly Item[]): Promise<Item[]>
   listing(payload: ListingParams): Promise<Item[]>
   getItemByUnityName(payload: { unity_name: string }): Promise<Item | null>

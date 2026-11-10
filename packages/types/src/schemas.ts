@@ -26,7 +26,11 @@ export const zKind = z
   .regex(/^[a-z][a-z0-9._-]*$/, 'kind 只能使用小写字母、数字、._-')
 
 export const zRole = z.enum([
-  'page', 'entity', 'textline', 'image', 'file', 'itemlink', 'tag', 'database',
+  'page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3',
+  'image', 'file', 'itemlink', 'tag', 'database',
+])
+export const zTextBlockRole = z.enum([
+  'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3',
 ])
 export const zThumbSize = z.custom<ThumbSize>(value => (
   typeof value === 'number' && __THUMBNAIL_SIZES__.some(size => size === value)
@@ -111,7 +115,10 @@ export const zPageAttributes = zAnyAttributes.superRefine((attributes, ctx) => {
 export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]>> = {
   page: zPageAttributes,
   entity: zAnyAttributes,
-  textline: zAnyAttributes,
+  'text-block': zAnyAttributes,
+  'text-heading-1': zAnyAttributes,
+  'text-heading-2': zAnyAttributes,
+  'text-heading-3': zAnyAttributes,
   image: zImageAttributes,
   file: zFileAttributes,
   itemlink: zPageAttributes,

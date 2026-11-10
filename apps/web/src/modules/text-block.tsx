@@ -1,24 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
-import { parseItemTokens } from '@laibrary/types'
+import { headingLevelOfRole, parseItemTokens } from '@laibrary/types'
 import { InlineText } from './inline-text'
 import { caretAtVisualEdge } from '../lib/caret-edge'
 import {
-  detectSlashQuery, filterSlashCommands, splitTextLine,
+  detectHeadingShortcut, detectSlashQuery, filterSlashCommands, splitTextBlock, splitTextBlocks,
   type SlashCommand,
-} from '../lib/textline-editor'
+} from '../lib/text-block-editor'
 import type { ItemModule, ViewerCtx } from './types'
 import { SlashMenu } from './slash-menu'
 
-export type TextLineFocusRequest = {
+export type TextBlockFocusRequest = {
   caret: number | 'end'
 }
 
-export type TextLineBlockProps = {
+export type TextBlockProps = {
   item: Item
   ctx: ViewerCtx
   is_active: boolean
-  focus_request: TextLineFocusRequest | null
+  focus_request: TextBlockFocusRequest | null
   onFocusHandled: () => void
   onActivate: () => void
   onTitleChange: (id: ItemID, title: string) => void
@@ -27,9 +27,11 @@ export type TextLineBlockProps = {
   onSlashCommand?: (command: SlashCommand, item: Item) => void
   onMoveBlock?: (direction: 'up' | 'down', item: Item) => void
   onSelectBlock?: (item: Item) => void
+  onConvertHeading?: (item: Item, role: 'text-heading-1' | 'text-heading-2' | 'text-heading-3', title: string) => void
+  onPasteBlocks?: (item: Item, blocks: readonly string[]) => void
 }
 
-function TextLineEditor({
+function TextBlockEditor({
   item,
   ctx,
   is_active,
@@ -42,7 +44,9 @@ function TextLineEditor({
   onSlashCommand,
   onMoveBlock,
   onSelectBlock,
-}: TextLineBlockProps) {
+  onConvertHeading,
+  onPasteBlocks,
+}: TextBlockProps) {
   const [value, setValue] = useState(item.title)
   const [slash_query, setSlashQuery] = useState<string | null>(null)
   const [selected_index, setSelectedIndex] = useState(0)
@@ -140,7 +144,7 @@ function TextLineEditor({
       await ctx.api.rpc.updateItem({ id: item.id, data: { title } })
     })
     write_chain_ref.current = run.catch(error => {
-      console.warn('textline save queue', error)
+      console.warn('text-block save queue', error)
     })
     run.catch(err => {
       if (alive_ref.current) {
@@ -200,7 +204,7 @@ function TextLineEditor({
       const node = textarea_ref.current
       if (node !== null) {
         busy_ref.current = true
-        const { left, right } = splitTextLine(value_ref.current, node.selectionStart, node.selectionEnd)
+        const { left, right } = splitTextBlock(value_ref.current, node.selectionStart, node.selectionEnd)
         cancelTimer()
         value_ref.current = left
         setValue(left)
@@ -225,42 +229,79 @@ function TextLineEditor({
 
   const inactive_view = (
     <div
-      className={value.length === 0 ? 'textline-block is-empty' : 'textline-block'}
+      className={value.length === 0 ? `text-block ${item.role} is-empty` : `text-block ${item.role}`}
       onClick={activateIfNoSelection}
     >
-      <div className="textline-view">
+      <div className="text-block-view">
         {value.length === 0 ? null : <InlineText text={value} ctx={ctx} />}
       </div>
     </div>
   )
 
   return is_active ? (
-    <div className="textline-block is-active">
+    <div className={`text-block ${item.role} is-active`}>
       <textarea
         ref={textarea_ref}
-        className="textline-textarea"
+        className="text-block-textarea"
         value={value}
         placeholder="按 / 插入内容"
         rows={1}
         spellCheck={false}
         onChange={ev => {
           const next = ev.target.value
-          value_ref.current = next
-          setValue(next)
-          onTitleChange(item.id, next)
-          scheduleSave(next)
-          const query = onSlashCommand === undefined
-            ? null
-            : detectSlashQuery(next, ev.target.selectionStart)
-          setSlashQuery(query)
-          if (query !== null) {
-            const rect = ev.currentTarget.getBoundingClientRect()
-            const above = rect.top - 12
-            const below = window.innerHeight - rect.bottom - 12
-            const open_up = below < 280 && above > below
-            setMenuPlacement(open_up ? 'up' : 'down')
-            setMenuMaxHeight(Math.min(320, Math.max(120, open_up ? above : below)))
-            setSelectedIndex(0)
+          const shortcut = detectHeadingShortcut(next, item.role)
+          if (shortcut !== null && onConvertHeading !== undefined) {
+            cancelTimer()
+            value_ref.current = shortcut.title
+            setValue(shortcut.title)
+            onTitleChange(item.id, shortcut.title)
+            setSlashQuery(null)
+            void onConvertHeading(item, shortcut.role, shortcut.title)
+          } else {
+            value_ref.current = next
+            setValue(next)
+            onTitleChange(item.id, next)
+            scheduleSave(next)
+            const query = onSlashCommand === undefined
+              ? null
+              : detectSlashQuery(next, ev.target.selectionStart)
+            setSlashQuery(query)
+            if (query !== null) {
+              const rect = ev.currentTarget.getBoundingClientRect()
+              const above = rect.top - 12
+              const below = window.innerHeight - rect.bottom - 12
+              const open_up = below < 280 && above > below
+              setMenuPlacement(open_up ? 'up' : 'down')
+              setMenuMaxHeight(Math.min(320, Math.max(120, open_up ? above : below)))
+              setSelectedIndex(0)
+            }
+          }
+        }}
+        onPaste={ev => {
+          const text = ev.clipboardData.getData('text/plain')
+          if (onPasteBlocks !== undefined && (text.includes('\n') || text.includes('\r'))) {
+            ev.preventDefault()
+            const blocks = splitTextBlocks(text)
+            const first = blocks[0]
+            if (first !== undefined) {
+              const node = ev.currentTarget
+              const start = node.selectionStart
+              const end = node.selectionEnd
+              const next = value.slice(0, start) + first + value.slice(end)
+              cancelTimer()
+              value_ref.current = next
+              setValue(next)
+              onTitleChange(item.id, next)
+              scheduleSave(next)
+              const rest = blocks.slice(1)
+              if (rest.length !== 0) {
+                onPasteBlocks(item, rest)
+              }
+              window.requestAnimationFrame(() => {
+                const caret = start + first.length
+                node.setSelectionRange(caret, caret)
+              })
+            }
           }
         }}
         onFocus={() => { skip_blur_save_ref.current = false }}
@@ -361,14 +402,15 @@ function TextLineEditor({
   ) : inactive_view
 }
 
-export function TextLineBlock(props: TextLineBlockProps) {
-  return <TextLineEditor {...props} />
+export function TextBlock(props: TextBlockProps) {
+  return <TextBlockEditor {...props} />
 }
 
-function TextLineCard({ item }: { item: Item }) {
+function TextBlockCard({ item }: { item: Item }) {
   const tokens = parseItemTokens(item.title)
+  const level = headingLevelOfRole(item.role)
   return (
-    <div className="card textline-card">
+    <div className="card text-block-card">
       <div className="card-title">
         {tokens.length === 0
           ? '(空行)'
@@ -376,16 +418,16 @@ function TextLineCard({ item }: { item: Item }) {
             ? <span key={index}>{token.text}</span>
             : <span key={index} className="inline-link-text">@{token.label ?? token.target_id}</span>)}
       </div>
-      <div className="card-sub">文本</div>
+      <div className="card-sub">{level === null ? '文本' : `${level} 级标题`}</div>
     </div>
   )
 }
 
-function TextLineFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
-  const [focus, setFocus] = useState<TextLineFocusRequest | null>({ caret: 'end' })
+function TextBlockFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
+  const [focus, setFocus] = useState<TextBlockFocusRequest | null>({ caret: 'end' })
   return (
     <div className="panel">
-      <TextLineBlock
+      <TextBlock
         item={item}
         ctx={ctx}
         is_active
@@ -398,10 +440,10 @@ function TextLineFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   )
 }
 
-export const __TEXTLINE_MODULE__: ItemModule = {
-  role: 'textline',
+export const __TEXT_BLOCK_MODULE__: ItemModule = {
+  role: 'text-block',
   Presenter: {
-    card: item => <TextLineCard item={item} />,
-    full: (item, ctx) => <TextLineFull item={item} ctx={ctx} />,
+    card: item => <TextBlockCard item={item} />,
+    full: (item, ctx) => <TextBlockFull item={item} ctx={ctx} />,
   },
 }
