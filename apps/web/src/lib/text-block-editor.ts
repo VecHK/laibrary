@@ -1,7 +1,8 @@
-import type { HeadingRole, Role } from '@laibrary/types'
+import type { HeadingRole, ListKind, Role, TextBlockRole } from '@laibrary/types'
 
 export type SlashCommandId =
   | 'text' | 'heading-1' | 'heading-2' | 'heading-3'
+  | 'list-bullet' | 'list-number' | 'list-alpha' | 'todo'
   | 'page' | 'page-open' | 'image' | 'file' | 'itemlink' | 'manga'
 export type SlashGroupId = 'suggested' | 'basic'
 
@@ -64,6 +65,38 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     group: 'suggested',
     role: 'page',
     aliases: ['page-open', '新页面打开', 'xinyemian-open', 'subpage-open'],
+  },
+  {
+    id: 'list-bullet',
+    label: '无序列表',
+    description: '圆点列表项',
+    group: 'basic',
+    role: 'text-list',
+    aliases: ['list', 'ul', 'bullet', 'liebiao'],
+  },
+  {
+    id: 'list-number',
+    label: '数字列表',
+    description: '1. 2. 3. 列表项',
+    group: 'basic',
+    role: 'text-list',
+    aliases: ['ol', 'number', 'numbered', 'shuzi'],
+  },
+  {
+    id: 'list-alpha',
+    label: '字母列表',
+    description: 'a. b. c. 列表项',
+    group: 'basic',
+    role: 'text-list',
+    aliases: ['alpha', 'abc', 'zimu'],
+  },
+  {
+    id: 'todo',
+    label: '待办事项',
+    description: '可勾选的列表项',
+    group: 'basic',
+    role: 'text-todo',
+    aliases: ['todo', 'checkbox', 'task', 'gouxuan'],
   },
   {
     id: 'image',
@@ -210,4 +243,31 @@ export function splitTextBlocks(text: string): readonly string[] {
     }
   }
   return blocks
+}
+
+
+export type ListShortcut =
+  | { readonly role: 'text-list', readonly list_kind: ListKind, readonly title: '' }
+  | { readonly role: 'text-todo', readonly checked: false, readonly title: '' }
+
+export function detectListShortcut(value: string, role: Role): ListShortcut | null {
+  if (role !== 'text-block') {
+    return null
+  } else if (value.startsWith('- ') && value.slice(2).trim().length === 0) {
+    return { role: 'text-list', list_kind: 'bullet', title: '' }
+  } else if (value.startsWith('1. ') && value.slice(3).trim().length === 0) {
+    return { role: 'text-list', list_kind: 'number', title: '' }
+  } else if (value.startsWith('a. ') && value.slice(3).trim().length === 0) {
+    return { role: 'text-list', list_kind: 'alpha', title: '' }
+  } else if ((value.startsWith('[] ') || value.startsWith('【】 ')) && value.trim().length === 2) {
+    return { role: 'text-todo', checked: false, title: '' }
+  } else {
+    return null
+  }
+}
+
+export type TextRoleConversion = {
+  readonly role: TextBlockRole
+  readonly title: string
+  readonly attributes?: Readonly<Record<string, unknown>> | undefined
 }

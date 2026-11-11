@@ -53,7 +53,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 
 这些是决策，不是建议：
 
-- `role` 是闭集：`page / entity / text-block / text-heading-1 / text-heading-2 / text-heading-3 / image / file / itemlink / tag / database`。文本编辑器专用 role 统一使用 `text-` 前缀；新的文本形态优先复用 text-* 体系。不要新增 role 绕过模型；非文本新内容类型用 `entity + kind`。
+- `role` 是闭集：`page / entity / text-block / text-heading-1 / text-heading-2 / text-heading-3 / text-list / text-todo / image / file / itemlink / tag / database`。文本编辑器专用 role 统一使用 `text-` 前缀；新的文本形态优先复用 text-* 体系。不要新增 role 绕过模型；非文本新内容类型用 `entity + kind`。
 - `kind` 只属于 `entity`：`(role='entity') ⇔ (kind IS NOT NULL)`；page 永远没有 kind。
 - 漫画不是 role：漫画 = `entity + kind=manga` + image children。
 - 不要恢复 `custom`、`sys/type/*`、`sys/related/*`、`FileID`/`fid_`、`latest.json`。
@@ -61,7 +61,8 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 缩略图是隐藏的 `thumbnails` 派生表，不是 Item；尺寸 96/384/800/1440 AVIF；删除 image 级联，thumb blob 由 GC 回收。
 - `unity_name` 全局唯一、设置后不可变、`sys.` 保留；database 字段类型 `unity_name` 映射 item 列，不放进 attributes。
 - `itemlink` 用 `target_id`；行内链接是 text-* block 的纯文本 token `[[item:123]]` / `[[item:123|label]]`；没有 links 表/反链。
-- text-heading-1/2/3 是文本编辑器专用 role；输入组件与 text-block 共用，Shift+Enter 同样只做块内换行。
+- text-heading-1/2/3、text-list、text-todo 是文本编辑器专用 role；输入组件与 text-block 共用，Shift+Enter 同样只做块内换行。
+- text-list 用 attributes.list_kind=bullet/number/alpha；text-todo 用 attributes.checked。列表/勾选快捷输入只允许在 trim 空的 text-block 上触发。
 - `tag` 只做分类；title 大小写不敏感唯一。
 - 配置分两层：bootstrap 只在根 `.env`/OS env；runtime 只在 `sys.config` Item；runtime 不接受 env 覆盖。
 - 系统项（`sys.`）不出现在公共 listing，不能被通用 item 写接口修改/删除。
@@ -127,8 +128,8 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 页面接受 OS 文件拖入：按 MIME/扩展名判断 image 或 file；外部纯文本拖入按空行规则拆成 text-block。
 - Block 焦点：首/末视觉行上下键跨 block；Esc/handle 进入选中模式；内容区外 marquee 框选、内容区内保留普通文本选择；Shift+Arrow 扩展；批量删除 undo 使用 `deleteItems`/`restoreItems` 保持原 ID，历史仅页面内存。Shift+Click/Cmd+Click 不用于 block 多选。
 - 保持焦点、caret 和滚动位置；不要因为保存/父级刷新让 text-block 重新挂载或跳回末尾。
-- `/` 打开插入菜单（新页面（普通/创建后打开）/文本/一级标题/二级标题/三级标题/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
-- Enter 在当前光标处拆行并聚焦新行；Shift+Enter 软换行；空行 Backspace 删除，行首 Backspace 合并到上一条 text-block。
+- `/` 打开插入菜单（新页面（普通/创建后打开）/文本/一级标题/二级标题/三级标题/无序列表/数字列表/字母列表/待办事项/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
+- Enter 在当前光标处拆行并聚焦新行；列表/勾选项 Enter 生成同类型下一项，右侧内容进入新项且 caret 在新项开头；Shift+Enter 软换行；空行 Backspace 删除，行首 Backspace 合并到上一条 text-block。
 - 中文 IME composing 时不能误触发 Enter/斜杠命令。
 - 链接选择器必须排除当前占位行，避免 itemlink 指向马上被删除的 Item。
 - 未知 kind 统一提示“没有合适的打开方式”；不要偷偷降级成某种编辑器。

@@ -4,6 +4,7 @@ import { zItemID, isTextBlockRole } from '@laibrary/types'
 import { createFileItem, createImageItem, mediaKindForFile } from '../lib/blob'
 import { orderAfter } from '../lib/order'
 import { blockCanDelete, blockCanDuplicate } from '../lib/page-blocks'
+import { listKindOf, listMarkerFor, todoCheckedOf } from '../lib/text-list'
 import { mergeTextBlock, splitTextBlocks, type SlashCommand } from '../lib/text-block-editor'
 import { boxFromPoints, boxesIntersect, type Box } from '../lib/marquee'
 import type { ItemModule, ViewerCtx } from './types'
@@ -492,11 +493,18 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     patchChild(current.id, { title: left })
     try {
       await ctx.api.rpc.updateItem({ id: current.id, data: { title: left } })
+      const next_role = current.role === 'text-list'
+        ? 'text-list'
+        : (current.role === 'text-todo' ? 'text-todo' : 'text-block')
+      const next_attributes = current.role === 'text-list'
+        ? { list_kind: listKindOf(current) }
+        : (current.role === 'text-todo' ? { checked: false } : undefined)
       const created = await ctx.api.rpc.addItem({
-        role: 'text-block',
+        role: next_role,
         title: right,
         parent_id: item.id,
         order_index,
+        ...(next_attributes === undefined ? {} : { attributes: next_attributes }),
       })
       insertChild(created)
       focusBlock(created.id, 0)
@@ -876,14 +884,34 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const toggleTodo = (target: Item, checked: boolean) => {
+    const attributes = { ...target.attributes, checked }
+    patchChild(target.id, { attributes })
+    ctx.api.rpc.updateItem({ id: target.id, data: { attributes } })
+      .catch(err => {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+        void loadChildren()
+      })
+  }
+
   const convertTextBlock = async (
     target: Item,
     role: TextBlockRole,
     title: string,
+    attributes?: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     try {
-      const converted = await ctx.api.rpc.convertTextBlock({ id: target.id, role, title })
-      patchChild(converted.id, { role: converted.role, title: converted.title })
+      const converted = await ctx.api.rpc.convertTextBlock({
+        id: target.id,
+        role,
+        title,
+        ...(attributes === undefined ? {} : { attributes }),
+      })
+      patchChild(converted.id, {
+        role: converted.role,
+        title: converted.title,
+        attributes: converted.attributes,
+      })
       focusBlock(converted.id, 'end')
       ctx.refreshSidebar()
     } catch (err) {
@@ -910,6 +938,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       void convertTextBlock(placeholder, 'text-heading-2', '')
     } else if (command.id === 'heading-3') {
       void convertTextBlock(placeholder, 'text-heading-3', '')
+    } else if (command.id === 'list-bullet') {
+      void convertTextBlock(placeholder, 'text-list', '', { list_kind: 'bullet' })
+    } else if (command.id === 'list-number') {
+      void convertTextBlock(placeholder, 'text-list', '', { list_kind: 'number' })
+    } else if (command.id === 'list-alpha') {
+      void convertTextBlock(placeholder, 'text-list', '', { list_kind: 'alpha' })
+    } else if (command.id === 'todo') {
+      void convertTextBlock(placeholder, 'text-todo', '', { checked: false })
     }
   }
 
@@ -1012,8 +1048,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onSlashCommand={handleSlashCommand}
               onMoveBlock={direction => focusAdjacentBlock(direction, child)}
               onSelectBlock={() => selectOne(child.id)}
-              onConvertHeading={(target, role, title) => { void convertTextBlock(target, role, title) }}
+              onConvertRole={(target, role, title, attributes) => {
+                void convertTextBlock(target, role, title, attributes)
+              }}
               onPasteBlocks={(target, blocks) => { void createTextBlocksAfter(target, blocks) }}
+              marker={listMarkerFor(children, index)}
+              todo_checked={todoCheckedOf(child)}
+              onToggleTodo={checked => toggleTodo(child, checked)}
             />
           ) : (
             module.Block !== undefined

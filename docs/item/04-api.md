@@ -76,9 +76,9 @@ Item[] → Item[]
 
 ### convertTextBlock
 ```text
-{ id, role: 'text-block' | 'text-heading-1' | 'text-heading-2' | 'text-heading-3', title? } → Item
+{ id, role: 'text-block' | 'text-heading-1' | 'text-heading-2' | 'text-heading-3' | 'text-list' | 'text-todo', title?, attributes? } → Item
 ```
-仅允许 text-* role 之间转换；同 ID；title 可选并与 role 原子更新；非文本 role 400。
+仅允许 text-* role 之间转换；同 ID；title/attributes 可选并与 role 原子更新；非文本 role 400。
 
 ### listing
 ```text

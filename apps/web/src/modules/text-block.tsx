@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Item, ItemID } from '@laibrary/types'
+import type { Item, ItemID, TextBlockRole } from '@laibrary/types'
 import { headingLevelOfRole, parseItemTokens } from '@laibrary/types'
 import { InlineText } from './inline-text'
 import { caretAtVisualEdge } from '../lib/caret-edge'
 import {
-  detectHeadingShortcut, detectSlashQuery, filterSlashCommands, orderSlashCommands,
+  detectHeadingShortcut, detectListShortcut, detectSlashQuery, filterSlashCommands, orderSlashCommands,
   splitTextBlock, splitTextBlocks,
   type SlashCommand,
 } from '../lib/text-block-editor'
@@ -28,8 +28,11 @@ export type TextBlockProps = {
   onSlashCommand?: (command: SlashCommand, item: Item) => void
   onMoveBlock?: (direction: 'up' | 'down', item: Item) => void
   onSelectBlock?: (item: Item) => void
-  onConvertHeading?: (item: Item, role: 'text-heading-1' | 'text-heading-2' | 'text-heading-3', title: string) => void
+  onConvertRole?: (item: Item, role: TextBlockRole, title: string, attributes?: Readonly<Record<string, unknown>>) => void
   onPasteBlocks?: (item: Item, blocks: readonly string[]) => void
+  marker?: string | null | undefined
+  todo_checked?: boolean | undefined
+  onToggleTodo?: ((checked: boolean) => void) | undefined
 }
 
 function TextBlockEditor({
@@ -45,8 +48,11 @@ function TextBlockEditor({
   onSlashCommand,
   onMoveBlock,
   onSelectBlock,
-  onConvertHeading,
+  onConvertRole,
   onPasteBlocks,
+  marker,
+  todo_checked,
+  onToggleTodo,
 }: TextBlockProps) {
   const [value, setValue] = useState(item.title)
   const [slash_query, setSlashQuery] = useState<string | null>(null)
@@ -228,11 +234,40 @@ function TextBlockEditor({
     }
   }
 
+  const is_todo = item.role === 'text-todo'
+  const has_prefix = is_todo || (marker !== null && marker !== undefined)
+  const root_class = [
+    'text-block',
+    item.role,
+    value.length === 0 ? 'is-empty' : '',
+    has_prefix ? 'has-prefix' : '',
+    is_todo && todo_checked === true ? 'is-checked' : '',
+  ].filter(part => part.length !== 0).join(' ')
+
+  const prefix = (
+    is_todo ? (
+      <input
+        type="checkbox"
+        className="text-block-checkbox"
+        checked={todo_checked === true}
+        aria-label="切换完成状态"
+        onMouseDown={ev => { ev.stopPropagation() }}
+        onClick={ev => { ev.stopPropagation() }}
+        onChange={ev => { onToggleTodo?.(ev.target.checked) }}
+      />
+    ) : (
+      marker === null || marker === undefined ? null : (
+        <span className="text-block-marker" aria-hidden="true">{marker}</span>
+      )
+    )
+  )
+
   const inactive_view = (
     <div
-      className={value.length === 0 ? `text-block ${item.role} is-empty` : `text-block ${item.role}`}
+      className={root_class}
       onClick={activateIfNoSelection}
     >
+      {prefix}
       <div className="text-block-view">
         {value.length === 0 ? null : <InlineText text={value} ctx={ctx} />}
       </div>
@@ -240,7 +275,8 @@ function TextBlockEditor({
   )
 
   return is_active ? (
-    <div className={`text-block ${item.role} is-active`}>
+    <div className={root_class}>
+      {prefix}
       <textarea
         ref={textarea_ref}
         className="text-block-textarea"
@@ -250,14 +286,29 @@ function TextBlockEditor({
         spellCheck={false}
         onChange={ev => {
           const next = ev.target.value
-          const shortcut = detectHeadingShortcut(next, item.role)
-          if (shortcut !== null && onConvertHeading !== undefined) {
+          const heading_shortcut = detectHeadingShortcut(next, item.role)
+          const list_shortcut = detectListShortcut(next, item.role)
+          if (heading_shortcut !== null && onConvertRole !== undefined) {
             cancelTimer()
-            value_ref.current = shortcut.title
-            setValue(shortcut.title)
-            onTitleChange(item.id, shortcut.title)
+            value_ref.current = heading_shortcut.title
+            setValue(heading_shortcut.title)
+            onTitleChange(item.id, heading_shortcut.title)
             setSlashQuery(null)
-            void onConvertHeading(item, shortcut.role, shortcut.title)
+            onConvertRole(item, heading_shortcut.role, heading_shortcut.title)
+          } else if (list_shortcut !== null && onConvertRole !== undefined) {
+            cancelTimer()
+            value_ref.current = list_shortcut.title
+            setValue(list_shortcut.title)
+            onTitleChange(item.id, list_shortcut.title)
+            setSlashQuery(null)
+            onConvertRole(
+              item,
+              list_shortcut.role,
+              list_shortcut.title,
+              list_shortcut.role === 'text-list'
+                ? { list_kind: list_shortcut.list_kind }
+                : { checked: false },
+            )
           } else {
             value_ref.current = next
             setValue(next)

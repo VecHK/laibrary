@@ -15,6 +15,13 @@
       "when": 1794317351273,
       "tag": "0001_magenta_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794395180598,
+      "tag": "0002_perfect_puff_adder",
+      "breakpoints": true
     }
   ]
 }

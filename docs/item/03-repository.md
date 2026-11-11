@@ -41,7 +41,7 @@
 - 若最终 parent 是 database：按 schema 校验最终 attributes 和 unity_name 要求。
 - itemlink：target_id 可改，必须存在且非自己；其他 role 不允许 target_id。
 - tags 提供时校验。
-- text-block 与 text-heading-1/2/3：title/attributes 变更时重新校验 inline token（拒绝自指）。`convertTextBlock` 仅允许 text-* role 之间同 ID 转换。
+- text-block、text-heading-1/2/3、text-list、text-todo：title/attributes 变更时重新校验 inline token（拒绝自指）。`convertTextBlock` 仅允许 text-* role 之间同 ID 转换。
 - UPDATE 所有可写字段 + update_date；返回 wire。
 
 ## 4. deleteItem

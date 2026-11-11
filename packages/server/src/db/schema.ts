@@ -58,7 +58,7 @@ export const items = pgTable('items', {
     .on(table.unity_name)
     .where(sql`${table.unity_name} IS NOT NULL`),
   check('items_role_check', sql`
-    ${table.role} IN ('page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3', 'image', 'file', 'itemlink', 'tag', 'database')
+    ${table.role} IN ('page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3', 'text-list', 'text-todo', 'image', 'file', 'itemlink', 'tag', 'database')
   `),
   check('items_entity_kind_check', sql`
     (${table.role} = 'entity') = (${table.kind} IS NOT NULL)

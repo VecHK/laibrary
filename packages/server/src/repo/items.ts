@@ -350,6 +350,7 @@ export async function convertTextBlock(
   id: ItemID,
   role: TextBlockRole,
   title: string | undefined,
+  attributes: Readonly<Record<string, unknown>> | undefined,
 ): Promise<Item> {
   const prev = await getItemRowForUpdate(db, id)
   if (!isTextBlockRole(prev.role)) {
@@ -361,9 +362,12 @@ export async function convertTextBlock(
     if (title !== undefined) {
       await validateInlineTokens(db, next_title, id)
     }
+    const next_attributes = attributes === undefined
+      ? prev.attributes
+      : as<Record<string, unknown>>(itemCheckAttributes(role, attributes))
     const updated = await db
       .update(items)
-      .set({ role, title: next_title, update_date: new Date() })
+      .set({ role, title: next_title, attributes: next_attributes, update_date: new Date() })
       .where(eq(items.id, id))
       .returning()
     const row = updated[0]

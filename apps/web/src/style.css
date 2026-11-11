@@ -2697,3 +2697,38 @@ body.marquee-selecting {
   line-height: 26px;
   font-weight: 600;
 }
+
+/* list and todo prefixes */
+.text-block.has-prefix {
+  position: relative;
+  padding-left: 28px;
+}
+
+.text-block-marker {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 22px;
+  color: #9b9a97;
+  text-align: right;
+  line-height: inherit;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.text-block-checkbox {
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #4a4a55;
+  cursor: pointer;
+}
+
+.text-block.is-checked .text-block-view,
+.text-block.is-checked .text-block-textarea {
+  color: #9b9a97;
+  text-decoration: line-through;
+}

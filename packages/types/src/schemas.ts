@@ -27,10 +27,11 @@ export const zKind = z
 
 export const zRole = z.enum([
   'page', 'entity', 'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3',
-  'image', 'file', 'itemlink', 'tag', 'database',
+  'text-list', 'text-todo', 'image', 'file', 'itemlink', 'tag', 'database',
 ])
 export const zTextBlockRole = z.enum([
   'text-block', 'text-heading-1', 'text-heading-2', 'text-heading-3',
+  'text-list', 'text-todo',
 ])
 export const zThumbSize = z.custom<ThumbSize>(value => (
   typeof value === 'number' && __THUMBNAIL_SIZES__.some(size => size === value)
@@ -112,6 +113,28 @@ export const zPageAttributes = zAnyAttributes.superRefine((attributes, ctx) => {
   }
 })
 
+export const zTextListAttributes = zAnyAttributes.superRefine((attributes, ctx) => {
+  const kind = attributes['list_kind']
+  if (kind !== undefined && kind !== 'bullet' && kind !== 'number' && kind !== 'alpha') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'list_kind 必须是 bullet/number/alpha',
+      path: ['list_kind'],
+    })
+  }
+})
+
+export const zTextTodoAttributes = zAnyAttributes.superRefine((attributes, ctx) => {
+  const checked = attributes['checked']
+  if (checked !== undefined && typeof checked !== 'boolean') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'checked 必须是 boolean',
+      path: ['checked'],
+    })
+  }
+})
+
 export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]>> = {
   page: zPageAttributes,
   entity: zAnyAttributes,
@@ -119,6 +142,8 @@ export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]
   'text-heading-1': zAnyAttributes,
   'text-heading-2': zAnyAttributes,
   'text-heading-3': zAnyAttributes,
+  'text-list': zTextListAttributes,
+  'text-todo': zTextTodoAttributes,
   image: zImageAttributes,
   file: zFileAttributes,
   itemlink: zPageAttributes,

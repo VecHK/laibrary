@@ -226,11 +226,11 @@ describe('text block roles', () => {
       title: 'body',
       parent_id: page_item.id,
     }, blobs)
-    const heading = await convertTextBlock(db, block.id, 'text-heading-1', 'Title')
+    const heading = await convertTextBlock(db, block.id, 'text-heading-1', 'Title', undefined)
     expect(heading.id).toBe(block.id)
     expect(heading.role).toBe('text-heading-1')
     expect(heading.title).toBe('Title')
-    const body = await convertTextBlock(db, block.id, 'text-block', undefined)
+    const body = await convertTextBlock(db, block.id, 'text-block', undefined, undefined)
     expect(body.id).toBe(block.id)
     expect(body.role).toBe('text-block')
     expect(body.title).toBe('Title')
@@ -238,7 +238,28 @@ describe('text block roles', () => {
 
   it('rejects conversion of non-text roles', async () => {
     const page_item = await page('text role reject')
-    await expect(convertTextBlock(db, page_item.id, 'text-heading-1', undefined)).rejects.toThrow('文本块')
+    await expect(convertTextBlock(db, page_item.id, 'text-heading-1', undefined, undefined)).rejects.toThrow('文本块')
+  })
+
+  it('converts to list/todo and validates attributes', async () => {
+    const page_item = await page('list roles')
+    const block = await createItem(db, {
+      role: 'text-block',
+      title: '',
+      parent_id: page_item.id,
+    }, blobs)
+    const list = await convertTextBlock(db, block.id, 'text-list', '', { list_kind: 'number' })
+    expect(list.id).toBe(block.id)
+    expect(list.role).toBe('text-list')
+    expect(list.attributes['list_kind']).toBe('number')
+
+    const todo = await convertTextBlock(db, block.id, 'text-todo', '', { checked: false })
+    expect(todo.role).toBe('text-todo')
+    expect(todo.attributes['checked']).toBe(false)
+
+    await expect(convertTextBlock(db, block.id, 'text-list', '', {
+      list_kind: 'roman',
+    })).rejects.toThrow('list_kind')
   })
 
   it('creates heading roles directly', async () => {

@@ -17,6 +17,8 @@ const role_modules: Record<Role, ItemModule> = {
   'text-heading-1': __TEXT_BLOCK_MODULE__,
   'text-heading-2': __TEXT_BLOCK_MODULE__,
   'text-heading-3': __TEXT_BLOCK_MODULE__,
+  'text-list': __TEXT_BLOCK_MODULE__,
+  'text-todo': __TEXT_BLOCK_MODULE__,
   image: __IMAGE_MODULE__,
   file: __FILE_MODULE__,
   itemlink: __ITEMLINK_MODULE__,

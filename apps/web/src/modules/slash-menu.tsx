@@ -16,6 +16,41 @@ function CommandIcon({ id }: { id: SlashCommandId }) {
         <text x="4" y="15" fontSize="10" fontWeight="700" fill="currentColor">H{level}</text>
       </svg>
     )
+  } else if (id === 'list-bullet') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="5" cy="6" r="1.3" />
+        <circle cx="5" cy="10" r="1.3" />
+        <circle cx="5" cy="14" r="1.3" />
+        <path d="M8.5 6h7M8.5 10h7M8.5 14h7" />
+      </svg>
+    )
+  } else if (id === 'list-number') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <text x="2" y="7" fontSize="6" fontWeight="700" fill="currentColor">1.</text>
+        <text x="2" y="11.5" fontSize="6" fontWeight="700" fill="currentColor">2.</text>
+        <text x="2" y="16" fontSize="6" fontWeight="700" fill="currentColor">3.</text>
+        <path d="M7.5 6h9M7.5 10.5h9M7.5 15h9" />
+      </svg>
+    )
+  } else if (id === 'list-alpha') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <text x="2" y="7" fontSize="6" fontWeight="700" fill="currentColor">a.</text>
+        <text x="2" y="11.5" fontSize="6" fontWeight="700" fill="currentColor">b.</text>
+        <text x="2" y="16" fontSize="6" fontWeight="700" fill="currentColor">c.</text>
+        <path d="M7.5 6h9M7.5 10.5h9M7.5 15h9" />
+      </svg>
+    )
+  } else if (id === 'todo') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="3" y="4" width="4" height="4" rx="1" />
+        <rect x="3" y="12" width="4" height="4" rx="1" />
+        <path d="m3.8 14 1 1 1.8-2M9.5 6h7M9.5 14h7" />
+      </svg>
+    )
   } else if (id === 'page' || id === 'page-open') {
     return (
       <svg viewBox="0 0 20 20" aria-hidden="true">

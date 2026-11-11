@@ -14,6 +14,7 @@ export interface ActionTable {
     id: ItemID
     role: TextBlockRole
     title?: string | undefined
+    attributes?: Readonly<Record<string, unknown>> | undefined
   }): Promise<Item>
   restoreItems(items: readonly Item[]): Promise<Item[]>
   listing(payload: ListingParams): Promise<Item[]>

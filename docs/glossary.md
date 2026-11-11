@@ -11,6 +11,8 @@
 | **Page（页面）** | `role='page'` | 普通页面/block 容器。永远没有 kind，永远用页面编辑器打开。 |
 | **Text Block（文本块）** | `role='text-block'` | 纯文本 block；内容即 `title`。没有富文本 marks；支持 inline itemlink token。 |
 | **Text Heading（文本标题）** | `role='text-heading-1'` 等 | 文本编辑器专用的 heading block；与 text-block 共用输入组件，仅字号与快捷转换不同。 |
+| **Text List（列表项）** | `role='text-list'` | 列表 block；`attributes.list_kind` 为 bullet/number/alpha；marker 自动计算。 |
+| **Text Todo（勾选项）** | `role='text-todo'` | 可勾选 block；`attributes.checked` 保存状态。 |
 | **Image（图片）** | `role='image'` | 指向一个 blob 的图片 Item；MIME/尺寸来自 blob。 |
 | **File（附件）** | `role='file'` | 指向一个 blob 的普通附件 Item。文件柜不是这个。 |
 | **Itemlink（链接块）** | `role='itemlink'` | 指向另一个 Item 的块级链接；`target_id` 是 ItemID。点击走统一 open resolver。 |

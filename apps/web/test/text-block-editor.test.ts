@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  detectHeadingShortcut, detectSlashQuery, filterSlashCommands, groupSlashCommands,
-  mergeTextBlock, orderSlashCommands, splitTextBlock, splitTextBlocks,
+  detectHeadingShortcut, detectListShortcut, detectSlashQuery, filterSlashCommands,
+  groupSlashCommands, mergeTextBlock, orderSlashCommands, splitTextBlock, splitTextBlocks,
 } from '../src/lib/text-block-editor'
 
 describe('slash query', () => {
@@ -18,7 +18,8 @@ describe('slash query', () => {
   it('中文、英文和 role 都能筛选', () => {
     expect(detectSlashQuery('/', 1)).not.toBeNull()
     expect(filterSlashCommands('').map(command => command.id)).toEqual([
-      'text', 'heading-1', 'heading-2', 'heading-3', 'page', 'page-open', 'image', 'file', 'itemlink', 'manga',
+      'text', 'heading-1', 'heading-2', 'heading-3', 'page', 'page-open',
+      'list-bullet', 'list-number', 'list-alpha', 'todo', 'image', 'file', 'itemlink', 'manga',
     ])
     expect(filterSlashCommands('图').map(command => command.id)).toEqual(['image'])
     expect(filterSlashCommands('img').map(command => command.id)).toEqual(['image'])
@@ -34,7 +35,8 @@ describe('slash query', () => {
     expect(ordered[0]?.id).toBe('page')
     expect(ordered.map(command => command.id)).toEqual([
       'page', 'page-open', 'image', 'file', 'itemlink',
-      'text', 'heading-1', 'heading-2', 'heading-3', 'manga',
+      'text', 'heading-1', 'heading-2', 'heading-3',
+      'list-bullet', 'list-number', 'list-alpha', 'todo', 'manga',
     ])
   })
 
@@ -45,7 +47,8 @@ describe('slash query', () => {
       'page', 'page-open', 'image', 'file', 'itemlink',
     ])
     expect(groups[1]?.commands.map(command => command.id)).toEqual([
-      'text', 'heading-1', 'heading-2', 'heading-3', 'manga',
+      'text', 'heading-1', 'heading-2', 'heading-3',
+      'list-bullet', 'list-number', 'list-alpha', 'todo', 'manga',
     ])
     expect(groupSlashCommands([])).toEqual([])
   })
@@ -126,5 +129,24 @@ describe('heading shortcut', () => {
     expect(detectHeadingShortcut('#### ', 'text-block')).toBeNull()
     expect(detectHeadingShortcut('x# ', 'text-block')).toBeNull()
     expect(detectHeadingShortcut('# ', 'text-heading-1')).toBeNull()
+  })
+})
+
+
+describe('list shortcuts', () => {
+  it('converts empty text-block prefixes', () => {
+    expect(detectListShortcut('- ', 'text-block')).toEqual({ role: 'text-list', list_kind: 'bullet', title: '' })
+    expect(detectListShortcut('1. ', 'text-block')).toEqual({ role: 'text-list', list_kind: 'number', title: '' })
+    expect(detectListShortcut('a. ', 'text-block')).toEqual({ role: 'text-list', list_kind: 'alpha', title: '' })
+    expect(detectListShortcut('[] ', 'text-block')).toEqual({ role: 'text-todo', checked: false, title: '' })
+    expect(detectListShortcut('【】 ', 'text-block')).toEqual({ role: 'text-todo', checked: false, title: '' })
+  })
+
+  it('requires an otherwise empty text-block', () => {
+    expect(detectListShortcut('- x', 'text-block')).toBeNull()
+    expect(detectListShortcut('1.x', 'text-block')).toBeNull()
+    expect(detectListShortcut('b. ', 'text-block')).toBeNull()
+    expect(detectListShortcut('[]', 'text-block')).toBeNull()
+    expect(detectListShortcut('- ', 'text-heading-1')).toBeNull()
   })
 })

@@ -86,6 +86,7 @@ export const zActionPayloads = {
     id: zItemID,
     role: zTextBlockRole,
     title: z.string().max(100_000).optional(),
+    attributes: z.record(z.string(), z.unknown()).optional(),
   }).strict(),
   listing: zListingParams,
   getItemByUnityName: z.object({ unity_name: zUnityName }).strict(),

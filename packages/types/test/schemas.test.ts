@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   zAddItemForm, zBlobID, zDatabaseAttributes, zImageAttributes, zPageAttributes, zUnityName,
   itemBuildRowValidator, itemCheckAttributes,
-  zTextBlockRole,
+  zTextBlockRole, zTextListAttributes, zTextTodoAttributes,
 } from '../src/schemas'
 import { zActionPayloads } from '../src/action-schemas'
 
@@ -127,5 +127,28 @@ describe('convertTextBlock payload', () => {
     expect(zActionPayloads.convertTextBlock.safeParse({
       id: 1, role: 'page',
     }).success).toBe(false)
+  })
+})
+
+
+describe('text list / text todo', () => {
+  it('validates list kind and checked state', () => {
+    expect(zAddItemForm.safeParse({
+      role: 'text-list', attributes: { list_kind: 'number' },
+    }).success).toBe(true)
+    expect(zTextListAttributes.safeParse({ list_kind: 'alpha' }).success).toBe(true)
+    expect(zTextListAttributes.safeParse({ list_kind: 'roman' }).success).toBe(false)
+    expect(zTextTodoAttributes.safeParse({ checked: true }).success).toBe(true)
+    expect(zTextTodoAttributes.safeParse({ checked: 'yes' }).success).toBe(false)
+    expect(zAddItemForm.safeParse({ role: 'text-todo', attributes: { checked: false } }).success).toBe(true)
+  })
+
+  it('accepts conversion attributes', () => {
+    expect(zActionPayloads.convertTextBlock.safeParse({
+      id: 1,
+      role: 'text-todo',
+      title: '',
+      attributes: { checked: false },
+    }).success).toBe(true)
   })
 })

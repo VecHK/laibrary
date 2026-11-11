@@ -41,8 +41,11 @@ export function toWireItem(row: ItemRow, blob: BlobRow | null): Item {
 export async function getItemRow(db: DbLike, id: ItemID): Promise<ItemRow> {
   const rows = await db.select().from(items).where(eq(items.id, id)).limit(1)
   const row = rows[0]
-  if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
-  return row
+  if (row === undefined) {
+    throw errorsNotFound(`item(id=${id}) not found`)
+  } else {
+    return row
+  }
 }
 
 export async function getItemRowForUpdate(db: DbLike, id: ItemID): Promise<ItemRow> {
@@ -53,8 +56,11 @@ export async function getItemRowForUpdate(db: DbLike, id: ItemID): Promise<ItemR
     .limit(1)
     .for('update')
   const row = rows[0]
-  if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
-  return row
+  if (row === undefined) {
+    throw errorsNotFound(`item(id=${id}) not found`)
+  } else {
+    return row
+  }
 }
 
 export async function findItemRow(db: DbLike, id: ItemID): Promise<ItemRow | null> {
@@ -82,8 +88,11 @@ async function selectWithBlob(db: DbLike, id: ItemID) {
     .where(eq(items.id, id))
     .limit(1)
   const row = rows[0]
-  if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
-  return row
+  if (row === undefined) {
+    throw errorsNotFound(`item(id=${id}) not found`)
+  } else {
+    return row
+  }
 }
 
 export async function getWireItem(db: DbLike, id: ItemID): Promise<Item> {

@@ -27,7 +27,7 @@ CREATE TABLE items (
 
 ### 约束
 
-- `role IN ('page','entity','text-block','text-heading-1','text-heading-2','text-heading-3','image','file','itemlink','tag','database')`
+- `role IN ('page','entity','text-block','text-heading-1','text-heading-2','text-heading-3','text-list','text-todo','image','file','itemlink','tag','database')`
 - `(role='entity') = (kind IS NOT NULL)`
 - `(role='itemlink') = (target_id IS NOT NULL)`
 - `(role IN ('file','image')) = (blob_id IS NOT NULL)`
@@ -46,6 +46,8 @@ CREATE TABLE items (
 | text-heading-1 | NULL | 空 record | 一级标题，与 text-block 共用输入组件 |
 | text-heading-2 | NULL | 空 record | 二级标题 |
 | text-heading-3 | NULL | 空 record | 三级标题 |
+| text-list | NULL | `{ list_kind? }` | 列表项；缺省 bullet |
+| text-todo | NULL | `{ checked? }` | 勾选项；缺省 false |
 | image | NULL | `{ filename, display_width?, align?, caption? }` | blob 必须是图片；新建默认 display_width=480px，范围 80–1440px |
 | file | NULL | `{ filename }` | 任意 blob |
 | itemlink | NULL | 自由 record，可含 `icon` | target_id |

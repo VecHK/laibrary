@@ -5,6 +5,8 @@ export type Role =
   | 'text-heading-1'
   | 'text-heading-2'
   | 'text-heading-3'
+  | 'text-list'
+  | 'text-todo'
   | 'image'
   | 'file'
   | 'itemlink'
@@ -51,16 +53,30 @@ export type TextBlockRole =
   | 'text-heading-1'
   | 'text-heading-2'
   | 'text-heading-3'
+  | 'text-list'
+  | 'text-todo'
+
+export type ListKind = 'bullet' | 'number' | 'alpha'
+
+export interface TextListAttributes extends Readonly<Record<string, unknown>> {
+  readonly list_kind?: ListKind | undefined
+}
+
+export interface TextTodoAttributes extends Readonly<Record<string, unknown>> {
+  readonly checked?: boolean | undefined
+}
 
 export const __TEXT_BLOCK_ROLES__ = [
   'text-block',
   'text-heading-1',
   'text-heading-2',
   'text-heading-3',
+  'text-list',
+  'text-todo',
 ] as const satisfies readonly TextBlockRole[]
 
 export function isTextBlockRole(role: Role): role is TextBlockRole {
-  return role === 'text-block' || role === 'text-heading-1' || role === 'text-heading-2' || role === 'text-heading-3'
+  return role === 'text-block' || role === 'text-heading-1' || role === 'text-heading-2' || role === 'text-heading-3' || role === 'text-list' || role === 'text-todo'
 }
 
 export type HeadingRole = 'text-heading-1' | 'text-heading-2' | 'text-heading-3'
@@ -108,6 +124,8 @@ export interface RoleAttributes {
   'text-heading-1': Readonly<Record<string, unknown>>
   'text-heading-2': Readonly<Record<string, unknown>>
   'text-heading-3': Readonly<Record<string, unknown>>
+  'text-list': TextListAttributes
+  'text-todo': TextTodoAttributes
   image: ImageAttributes
   file: FileAttributes
   itemlink: ItemLinkAttributes

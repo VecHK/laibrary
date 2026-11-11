@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 45、types 20、web 42。
+- 当前：server 46、types 22、web 47。
 
 ## 7. Web
 
@@ -107,6 +107,7 @@ npm run web   # Vite 5173
 - Block 焦点：首/末视觉行上下键跨 block；Esc/handle 进入选中模式；只有 `.page-full` 外可 marquee 框选，内容区内是普通文本选择；Shift+Arrow 扩展；Del/Backspace 批量删除；undo/redo 通过 `deleteItems`/`restoreItems` 保持原 ID，历史仅当前页面内存。Shift+Click/Cmd+Click 不选 block。
 - 图片 block：左右拖拽等比缩放（80–1440px）、Alignment/Caption/Expand/Download 浮层、双击/Expand 打开 lightbox、放大预加载高一级缩略图；拖动有 before/after 插入线。
 - 页面接受 OS 文件拖入：`image/*` → image，其他 → file；多文件按目标 block 的 before/after 插入，空白处追加到末尾，并补空 text-block；拖拽时只显示插入线，不显示整页覆盖提示。
+- `- ` / `1. ` / `a. ` / `[] ` / `【】 ` 只在空 text-block 行首转换为列表/勾选项；列表 marker 自动计算。列表/勾选项 Enter 在光标处拆分，右侧进入同类型新项，caret 在新项开头。
 - 外部纯文本拖入/粘贴按空行规则拆块；`# ` / `## ` / `### ` 只在空 text-block 行首转换为 text-heading-1/2/3；Shift+Enter 对所有 text-* 只做块内换行。
 - 新建 image 默认显示宽度 480px（后续可用两侧 bar 调整，硬上限 1440px）。
 - 侧边栏：page/database/itemlink 树；page 才可展开，database/itemlink 不展开。节点 hover 显示 `+`（page/database，以及 target=page 的 itemlink）和 page/database 的 `···` 菜单。

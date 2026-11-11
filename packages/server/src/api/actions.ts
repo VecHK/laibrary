@@ -39,8 +39,8 @@ export function CreateActionRoute({
     },
     deleteItems: ids => db.transaction(tx => deleteItems(tx, ids)),
     restoreItems: snapshots => db.transaction(tx => restoreItems(tx, snapshots)),
-    convertTextBlock: ({ id, role, title }) => db.transaction(tx => (
-      convertTextBlock(tx, id, role, title)
+    convertTextBlock: ({ id, role, title, attributes }) => db.transaction(tx => (
+      convertTextBlock(tx, id, role, title, attributes)
     )),
     listing: payload => listItems(db, payload),
     getItemByUnityName: ({ unity_name }) => getItemByUnityName(db, unity_name),
