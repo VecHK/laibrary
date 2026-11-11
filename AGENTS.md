@@ -13,7 +13,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 
 补充规则：
 
-- 写代码前，必须读 [docs/methods.md](docs/methods.md)（编码硬规则）和 [docs/glossary.md](docs/glossary.md)（领域术语）。
+- 写代码前，必须读 [docs/methods.md](docs/methods.md)（编码硬规则）和 [docs/glossary.md](docs/glossary.md)（领域术语）；改前端必须先读 [docs/frontend/introduction.md](docs/frontend/introduction.md) 和 [docs/frontend/glossary.md](docs/frontend/glossary.md)。
 - 改数据/API/数据库前，读 `DESIGN.md` 与对应的 `docs/item/01~06`。
 - 改前端交互前，读 `DESIGN.md` §9 和 [docs/item/06-runtime.md](docs/item/06-runtime.md)。
 - `docs/vision.md` 是北极星，不是当前实现规格；当前行为以 `DESIGN.md` 和 `docs/item/` 为准。
@@ -66,7 +66,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - `tag` 只做分类；title 大小写不敏感唯一。
 - 配置分两层：bootstrap 只在根 `.env`/OS env；runtime 只在 `sys.config` Item；runtime 不接受 env 覆盖。
 - 系统项（`sys.`）不出现在公共 listing，不能被通用 item 写接口修改/删除。
-- 术语表是领域契约：新增概念先更新 `docs/glossary.md`，再写代码/文档；不要发明同义词。
+- 术语表是领域契约：领域术语先更新 `docs/glossary.md`，前端/编辑器术语更新 `docs/frontend/glossary.md`；不要发明同义词。
 - 常量用 `__MODULE_NAME__`；Drizzle table、zod schema、React module descriptor 是模块 API 对象，保留其稳定接口名。
 
 ## 文档权威与冲突处理
@@ -129,7 +129,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - Block 焦点：首/末视觉行上下键跨 block；Esc/handle 进入选中模式；内容区外 marquee 框选、内容区内保留普通文本选择；Shift+Arrow 扩展；批量删除 undo 使用 `deleteItems`/`restoreItems` 保持原 ID，历史仅页面内存。Shift+Click/Cmd+Click 不用于 block 多选。
 - 保持焦点、caret 和滚动位置；不要因为保存/父级刷新让 text-block 重新挂载或跳回末尾。
 - `/` 打开插入菜单（新页面（普通/创建后打开）/文本/一级标题/二级标题/三级标题/无序列表/数字列表/字母列表/待办事项/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
-- Enter 在当前光标处拆行并聚焦新行；列表/勾选项 Enter 生成同类型下一项，右侧内容进入新项且 caret 在新项开头；Shift+Enter 软换行；空行 Backspace 删除，行首 Backspace 合并到上一条 text-block。
+- Enter 在当前光标处拆行并聚焦新行；列表/勾选项 Enter 生成同类型下一项，右侧内容进入新项且 caret 在新项开头；Shift+Enter 软换行；空 text-block/heading 的 Backspace 删除并 focus 前一个 text block 末尾，空 list/todo 转 text-block；删除走 `deleteItems` 快照 + undo。
 - 中文 IME composing 时不能误触发 Enter/斜杠命令。
 - 链接选择器必须排除当前占位行，避免 itemlink 指向马上被删除的 Item。
 - 未知 kind 统一提示“没有合适的打开方式”；不要偷偷降级成某种编辑器。
@@ -196,7 +196,7 @@ npm run build -w @laibrary/web
 - `README.md` 只放快速开始、当前能力和顶层入口，不复制完整规格。
 - `DESIGN.md` 是决策记录；改变决策时更新它，而不是只改代码。
 - `docs/methods.md` 是编码规则；不要把它改写成项目领域文档。
-- `docs/glossary.md` 是术语唯一来源；新增术语先改 glossary。
+- `docs/glossary.md` 是领域术语唯一来源；前端/编辑器术语以 `docs/frontend/glossary.md` 为准；新增术语先改对应 glossary。
 - `docs/vision.md` 只表达北极星；当前实现状态不要写进去冒充现状。
 - 文档之间用相对链接；避免复制同一段事实。发现索引漏项或链接失效要主动修。
 

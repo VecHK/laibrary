@@ -70,7 +70,7 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 
 ## 当前实现边界（v2 POC）
 
-已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/text-block/text-heading-1/2/3/image/file/entity/manga、`/` 插入菜单与 Enter 拆行、设置页。
+已实现：单表 Item、role/kind、unity_name、itemlink、inline token、blobs、thumbnails、系统配置、page/text-block/text-heading-1/2/3/text-list/text-todo/image/file/entity/manga、`/` 插入菜单、标题/列表/勾选快捷输入、Enter 拆行、设置页。
 
 暂未实现：富文本/marks、大纲/反链、文件柜/SMB、database 高级视图、派生数据库、Gāng、Public Space、鉴权/多用户、Electron、200 万导入。
 
@@ -93,7 +93,21 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 | [glossary.md](glossary.md) | **名词表（术语唯一来源）** | 每个任务；新增术语先改这里 |
 | [vision.md](vision.md) | 使用愿景/北极星 | 理解长期方向；不当作当前规格 |
 
-### 实现规格
+### 前端实现规格
+
+| 文档 | 内容 | 什么时候读 |
+|---|---|---|
+| [frontend/introduction.md](frontend/introduction.md) | 前端文档入口、目录、阅读顺序 | 改 `apps/web` 前 |
+| [frontend/designs.md](frontend/designs.md) | UI/UX 原则 | 做交互/视觉设计前 |
+| [frontend/glossary.md](frontend/glossary.md) | 编辑器/前端术语，Item/Block/TextBlock 区分 | 改编辑器前必读 |
+| [frontend/architecture.md](frontend/architecture.md) | App shell、session、路由、模块 registry | 改前端结构前 |
+| [frontend/state/](frontend/state/) | session、PageFull、模式、undo | 改状态/保存/历史 |
+| [frontend/editor/](frontend/editor/) | PageFull、PageBlock、TextBlock、role、选择、粘贴、媒体 | 改编辑器 block |
+| [frontend/views/](frontend/views/) | Sidebar、Breadcrumbs、Plaza、Settings、SidePeek | 改页面区域 |
+| [frontend/mechanisms/](frontend/mechanisms/) | 错误、blob、配置、标签、可访问性、性能、测试 | 改横切机制 |
+| [frontend/reference/file-map.md](frontend/reference/file-map.md) | 前端文件到文档映射 | 找模块/新增文件 |
+
+### 后端实现规格
 
 | 文档 | 内容 | 什么时候读 |
 |---|---|---|

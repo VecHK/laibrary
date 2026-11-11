@@ -1,6 +1,6 @@
 # Laibrary 名词表（Glossary）
 
-本文统一 Laibrary 的术语。代码、API、文档、UI 一律使用这里的定义；发现不一致时，以本文和 `DESIGN.md` 的决策记录为准。
+本文统一 Laibrary 的**领域术语**。代码、API、文档、UI 的领域词汇使用这里的定义；前端/编辑器专用术语见 [frontend/glossary.md](frontend/glossary.md)。发现不一致时，以本文、前端术语表和 `DESIGN.md` 的决策记录为准。
 
 | 术语 | 英文 / 代码 | 定义 |
 |---|---|---|
@@ -44,3 +44,6 @@
 4. **文件不是 FileID**：文件是 file/image Item，字节是 blob；用户数据里不再出现 `fid_`。
 5. **缩略图不是 Item**：它是 `thumbnails` 派生缓存。
 6. **配置分两层**：bootstrap 在 `.env`，runtime 在 `sys.config` Item。
+
+
+> 前端/编辑器专用术语（Item/Block 区分、PageFull、TextBlock、Selection、Structural Undo 等）以 [frontend/glossary.md](frontend/glossary.md) 为准；本表保留领域术语。

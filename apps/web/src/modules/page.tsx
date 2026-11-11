@@ -55,6 +55,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [redo_stack, setRedoStack] = useState<readonly PageHistoryEntry[]>([])
   const page_ref = useRef<HTMLDivElement>(null)
   const history_busy_ref = useRef(false)
+  const structural_undo_ref = useRef(false)
   const [link_placeholder, setLinkPlaceholder] = useState<Item | null>(null)
   const [title, scheduleTitle, saveTitle] = usePageTitle(item, ctx)
   const alive_ref = useRef(true)
@@ -115,11 +116,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const clearSelection = () => {
+    structural_undo_ref.current = false
     setSelectedIds([])
     setSelectionAnchorId(null)
   }
 
   const selectOne = (id: ItemID) => {
+    structural_undo_ref.current = false
     setActiveBlockId(null)
     setFocusRequest(null)
     setSelectedIds([id])
@@ -209,6 +212,22 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       } finally {
         history_busy_ref.current = false
       }
+    }
+  }
+
+  const handleStructuralUndoCapture = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const modifier = event.metaKey || event.ctrlKey
+    if (
+      structural_undo_ref.current &&
+      event.target instanceof HTMLTextAreaElement &&
+      modifier &&
+      !event.shiftKey &&
+      (event.key === 'z' || event.key === 'Z')
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      structural_undo_ref.current = false
+      void undoDelete()
     }
   }
 
@@ -324,6 +343,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     setSelectionAnchorId(null)
     setUndoStack([])
     setRedoStack([])
+    structural_undo_ref.current = false
     void loadChildren(true, true)
     return () => { alive_ref.current = false }
   }, [item.id])
@@ -519,7 +539,39 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const index = list.findIndex(child => child.id === current.id)
     const previous = index > 0 ? list[index - 1] : undefined
 
-    if (previous !== undefined && isTextBlockRole(previous.role)) {
+    if (value.length === 0 && (current.role === 'text-list' || current.role === 'text-todo')) {
+      try {
+        const converted = await ctx.api.rpc.convertTextBlock({
+          id: current.id,
+          role: 'text-block',
+          title: '',
+          attributes: {},
+        })
+        patchChild(converted.id, {
+          role: converted.role,
+          title: converted.title,
+          attributes: converted.attributes,
+        })
+        focusBlock(converted.id, 'end')
+      } catch (err) {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+        void loadChildren()
+      }
+    } else if (value.length === 0 && isTextBlockRole(current.role)) {
+      if (previous !== undefined && isTextBlockRole(previous.role)) {
+        try {
+          const snapshots = await ctx.api.rpc.deleteItems([current.id])
+          removeChild(current.id)
+          setUndoStack(prev => [...prev, { ids: [current.id], items: snapshots }])
+          setRedoStack([])
+          structural_undo_ref.current = true
+          focusBlock(previous.id, 'end')
+        } catch (err) {
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          void loadChildren()
+        }
+      }
+    } else if (previous !== undefined && isTextBlockRole(previous.role)) {
       const merged = mergeTextBlock(previous.title, value)
       try {
         await ctx.api.rpc.updateItem({ id: previous.id, data: { title: merged.title } })
@@ -530,14 +582,6 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       } catch (err) {
         ctx.showError(err instanceof Error ? err.message : String(err))
         void loadChildren()
-      }
-    } else if (value.length === 0) {
-      try {
-        await ctx.api.rpc.deleteItem({ id: current.id })
-        removeChild(current.id)
-        setFocusRequest(null)
-      } catch (err) {
-        ctx.showError(err instanceof Error ? err.message : String(err))
       }
     }
   }
@@ -982,6 +1026,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       className="page-full"
       tabIndex={-1}
       onKeyDown={handlePageKeyDown}
+      onKeyDownCapture={handleStructuralUndoCapture}
       onDragEnter={handlePageDragOver}
       onDragOver={handlePageDragOver}
       onDrop={handlePageDrop}
@@ -1041,8 +1086,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               is_active={active_block_id === child.id}
               focus_request={focus_request?.id === child.id ? focus_request.request : null}
               onFocusHandled={() => setFocusRequest(null)}
-              onActivate={() => focusBlock(child.id, 'end')}
-              onTitleChange={(id, new_title) => patchChild(id, { title: new_title })}
+              onActivate={() => {
+                structural_undo_ref.current = false
+                focusBlock(child.id, 'end')
+              }}
+              onTitleChange={(id, new_title) => {
+                structural_undo_ref.current = false
+                patchChild(id, { title: new_title })
+              }}
               onSplit={handleSplit}
               onBackspace={handleBackspace}
               onSlashCommand={handleSlashCommand}

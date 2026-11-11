@@ -119,6 +119,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 - `# ` / `## ` / `### ` 只在空 text-block 行首转换为 text-heading-1/2/3；`#### ` 不转换。
 - `- ` / `1. ` / `a. ` / `[] ` / `【】 ` 只在空 text-block 行首转换为 text-list（bullet/number/alpha）或 text-todo。
 - 列表 marker 自动按连续同 kind 计算；Enter 在列表/勾选项中间从光标拆分，右侧进入同类型新项，caret 在新项开头。
+- 空 text-block/heading 的 Backspace 删除当前并进入前一个 text block 末尾；空 list/todo 的 Backspace 转 text-block；结构删除进入页面 undo 栈。
 - 新建 image 默认 `display_width=480px`；后续可左右拖拽调整。
 - 拖拽 block 显示 before/after 插入线；图片任意位置可作为拖拽源。
 - OS 文件拖入页面时只显示 block 插入线，不再显示整页覆盖提示；在 block 上放下不会被 block 拖拽逻辑吞掉。
