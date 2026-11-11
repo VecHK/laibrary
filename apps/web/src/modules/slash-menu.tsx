@@ -16,6 +16,13 @@ function CommandIcon({ id }: { id: SlashCommandId }) {
         <text x="4" y="15" fontSize="10" fontWeight="700" fill="currentColor">H{level}</text>
       </svg>
     )
+  } else if (id === 'page' || id === 'page-open') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M5 2.5h7l3 3v12H5z" />
+        <path d="M12 2.5v3h3" />
+      </svg>
+    )
   } else if (id === 'image') {
     return (
       <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -123,6 +130,9 @@ export function SlashMenu({
                 >
                   <span className="slash-menu-icon"><CommandIcon id={command.id} /></span>
                   <span className="slash-menu-label">{command.label}</span>
+                  {command.suffix !== undefined && (
+                    <span className="slash-menu-suffix">{command.suffix}</span>
+                  )}
                 </button>
               )
             })}

@@ -2,7 +2,7 @@ import type { HeadingRole, Role } from '@laibrary/types'
 
 export type SlashCommandId =
   | 'text' | 'heading-1' | 'heading-2' | 'heading-3'
-  | 'image' | 'file' | 'itemlink' | 'manga'
+  | 'page' | 'page-open' | 'image' | 'file' | 'itemlink' | 'manga'
 export type SlashGroupId = 'suggested' | 'basic'
 
 export type SlashCommand = {
@@ -12,6 +12,7 @@ export type SlashCommand = {
   group: SlashGroupId
   role: string
   aliases: string[]
+  suffix?: string | undefined
 }
 
 export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
@@ -46,6 +47,23 @@ export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
     group: 'basic',
     role: 'text-heading-3',
     aliases: ['h3', 'heading3', 'heading-3', 'biaoti3'],
+  },
+  {
+    id: 'page',
+    label: '新页面',
+    description: '在页面里创建子页面',
+    group: 'suggested',
+    role: 'page',
+    aliases: ['page', '新页面', 'xinyemian', 'subpage'],
+  },
+  {
+    id: 'page-open',
+    label: '新页面',
+    description: '创建子页面并立即打开',
+    suffix: '创建后打开',
+    group: 'suggested',
+    role: 'page',
+    aliases: ['page-open', '新页面打开', 'xinyemian-open', 'subpage-open'],
   },
   {
     id: 'image',
@@ -106,6 +124,10 @@ const __SLASH_GROUPS__: readonly { id: SlashGroupId, label: string }[] = [
   { id: 'basic', label: '基础块' },
 ]
 
+export function orderSlashCommands(commands: readonly SlashCommand[]): readonly SlashCommand[] {
+  return groupSlashCommands(commands).flatMap(group => group.commands)
+}
+
 export function groupSlashCommands(commands: readonly SlashCommand[]): readonly SlashCommandGroup[] {
   return __SLASH_GROUPS__.map(group => ({
     ...group,
@@ -121,7 +143,8 @@ export function filterSlashCommands(query: string): readonly SlashCommand[] {
     return __SLASH_COMMANDS__.filter(command => (
       command.label.toLowerCase().includes(needle) ||
       command.role.toLowerCase().includes(needle) ||
-      command.aliases.some(alias => alias.includes(needle))
+      command.aliases.some(alias => alias.includes(needle)) ||
+      (command.suffix?.toLowerCase().includes(needle) ?? false)
     ))
   }
 }

@@ -93,7 +93,7 @@ npm run test -w @laibrary/web
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 45、types 20、web 41。
+- 当前：server 45、types 20、web 42。
 
 ## 7. Web
 

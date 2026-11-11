@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   detectHeadingShortcut, detectSlashQuery, filterSlashCommands, groupSlashCommands,
-  mergeTextBlock, splitTextBlock, splitTextBlocks,
+  mergeTextBlock, orderSlashCommands, splitTextBlock, splitTextBlocks,
 } from '../src/lib/text-block-editor'
 
 describe('slash query', () => {
@@ -18,19 +18,32 @@ describe('slash query', () => {
   it('中文、英文和 role 都能筛选', () => {
     expect(detectSlashQuery('/', 1)).not.toBeNull()
     expect(filterSlashCommands('').map(command => command.id)).toEqual([
-      'text', 'heading-1', 'heading-2', 'heading-3', 'image', 'file', 'itemlink', 'manga',
+      'text', 'heading-1', 'heading-2', 'heading-3', 'page', 'page-open', 'image', 'file', 'itemlink', 'manga',
     ])
     expect(filterSlashCommands('图').map(command => command.id)).toEqual(['image'])
     expect(filterSlashCommands('img').map(command => command.id)).toEqual(['image'])
     expect(filterSlashCommands('item').map(command => command.id)).toEqual(['itemlink'])
+    expect(filterSlashCommands('新页面').map(command => command.id)).toEqual(['page', 'page-open'])
+    expect(filterSlashCommands('打开').map(command => command.id)).toEqual(['page-open'])
     expect(filterSlashCommands('manga').map(command => command.id)).toEqual(['manga'])
     expect(filterSlashCommands('不存在')).toEqual([])
+  })
+
+  it('orders commands by the displayed group order', () => {
+    const ordered = orderSlashCommands(filterSlashCommands(''))
+    expect(ordered[0]?.id).toBe('page')
+    expect(ordered.map(command => command.id)).toEqual([
+      'page', 'page-open', 'image', 'file', 'itemlink',
+      'text', 'heading-1', 'heading-2', 'heading-3', 'manga',
+    ])
   })
 
   it('groups commands for the Notion-style menu', () => {
     const groups = groupSlashCommands(filterSlashCommands(''))
     expect(groups.map(group => group.id)).toEqual(['suggested', 'basic'])
-    expect(groups[0]?.commands.map(command => command.id)).toEqual(['image', 'file', 'itemlink'])
+    expect(groups[0]?.commands.map(command => command.id)).toEqual([
+      'page', 'page-open', 'image', 'file', 'itemlink',
+    ])
     expect(groups[1]?.commands.map(command => command.id)).toEqual([
       'text', 'heading-1', 'heading-2', 'heading-3', 'manga',
     ])

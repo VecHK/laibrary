@@ -664,6 +664,30 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     }
   }
 
+  const insertPage = async (placeholder: Item | null, open_after: boolean) => {
+    const order_index = placeholder === null ? appendOrder() : placeholder.order_index
+    try {
+      const created = await ctx.api.rpc.addItem({
+        role: 'page',
+        title: '新页面',
+        parent_id: item.id,
+        order_index,
+      })
+      if (placeholder === null) {
+        insertChild(created)
+        await createTextBlockAfter(created)
+      } else {
+        await replacePlaceholder(placeholder, created)
+      }
+      ctx.refreshSidebar()
+      if (open_after) {
+        ctx.navigate(created.id)
+      }
+    } catch (err) {
+      ctx.showError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const openUpload = (kind: UploadKind, placeholder: Item | null) => {
     pending_upload_ref.current = { kind, placeholder }
     const input = kind === 'image' ? image_input_ref.current : file_input_ref.current
@@ -876,6 +900,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       setPicker(true)
     } else if (command.id === 'manga') {
       void insertManga(placeholder)
+    } else if (command.id === 'page') {
+      void insertPage(placeholder, false)
+    } else if (command.id === 'page-open') {
+      void insertPage(placeholder, true)
     } else if (command.id === 'heading-1') {
       void convertTextBlock(placeholder, 'text-heading-1', '')
     } else if (command.id === 'heading-2') {

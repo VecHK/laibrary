@@ -4,7 +4,8 @@ import { headingLevelOfRole, parseItemTokens } from '@laibrary/types'
 import { InlineText } from './inline-text'
 import { caretAtVisualEdge } from '../lib/caret-edge'
 import {
-  detectHeadingShortcut, detectSlashQuery, filterSlashCommands, splitTextBlock, splitTextBlocks,
+  detectHeadingShortcut, detectSlashQuery, filterSlashCommands, orderSlashCommands,
+  splitTextBlock, splitTextBlocks,
   type SlashCommand,
 } from '../lib/text-block-editor'
 import type { ItemModule, ViewerCtx } from './types'
@@ -63,7 +64,7 @@ function TextBlockEditor({
   const value_ref = useRef(item.title)
 
   const commands = useMemo(
-    () => slash_query === null ? [] : filterSlashCommands(slash_query),
+    () => slash_query === null ? [] : orderSlashCommands(filterSlashCommands(slash_query)),
     [slash_query],
   )
 

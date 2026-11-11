@@ -127,7 +127,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 页面接受 OS 文件拖入：按 MIME/扩展名判断 image 或 file；外部纯文本拖入按空行规则拆成 text-block。
 - Block 焦点：首/末视觉行上下键跨 block；Esc/handle 进入选中模式；内容区外 marquee 框选、内容区内保留普通文本选择；Shift+Arrow 扩展；批量删除 undo 使用 `deleteItems`/`restoreItems` 保持原 ID，历史仅页面内存。Shift+Click/Cmd+Click 不用于 block 多选。
 - 保持焦点、caret 和滚动位置；不要因为保存/父级刷新让 text-block 重新挂载或跳回末尾。
-- `/` 打开插入菜单（文本/一级标题/二级标题/三级标题/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
+- `/` 打开插入菜单（新页面（普通/创建后打开）/文本/一级标题/二级标题/三级标题/图片/附件/链接/漫画）；支持上下键、Enter、Esc、鼠标选择。
 - Enter 在当前光标处拆行并聚焦新行；Shift+Enter 软换行；空行 Backspace 删除，行首 Backspace 合并到上一条 text-block。
 - 中文 IME composing 时不能误触发 Enter/斜杠命令。
 - 链接选择器必须排除当前占位行，避免 itemlink 指向马上被删除的 Item。

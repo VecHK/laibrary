@@ -1207,8 +1207,19 @@ button {
 }
 
 .slash-menu-label {
+  flex: none;
   font-size: 13px;
   font-weight: 500;
+}
+
+.slash-menu-suffix {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #9b9a97;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .slash-menu-desc {
