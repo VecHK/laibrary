@@ -241,10 +241,6 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   return (
     <div className="manga-reader-wrap">
       <div className="manga-toolbar">
-        <button className="button" onClick={() => {
-          if (item.parent_id !== null) {ctx.navigate(item.parent_id)}
-          else {ctx.navigate({ name: 'plaza' })}
-        }}>← 返回</button>
         <span className="manga-title">{item.title}</span>
         <button className="button" onClick={() => file_input_ref.current?.click()}>
           ＋ 添加页

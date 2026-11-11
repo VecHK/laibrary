@@ -371,13 +371,6 @@ function ImageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     <div className="image-full" onClick={() => ctx.navigate(item.parent_id ?? item.id)}>
       <div className="image-full-bar">
         <span className="image-full-title">{item.title}</span>
-        <button
-          className="button"
-          onClick={ev => {
-            ev.stopPropagation()
-            if (item.parent_id !== null) {ctx.navigate(item.parent_id)}
-          }}
-        >返回</button>
       </div>
       {src !== null ? (
         <img className="image-full-img" src={src} alt={item.title} />

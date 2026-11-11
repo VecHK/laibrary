@@ -1,4 +1,4 @@
-import type { BlobID, Item, ItemID, ThumbSize } from '@laibrary/types'
+import type { BlobID, FileAttributes, ImageAttributes, Item, ItemID, ThumbSize } from '@laibrary/types'
 import {
   createBlobUrl, createThumbUrl, uploadBlob,
 } from '@laibrary/types'
@@ -40,6 +40,17 @@ export type CreateMediaItemOptions = {
   order_index?: number | undefined
 }
 
+export function mediaAttributesFor(
+  role: 'image' | 'file',
+  filename: string,
+): ImageAttributes | FileAttributes {
+  if (role === 'image') {
+    return { filename, display_width: 480 }
+  } else {
+    return { filename }
+  }
+}
+
 export async function createImageItem({
   api, file, parent_id, order_index,
 }: CreateMediaItemOptions): Promise<Item> {
@@ -50,7 +61,7 @@ export async function createImageItem({
     parent_id,
     order_index,
     blob_id: blob.id,
-    attributes: { filename: file.name, display_width: 480 },
+    attributes: mediaAttributesFor('image', file.name),
   })
 }
 
@@ -64,6 +75,6 @@ export async function createFileItem({
     parent_id,
     order_index,
     blob_id: blob.id,
-    attributes: { filename: file.name, display_width: 480 },
+    attributes: mediaAttributesFor('file', file.name),
   })
 }

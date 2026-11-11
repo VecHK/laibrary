@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Item, ItemID } from '@laibrary/types'
 import type { ViewerCtx } from '../modules/types'
+import { Breadcrumbs } from './Breadcrumbs'
 
 function TagBar({
   item, ctx, onChange,
@@ -135,22 +136,10 @@ function ItemContent({
   onChange: (item: Item) => void
 }) {
   const module = ctx.modules.resolve(item)
-  const back = () => {
-    if (item.parent_id !== null) {
-      ctx.navigate(item.parent_id)
-    } else {
-      ctx.navigate({ name: 'plaza' })
-    }
-  }
 
   return (
     <div className="item-view">
-      <div className="breadcrumb">
-        <button className="link-button" onClick={back}>⬅ 返回</button>
-        {item.role !== 'page' && (
-          <span className="breadcrumb-role">{item.role}{item.kind ? ` · ${item.kind}` : ''}</span>
-        )}
-      </div>
+      <Breadcrumbs item={item} ctx={ctx} />
       <div className="item-content">
         {module.Presenter.full(item, ctx)}
       </div>

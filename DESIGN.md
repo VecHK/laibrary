@@ -108,6 +108,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 - 连接页设置 API baseurl（localStorage）。
 - page block 编辑器：text-block / text-heading-1/2/3 / image / file / itemlink / entity；所有 text-* 共用 TextBlock 输入组件。无固定工具栏，`/` 分组插入菜单、Enter 拆行、Shift+Enter 软换行；hover gutter + block 菜单；文本编辑不触发整页刷新。
 - 页面视觉：正文 `708px` 居中、标题 40px；无每行白框、无常驻删除按钮；左侧 hover 显示 `＋` 和拖拽把手。
+- 顶部导航：`🏠 Home Page / 祖先页面 / 当前页面` Breadcrumbs；Home Page 指向 plaza，祖先可点击，当前不可点；不显示自定义返回按钮，浏览器后退继续可用。顶栏统一 `--topbar-inset/--topbar-height`，侧边栏 `Laibrary` 与 Breadcrumbs 垂直中心对齐。
 - Block 焦点：text-block 首/末视觉行上下键跨 block；Esc/handle 进入选中模式；只在 `.page-full` 外 marquee 框选，内容区内保留普通文本选择；Shift+Arrow 扩展；Del/Backspace 批量删除；不使用 Shift+Click/Cmd+Click 多选。
 - 批量删除 undo/redo 使用 `deleteItems`/`restoreItems` 快照与显式原 ID 恢复；仅页面内存历史，不做 Trash。
 - 图片 block：左右拖拽等比缩放（宽度 80–1440px）、Alignment/Caption/Expand/Download 浮层、双击/Expand 打开 lightbox；放大预加载更高缩略图，缩小不请求更小图。
@@ -154,7 +155,7 @@ docs             规格、愿景、名词表、方法论、重构记录
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
 - Server 使用闭包工厂（BlobStore/BlobService/ConfigStore/ThumbnailService）与组合根；Web 使用显式 session/tag store/module registry，无 RPC/标签模块单例。
 - 漫画阅读器；局域网可运行。
-- 测试：server 45、types 20、web 40；lint/typecheck/build 通过。
+- 测试：server 45、types 20、web 41；lint/typecheck/build 通过。
 
 待做：
 

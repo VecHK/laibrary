@@ -123,6 +123,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 文本输入不调用全局 `ctx.refresh()`；`ItemView` 只在切换 item 时显示 loading，后台刷新不得清空当前 item。
 - 页面编辑器不设置固定插入工具栏；插入走 `/`；block 控件只在 hover 时出现。
 - 侧边栏树只包含 page/database/itemlink；只有 page 可展开，database/itemlink 是叶子。节点 `+` / `···` 按侧边栏规格实现；Trash 未实现前 Remove 只能永久删除空容器。
+- 顶部导航只用 Breadcrumbs（Home Page / 祖先 / 当前）；首页进 plaza，祖先可点击，当前不可点；不实现自定义返回按钮，依赖 hash 路由和浏览器后退。
 - 页面接受 OS 文件拖入：按 MIME/扩展名判断 image 或 file；外部纯文本拖入按空行规则拆成 text-block。
 - Block 焦点：首/末视觉行上下键跨 block；Esc/handle 进入选中模式；内容区外 marquee 框选、内容区内保留普通文本选择；Shift+Arrow 扩展；批量删除 undo 使用 `deleteItems`/`restoreItems` 保持原 ID，历史仅页面内存。Shift+Click/Cmd+Click 不用于 block 多选。
 - 保持焦点、caret 和滚动位置；不要因为保存/父级刷新让 text-block 重新挂载或跳回末尾。
