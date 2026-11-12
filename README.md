@@ -20,18 +20,18 @@ Laibrary 是一个“一切皆 Item”的个人数据基座：结构化数据、
 
 ## 快速开始
 
-要求：Node 24、Docker（PostgreSQL 18）。
+要求：Node 26.13.1+、pnpm 12+、Docker（PostgreSQL 18）。
 
 ```bash
 cp .env.example .env
 docker compose up -d postgres
-npm install
+pnpm install
 
 # API（默认 http://127.0.0.1:44998）
-npm run dev
+pnpm dev
 
 # 另开终端：Web（http://127.0.0.1:5173）
-npm run web
+pnpm web
 ```
 
 Web 首次打开会要求填写 API 地址（默认 `http://127.0.0.1:44998`），地址存在 localStorage。
@@ -39,10 +39,10 @@ Web 首次打开会要求填写 API 地址（默认 `http://127.0.0.1:44998`）�
 ### 检查
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build -w @laibrary/web
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
 测试需要 PostgreSQL。测试库默认 `postgres://root:root@127.0.0.1:5432/laibrary_test`，可用 `TEST_DATABASE_URL` 覆盖；测试会重建 schema。
@@ -56,8 +56,8 @@ npm run build -w @laibrary/web
 docker compose exec -T postgres psql -U root -d root \
   -c 'DROP SCHEMA public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;'
 rm -rf storage
-npm run db:migrate
-npm run dev
+pnpm db:migrate
+pnpm dev
 ```
 
 ## 配置

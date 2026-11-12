@@ -33,10 +33,10 @@
 ## 命令
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build -w @laibrary/web
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
 ## 相关

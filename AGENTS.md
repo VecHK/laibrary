@@ -159,7 +159,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 行为符合当前规格；公开 API/schema 变化已同步类型、文档和索引。
 - 正常路径、边界情况和失败路径都有合理处理；没有静默吞错。
 - 行为变更带测试；前端交互做了浏览器/headless 验证。
-- `npm run lint`、`npm run typecheck`、`npm test`、`npm run build -w @laibrary/web` 通过（或明确说明未跑原因）。
+- `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 通过（或明确说明未跑原因）。
 - 没有未授权的数据/配置/进程破坏，没有无关 diff。
 - 交付说明列出改动文件、行为变化、验证结果、偏离项和遗留问题。
 
@@ -177,10 +177,10 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 ## 测试与验收
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build -w @laibrary/web
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
 - 行为变更必须有测试；bugfix 先有回归用例。
@@ -209,7 +209,7 @@ npm run build -w @laibrary/web
 
 ## 环境备注（会变化）
 
-- Node 24、PostgreSQL 18、drizzle、Koa、zod、sharp、React 19、Vite、Vitest。
+- Node 26.13.1（nvm，见 `.nvmrc`）、pnpm 12、PostgreSQL 18、drizzle、Koa、zod、sharp、React 19、Vite、Vitest。
 - 默认 API `http://127.0.0.1:44998`，Web `http://127.0.0.1:5173`。
 - bootstrap 在根 `.env`；`.env` 不提交；`config.json` 已移除。
 - Docker 开发库与测试库分离；开发数据可能被用户继续使用。

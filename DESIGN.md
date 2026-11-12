@@ -146,7 +146,7 @@ packages/web         @laibrary/web：React 19 + Vite
 docs             规格、愿景、名词表、方法论、重构记录
 ```
 
-技术栈：Node 24、PostgreSQL 18、drizzle-orm、Koa、zod、sharp、React 19、Vite 8、Vitest。
+技术栈：Node 26.13.1、pnpm 12、PostgreSQL 18、drizzle-orm、Koa、zod、sharp、React 19、Vite 8、Vitest。
 
 ## 11. 当前状态（v2 POC）
 

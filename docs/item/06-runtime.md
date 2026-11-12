@@ -68,7 +68,7 @@ bootstrapLoadEnv() + bootstrapLoadConfig()
 ### clean（GC）
 
 ```bash
-npm run clean
+pnpm clean
 ```
 
 `appPrepare` → 读 `gc_grace_hours` → `cleanUnreferencedBlobs` → 批量删无引用 blob → 退出。
@@ -76,17 +76,17 @@ npm run clean
 ### DB
 
 ```bash
-npm run db:generate   # drizzle 生成迁移
-npm run db:migrate    # 应用迁移
+pnpm db:generate   # drizzle 生成迁移
+pnpm db:migrate    # 应用迁移
 ```
 
 ## 6. 测试
 
 ```bash
-npm test
-npm run test -w @laibrary/server
-npm run test -w @laibrary/types
-npm run test -w @laibrary/web
+pnpm test
+pnpm --filter @laibrary/server test
+pnpm --filter @laibrary/types test
+pnpm --filter @laibrary/web test
 ```
 
 - server 测试需要 PostgreSQL；`TEST_DATABASE_URL` 默认 laibrary_test。
@@ -98,7 +98,7 @@ npm run test -w @laibrary/web
 ## 7. Web
 
 ```bash
-npm run web   # Vite 5173
+pnpm web   # Vite 5173
 ```
 
 - 连接页保存 API baseurl 到 localStorage。
@@ -113,12 +113,12 @@ npm run web   # Vite 5173
 - 侧边栏：page/database/itemlink 树；page 才可展开，database/itemlink 不展开。节点 hover 显示 `+`（page/database，以及 target=page 的 itemlink）和 page/database 的 `···` 菜单。
 - 侧边栏菜单：Copy link、Rename、Move to、Remove、Open in new tab、Open in side peek；显示 Last edited / Created Date。Trash 未实现，非空容器暂不允许 Remove。
 - 页面/数据库/ Itemlink 的 emoji 图标存 `attributes.icon`；缺省回退 📄/🗄️/🔗。
-- 构建：`npm run build -w @laibrary/web`。
+- 构建：`pnpm build`。
 
 ## 8. 部署（当前）
 
 - `docker compose up -d postgres`（postgres:18，数据在 `./volumes/postgres_data`）。
-- API 在宿主机 `npm run dev`；Web 在宿主机 `npm run web`；或由反代托管 dist。
+- API 在宿主机 `pnpm dev`；Web 在宿主机 `pnpm web`；或由反代托管 dist。
 - 局域网直接访问；公网需要额外反代 + Cloudflare Access/token（未实现）。
 - 单用户、单实例；不要直接暴露 44998 到公网。
 

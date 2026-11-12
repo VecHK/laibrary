@@ -47,7 +47,7 @@ packages/web/src/
 - Page children 由 PageFull 本地持有；不是全局 store。
 - Undo 目前是页面内存级、结构删除优先；不是完整 command journal。
 - 无 Trash、无嵌套列表、无协作、无鉴权。
-- 当前运行方式：`npm run web`（Vite 5173）+ API 44998。
+- 当前运行方式：`pnpm web`（Vite 5173）+ API 44998。
 
 ## 相关文档
 

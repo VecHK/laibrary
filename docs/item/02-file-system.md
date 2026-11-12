@@ -79,7 +79,7 @@ BLOB_PATH/<hash[0:2]>/<hash[2:4]>/<hash>
 
 ## 8. GC
 
-`npm run clean`：
+`pnpm clean`：
 
 1. 从 `items.blob_id` + `thumbnails.blob_id` 收集引用。
 2. 找 `create_date < now - grace` 且无引用的 blobs。

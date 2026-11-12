@@ -81,7 +81,7 @@ PRIMARY KEY (image_id, size)
 docker compose exec -T postgres psql -U root -d root \
   -c 'DROP SCHEMA public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;'
 rm -rf storage
-npm run db:migrate
+pnpm db:migrate
 ```
 
 `drizzle` schema 保存迁移 journal；只 drop public 会导致迁移被跳过。

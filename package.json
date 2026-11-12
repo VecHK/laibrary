@@ -3,19 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=26.13.1"
+  },
   "scripts": {
-    "dev": "npm run dev -w @laibrary/server",
-    "web": "npm run dev -w @laibrary/web",
-    "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "db:generate": "npm run db:generate -w @laibrary/server",
-    "db:migrate": "npm run db:migrate -w @laibrary/server",
-    "clean": "npm run clean -w @laibrary/server",
+    "dev": "pnpm --filter @laibrary/server dev",
+    "web": "pnpm --filter @laibrary/web dev",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "build": "pnpm --filter @laibrary/web build",
+    "db:generate": "pnpm --filter @laibrary/server db:generate",
+    "db:migrate": "pnpm --filter @laibrary/server db:migrate",
+    "clean": "pnpm --filter @laibrary/server clean",
     "lint": "oxlint --deny-warnings",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build -w @laibrary/web"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "oxlint": "^1.92.0",
