@@ -1,6 +1,6 @@
 # Image Block
 
-[image.tsx](../../../apps/web/src/modules/image.tsx)、[blob.ts](../../../apps/web/src/lib/blob.ts)
+[image.tsx](../../../packages/web/src/modules/image.tsx)、[blob.ts](../../../packages/web/src/lib/blob.ts)
 
 ## 数据
 

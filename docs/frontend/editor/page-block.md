@@ -1,6 +1,6 @@
 # PageBlock
 
-[page-block.tsx](../../../apps/web/src/modules/page-block.tsx)
+[page-block.tsx](../../../packages/web/src/modules/page-block.tsx)
 
 ## 职责
 

@@ -1,6 +1,6 @@
 # App Shell
 
-[App.tsx](../../../apps/web/src/App.tsx)、[MainLayout.tsx](../../../apps/web/src/views/MainLayout.tsx)、[ConnectScreen.tsx](../../../apps/web/src/views/ConnectScreen.tsx)
+[App.tsx](../../../packages/web/src/App.tsx)、[MainLayout.tsx](../../../packages/web/src/views/MainLayout.tsx)、[ConnectScreen.tsx](../../../packages/web/src/views/ConnectScreen.tsx)
 
 ## App
 

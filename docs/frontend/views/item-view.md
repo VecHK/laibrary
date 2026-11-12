@@ -1,6 +1,6 @@
 # ItemView / ItemContent
 
-[ItemView.tsx](../../../apps/web/src/views/ItemView.tsx)
+[ItemView.tsx](../../../packages/web/src/views/ItemView.tsx)
 
 ## 加载
 

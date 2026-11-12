@@ -1,6 +1,6 @@
 # 前端文档引言
 
-> 这是 `apps/web` 的入口文档。领域模型、API、数据库仍以根目录 `AGENTS.md`、`DESIGN.md`、`docs/item/` 为准；前端/编辑器术语见 [glossary.md](glossary.md)。
+> 这是 `packages/web` 的入口文档。领域模型、API、数据库仍以根目录 `AGENTS.md`、`DESIGN.md`、`docs/item/` 为准；前端/编辑器术语见 [glossary.md](glossary.md)。
 
 ## 目的
 
@@ -18,12 +18,12 @@
 5. [editor/](editor/)：编辑器区域与所有 block 模块。
 6. [views/](views/)：页面壳、侧边栏、Breadcrumbs、Plaza、Settings、SidePeek。
 7. [mechanisms/](mechanisms/)：错误、blob、配置、标签、可访问性、性能、测试。
-8. [reference/file-map.md](reference/file-map.md)：`apps/web/src` 文件到文档的映射。
+8. [reference/file-map.md](reference/file-map.md)：`packages/web/src` 文件到文档的映射。
 
 ## 目录地图
 
 ```text
-apps/web/src/
+packages/web/src/
   App.tsx / main.tsx      应用组合根、session、路由
   views/                  页面壳与页面区域
   modules/                Item 模块与编辑器 block 呈现

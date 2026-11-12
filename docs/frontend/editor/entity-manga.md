@@ -1,6 +1,6 @@
 # Entity / Manga
 
-[entity.tsx](../../../apps/web/src/modules/entity.tsx)、[manga.tsx](../../../apps/web/src/modules/manga.tsx)
+[entity.tsx](../../../packages/web/src/modules/entity.tsx)、[manga.tsx](../../../packages/web/src/modules/manga.tsx)
 
 ## Entity
 

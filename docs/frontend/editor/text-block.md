@@ -1,6 +1,6 @@
 # TextBlock
 
-[text-block.tsx](../../../apps/web/src/modules/text-block.tsx)
+[text-block.tsx](../../../packages/web/src/modules/text-block.tsx)
 
 ## 职责
 

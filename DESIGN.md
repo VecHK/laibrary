@@ -142,7 +142,7 @@ tag 只做用户分类；`sys/type/*`、`custom`、`sys/related/*` 已移除。
 ```text
 packages/types   @laibrary/types：类型、zod、action schemas、RPC client、token parser、blob/thumb URL
 packages/server  @laibrary/server：Koa RPC、drizzle/PG、blob store、thumbnail service、config service、GC CLI
-apps/web         @laibrary/web：React 19 + Vite
+packages/web         @laibrary/web：React 19 + Vite
 docs             规格、愿景、名词表、方法论、重构记录
 ```
 

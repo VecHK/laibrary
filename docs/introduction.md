@@ -97,7 +97,7 @@ Laibrary 不是笔记软件，不是文件管理器，也不是传统的数据�
 
 | 文档 | 内容 | 什么时候读 |
 |---|---|---|
-| [frontend/introduction.md](frontend/introduction.md) | 前端文档入口、目录、阅读顺序 | 改 `apps/web` 前 |
+| [frontend/introduction.md](frontend/introduction.md) | 前端文档入口、目录、阅读顺序 | 改 `packages/web` 前 |
 | [frontend/designs.md](frontend/designs.md) | UI/UX 原则 | 做交互/视觉设计前 |
 | [frontend/glossary.md](frontend/glossary.md) | 编辑器/前端术语，Item/Block/TextBlock 区分 | 改编辑器前必读 |
 | [frontend/architecture.md](frontend/architecture.md) | App shell、session、路由、模块 registry | 改前端结构前 |

@@ -1,6 +1,6 @@
 # 前端文件地图
 
-> 新增/移动 `apps/web/src` 文件时必须同步本表；没有映射说明该区域没有文档。
+> 新增/移动 `packages/web/src` 文件时必须同步本表；没有映射说明该区域没有文档。
 
 ## 入口与全局
 
@@ -72,4 +72,4 @@
 
 ## tests
 
-`apps/web/test/*.test.ts` 覆盖纯函数与 registry；交互测试见 [testing](../mechanisms/testing.md)。浏览器验证不进入仓库自动化，但每次 UI 改动必须执行。
+`packages/web/test/*.test.ts` 覆盖纯函数与 registry；交互测试见 [testing](../mechanisms/testing.md)。浏览器验证不进入仓库自动化，但每次 UI 改动必须执行。

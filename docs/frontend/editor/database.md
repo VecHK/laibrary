@@ -1,6 +1,6 @@
 # Database
 
-[database.tsx](../../../apps/web/src/modules/database.tsx)
+[database.tsx](../../../packages/web/src/modules/database.tsx)
 
 ## 数据
 

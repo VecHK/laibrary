@@ -1,6 +1,6 @@
 # PageFull
 
-[page.tsx](../../../apps/web/src/modules/page.tsx)
+[page.tsx](../../../packages/web/src/modules/page.tsx)
 
 ## 职责
 

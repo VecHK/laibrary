@@ -1,6 +1,6 @@
 # Itemlink
 
-[itemlink.tsx](../../../apps/web/src/modules/itemlink.tsx)
+[itemlink.tsx](../../../packages/web/src/modules/itemlink.tsx)
 
 ## 两种链接
 

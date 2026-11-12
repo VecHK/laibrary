@@ -2,7 +2,7 @@
 
 ## 连接
 
-[ConnectScreen](../../../apps/web/src/views/ConnectScreen.tsx) 接收 API base URL：
+[ConnectScreen](../../../packages/web/src/views/ConnectScreen.tsx) 接收 API base URL：
 
 1. `settingsParseBaseUrl` 只允许 http/https；
 2. `CreateRpcClient({ base_url })`；

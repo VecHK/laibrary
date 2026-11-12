@@ -1,6 +1,6 @@
 # Settings
 
-[SettingsView.tsx](../../../apps/web/src/views/SettingsView.tsx)
+[SettingsView.tsx](../../../packages/web/src/views/SettingsView.tsx)
 
 ## 内容
 

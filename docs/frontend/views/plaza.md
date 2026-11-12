@@ -1,6 +1,6 @@
 # Plaza
 
-[PlazaView.tsx](../../../apps/web/src/views/PlazaView.tsx)
+[PlazaView.tsx](../../../packages/web/src/views/PlazaView.tsx)
 
 - 全部/页面/漫画/图片/文件/数据库/标签筛选；
 - 按 update_date 排序；

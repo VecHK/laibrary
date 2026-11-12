@@ -1,6 +1,6 @@
 # Slash Menu
 
-[text-block-editor.ts](../../../apps/web/src/lib/text-block-editor.ts)、[slash-menu.tsx](../../../apps/web/src/modules/slash-menu.tsx)
+[text-block-editor.ts](../../../packages/web/src/lib/text-block-editor.ts)、[slash-menu.tsx](../../../packages/web/src/modules/slash-menu.tsx)
 
 ## 触发
 

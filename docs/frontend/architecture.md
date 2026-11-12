@@ -26,7 +26,7 @@ App
 
 ## 路由器
 
-[hash-router.ts](../../apps/web/src/lib/hash-router.ts) 解析：
+[hash-router.ts](../../packages/web/src/lib/hash-router.ts) 解析：
 
 - `#/plaza`
 - `#/item/:id`
@@ -36,7 +36,7 @@ App
 
 ## 模块系统
 
-[registry.ts](../../apps/web/src/modules/registry.ts) 持有：
+[registry.ts](../../packages/web/src/modules/registry.ts) 持有：
 
 - `role_modules: Record<Role, ItemModule>`
 - `kind_modules: ItemModule[]`

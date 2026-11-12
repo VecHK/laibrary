@@ -1,6 +1,6 @@
 # Breadcrumbs
 
-[Breadcrumbs.tsx](../../../apps/web/src/views/Breadcrumbs.tsx)
+[Breadcrumbs.tsx](../../../packages/web/src/views/Breadcrumbs.tsx)
 
 ## 显示
 

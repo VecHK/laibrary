@@ -1,6 +1,6 @@
 # Block 拖拽排序
 
-[page-block.tsx](../../../apps/web/src/modules/page-block.tsx)、[page.tsx](../../../apps/web/src/modules/page.tsx)
+[page-block.tsx](../../../packages/web/src/modules/page-block.tsx)、[page.tsx](../../../packages/web/src/modules/page.tsx)
 
 ## 拖拽源
 

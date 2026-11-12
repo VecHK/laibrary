@@ -2,7 +2,7 @@
 
 ## 单元
 
-`apps/web/test/`：
+`packages/web/test/`：
 
 - 纯函数：order、text-block-editor、text-list、marquee、image-thumb、hash-router、date-format；
 - 稳定 registry/sidebar tree；

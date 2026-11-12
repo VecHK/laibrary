@@ -1,6 +1,6 @@
 # Sidebar
 
-[Sidebar.tsx](../../../apps/web/src/views/Sidebar.tsx)、[SidebarItemMenu.tsx](../../../apps/web/src/views/SidebarItemMenu.tsx)
+[Sidebar.tsx](../../../packages/web/src/views/Sidebar.tsx)、[SidebarItemMenu.tsx](../../../packages/web/src/views/SidebarItemMenu.tsx)
 
 ## 内容
 

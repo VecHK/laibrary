@@ -1,6 +1,6 @@
 # Side Peek
 
-[SidePeek.tsx](../../../apps/web/src/views/SidePeek.tsx)
+[SidePeek.tsx](../../../packages/web/src/views/SidePeek.tsx)
 
 - 右侧覆盖面板，独立 item_id；
 - 复用 ItemView/PageFull；

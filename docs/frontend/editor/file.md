@@ -1,6 +1,6 @@
 # File Block
 
-[file.tsx](../../../apps/web/src/modules/file.tsx)、[blob.ts](../../../apps/web/src/lib/blob.ts)
+[file.tsx](../../../packages/web/src/modules/file.tsx)、[blob.ts](../../../packages/web/src/lib/blob.ts)
 
 ## 数据
 
