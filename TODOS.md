@@ -50,3 +50,12 @@
 - 富文本 Item 的 undo 不能只依赖粗粒度 Item 快照。
 
 - 嵌套列表、列表缩进/多级列表尚未实现。
+
+## 工具链评估
+
+### TypeScript 7（2026-11 评估，已采用）
+
+- 评估方式：临时分支 `spike/ts7` 升级到 7.0.2，跑 `pnpm typecheck` / `pnpm test` / `pnpm build`。
+- 结果：三项全绿，无需改业务代码或 tsconfig；本仓库 typecheck 耗时 2.87s（6.0.3）→ 1.04s（7.0.2）。
+- 结论：采用 `typescript ^7.0.2`。TS 7 不再提供 JS 编译器 API，但仓库已使用 oxlint、没有 typescript-eslint，当前无工具依赖该 API。
+- 后续注意：引入依赖 TypeScript API 的工具（typescript-eslint、自定义 codemod 等）时，需改用 `@typescript/native` 或 typescript6 兼容包。
