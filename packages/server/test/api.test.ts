@@ -162,6 +162,19 @@ describe('RPC API', () => {
     })
     expect(too_large.status).toBe(413)
     expect((await readJson<ErrorBody>(too_large)).code).toBe('PAYLOAD_TOO_LARGE')
+
+    const with_origin = await app.request('/action', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Origin: 'http://example.test',
+      },
+      body: JSON.stringify({ action: 'no_such_action', payload: {} }),
+    })
+    expect(with_origin.headers.get('access-control-allow-origin')).not.toBeNull()
+
+    const blob_wrong_method = await app.request(`/blob/${'a'.repeat(64)}`, { method: 'PUT' })
+    expect(blob_wrong_method.status).toBe(405)
   })
 
   it('config get/update', async () => {
@@ -236,6 +249,34 @@ describe('RPC API', () => {
     const missing = await fetch(`${base_url}/blob`, { method: 'POST', body: new FormData() })
     expect(missing.status).toBe(400)
     expect((await readJson<ErrorBody>(missing)).code).toBe('BAD_REQUEST')
+  })
+
+  it('坏 multipart 与非法 blob id 都是 4xx', async () => {
+    const malformed = await fetch(`${base_url}/blob`, {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data' },
+      body: 'not-a-multipart-body',
+    })
+    expect(malformed.status).toBe(400)
+    expect((await readJson<ErrorBody>(malformed)).code).toBe('BAD_REQUEST')
+
+    const bad_id = await app.request('/blob/not-a-blob-id')
+    expect(bad_id.status).toBe(400)
+    expect((await readJson<ErrorBody>(bad_id)).code).toBe('VALIDATION')
+  })
+
+  it('上传超过 runtime 上限时为 413', async () => {
+    const updated = await action('updateConfig', {
+      key: 'sys.config.upload_max_bytes',
+      value: 10,
+    })
+    expect(updated.status).toBe(200)
+
+    const form_data = new FormData()
+    form_data.append('file', new File([testPng()], 'too-big.png', { type: 'image/png' }))
+    const res = await fetch(`${base_url}/blob`, { method: 'POST', body: form_data })
+    expect(res.status).toBe(413)
+    expect((await readJson<ErrorBody>(res)).code).toBe('PAYLOAD_TOO_LARGE')
   })
 
   it('itemlink target 校验', async () => {

@@ -14,20 +14,15 @@ import { directoryInitSync } from '../utils/directory'
 const __UPLOAD_HARD_LIMIT_BYTES__ = 1024 * 1024 * 1024
 
 function detectSingleFile(files: Files): FormidableFile {
-  const value = files['file']
-  if (value === undefined) {
+  // formidable v3 的 Files 值恒为数组
+  const list = files['file'] ?? []
+  const file = list[0]
+  if (file === undefined) {
     throw errorsBadRequest("upload failure: require 'file' field")
+  } else if (list.length > 1) {
+    throw errorsBadRequest('upload failure: single upload required')
   } else {
-    // formidable v3 的 files 始终是数组，单文件取第一个
-    const list = Array.isArray(value) ? value : [value]
-    const file = list[0]
-    if (file === undefined) {
-      throw errorsBadRequest("upload failure: require 'file' field")
-    } else if (list.length > 1) {
-      throw errorsBadRequest('upload failure: single upload required')
-    } else {
-      return file
-    }
+    return file
   }
 }
 
@@ -69,8 +64,16 @@ function parseRange(range: string | undefined, size: number): ParsedRange {
   }
 }
 
-function isPayloadTooLarge(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && 'httpCode' in err && err.httpCode === 413
+function httpCodeOf(err: unknown): number | null {
+  if (typeof err === 'object' && err !== null && 'httpCode' in err && typeof err.httpCode === 'number') {
+    return err.httpCode
+  } else {
+    return null
+  }
+}
+
+function errorMessageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 function baseBlobHeaders(mime: string, blob_id: string): Record<string, string> {
@@ -118,8 +121,10 @@ export function CreateBlobRouter({
   app.post('/blob', async c => {
     let temp_path: string | null = null
     try {
+      const max_bytes = await get_max_upload_bytes()
       const form = formidable({
-        maxFileSize: __UPLOAD_HARD_LIMIT_BYTES__,
+        // 解析前就按 runtime 上限拒绝，避免把超限文件完整写进临时目录
+        maxFileSize: Math.min(__UPLOAD_HARD_LIMIT_BYTES__, max_bytes),
         maxFiles: 1,
         maxFields: 1,
         allowEmptyFiles: false,
@@ -131,7 +136,6 @@ export function CreateBlobRouter({
       const uploaded = detectSingleFile(files)
       const upload_path: string = uploaded.filepath
       temp_path = upload_path
-      const max_bytes = await get_max_upload_bytes()
       const stat = await fs.promises.stat(upload_path)
       if (stat.size > max_bytes) {
         throw errorsPayloadTooLarge(`上传文件超过上限 ${max_bytes} 字节`)
@@ -146,29 +150,31 @@ export function CreateBlobRouter({
       if (temp_path !== null) {
         await fs.promises.unlink(temp_path).catch(() => undefined)
       }
-      if (isPayloadTooLarge(err)) {
-        throw errorsPayloadTooLarge('上传文件过大')
-      } else if (errorsIsAppError(err)) {
+      if (errorsIsAppError(err)) {
         throw err
       } else {
-        throw errorsStorage('upload failure', err)
+        const http_code = httpCodeOf(err)
+        if (http_code === 413) {
+          throw errorsPayloadTooLarge('上传文件过大')
+        } else if (http_code !== null && http_code >= 400 && http_code < 500) {
+          throw errorsBadRequest(`upload failure: ${errorMessageOf(err)}`)
+        } else {
+          throw errorsStorage('upload failure', err)
+        }
       }
     }
   })
 
   const readBlob = async (c: Context<{ Bindings: HttpBindings }>) => {
-    const parsed = zBlobID.safeParse(c.req.param('blob_id'))
-    if (!parsed.success) {
-      throw errorsBadRequest('非法的 blob id')
-    }
-    const meta = await blobs.getMeta(parsed.data)
+    const parsed = zBlobID.parse(c.req.param('blob_id'))
+    const meta = await blobs.getMeta(parsed)
     if (meta === null) {
-      throw errorsNotFound(`blob(${parsed.data}) not found`)
+      throw errorsNotFound(`blob(${parsed}) not found`)
     }
-    if (!(await blobs.exists(parsed.data))) {
-      throw errorsNotFound(`blob(${parsed.data}) 文件不存在`)
+    if (!(await blobs.exists(parsed))) {
+      throw errorsNotFound(`blob(${parsed}) 文件不存在`)
     }
-    const stat = await blobs.stat(parsed.data)
+    const stat = await blobs.stat(parsed)
     const range = parseRange(c.req.header('range'), stat.size)
     const headers = baseBlobHeaders(meta.mime, meta.id)
 
@@ -177,11 +183,11 @@ export function CreateBlobRouter({
       return new Response(null, { status: 200, headers })
     } else if (range.kind !== 'range') {
       headers['Content-Length'] = String(stat.size)
-      return streamResponse(blobs.pathFor(parsed.data), 200, headers, null)
+      return streamResponse(blobs.pathFor(parsed), 200, headers, null)
     } else {
       headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`
       headers['Content-Length'] = String(range.end - range.start + 1)
-      return streamResponse(blobs.pathFor(parsed.data), 206, headers, range)
+      return streamResponse(blobs.pathFor(parsed), 206, headers, range)
     }
   }
 
