@@ -6,6 +6,7 @@ import { zItemID, zThumbSize } from '@laibrary/types'
 import type { BlobService } from '../blob/service'
 import type { ThumbnailService } from '../thumbnails/service'
 import { errorsValidation } from '../errors'
+import { unwrapWrite } from '../write-result'
 
 export type CreateThumbRouterOptions = {
   thumbnails: ThumbnailService
@@ -27,7 +28,7 @@ export function CreateThumbRouter({
     } else if (!size_parsed.success) {
       throw errorsValidation(`不支持的缩略图尺寸: ${size_raw}`)
     } else {
-      const meta = await _thumbnails.ensure(image_parsed.data, size_parsed.data)
+      const meta = unwrapWrite(await _thumbnails.ensure(image_parsed.data, size_parsed.data))
       if (!(await _blobs.exists(meta.id))) {
         throw new Error(`thumb blob(${meta.id}) 文件不存在`)
       } else {

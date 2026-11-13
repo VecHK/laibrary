@@ -38,7 +38,7 @@ type ViewerCtx = {
 - Action payload 由 `@laibrary/types` 的 zod schema 在 API 边界校验。
 - RPC client 对响应再次 parse，未知/坏结构直接报错。
 - 错误对象包含 status/code/message；UI 只显示 message，不把服务端堆栈展示给用户。
-- 所有 action 名称集中在 `__RPC_ACTION_NAMES__`。
+- 所有 action 名称集中在 `RPC_ACTION_NAMES`。
 
 ## Base URL
 

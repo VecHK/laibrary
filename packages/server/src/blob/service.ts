@@ -4,6 +4,7 @@ import type { BlobID, BlobMeta } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { blobs, type BlobRow } from '../db/schema'
 import { errorsNotFound, errorsStorage } from '../errors'
+import { type WriteResult, writeRun } from '../write-result'
 import type { BlobStore, StoredBlob } from './store'
 
 export type PutBlobResult = {
@@ -14,8 +15,8 @@ export type PutBlobResult = {
 export type BlobService = {
   readonly store: BlobStore
   readonly init: () => Promise<void>
-  readonly putFile: (temp_path: string, mime: string) => Promise<PutBlobResult>
-  readonly putBuffer: (buf: Buffer, mime: string) => Promise<PutBlobResult>
+  readonly putFile: (temp_path: string, mime: string) => Promise<WriteResult<PutBlobResult>>
+  readonly putBuffer: (buf: Buffer, mime: string) => Promise<WriteResult<PutBlobResult>>
   readonly getMeta: (id: BlobID) => Promise<BlobMeta | null>
   readonly requireMeta: (id: BlobID) => Promise<BlobMeta>
   readonly getRow: (id: BlobID) => Promise<BlobRow | null>
@@ -100,8 +101,8 @@ export function CreateBlobService({
   return {
     store: _store,
     init: _store.init,
-    putFile: async (temp_path, mime) => persist(await _store.putFile(temp_path, mime)),
-    putBuffer: async (buf, mime) => persist(await _store.putBuffer(buf, mime)),
+    putFile: (temp_path, mime) => writeRun(async () => persist(await _store.putFile(temp_path, mime))),
+    putBuffer: (buf, mime) => writeRun(async () => persist(await _store.putBuffer(buf, mime))),
     getMeta,
     requireMeta,
     getRow: async id => {

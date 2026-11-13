@@ -223,6 +223,8 @@ function CreateCounter() {
 
 - 数据默认不可变：修改 = 创建新对象/新数组，不原地改；函数不修改入参。
 - 有副作用（I/O / 网络 / 日志 / 时间 / 随机 / 状态变更）或 mutation 的函数，返回值只能是 `void`（`Promise<void>`）或 `Result<T, E>`；不要返回裸数据、布尔、数组长度。纯查询（无副作用）可以返回数据；可能失败的查询用 `Result`。
+- 领域写函数（repo / service）返回 `void` / `Result`；HTTP / RPC / CLI / 存储适配器等边界可以把 `Result` 失败映射回 `AppError` / `Response` / wire data。边界函数本身可以返回 transport data，但不要把 `Response` 带进业务层。
+- 项目内领域写函数用 `writeRun` 包装，成功返回 data，失败返回 `WriteFailure`；边界用 `unwrapWrite` 映射回 `AppError`。`WriteFailure` 可带内部诊断 `cause`；cause 只用于日志/诊断，不参与业务分支，不序列化到 HTTP/wire；边界转 `AppError` 时透传。
 - 数组禁止原地改：不用 `push` / `pop` / `shift` / `unshift` / `splice` / `sort` / `reverse` / `fill` / `copyWithin`。要变就 `let $arr`，然后 `$arr = [...$arr, x]` / `$arr = $arr.slice(0, 3)`；只有性能瓶颈（有测量依据）才用原地方法，并写 `// justify: 3 <理由>`。
 - 纯函数是默认形态；中间计算保持纯净，脏事在明确的位置一次做完。
 - 副作用集中到可数的点：要么一个函数统一做，要么在流程的固定阶段统一处理。
@@ -703,6 +705,7 @@ type Result<T, E> =
 - 不变量破坏、编程错误、依赖挂了 → throw。
 - 一个函数选定一种，内部不混用；throw ↔ Result 的转换只在边界做一次。
 - `E` 用可辨识联合的失败数据（`{ code: 'NOT_FOUND'; id }`），不要用 `AppError` / `Error` 子类。
+- Result 的失败数据可以带内部诊断 `cause`；cause 不是业务分支依据，也不进入 HTTP/wire；边界转回 `AppError` 时保留 cause。
 
 ### 9.5 Result 与 try/catch：两条通道
 

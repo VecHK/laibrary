@@ -9,6 +9,7 @@ import type { BlobService } from '../src/blob/service'
 import { blobs as blobs_table } from '../src/db/schema'
 import { cleanUnreferencedBlobs, collectReferencedBlobIds } from '../src/blob/gc'
 import { createItem } from '../src/repo/items'
+import { unwrapWrite } from '../src/write-result'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -35,8 +36,8 @@ afterAll(async () => {
 describe('blob store', () => {
   it('内容寻址、扇出路径、去重', async () => {
     const buf = testPng()
-    const first = await $_blobs.putBuffer(buf, 'image/png')
-    const second = await $_blobs.putBuffer(buf, 'image/png')
+    const first = unwrapWrite(await $_blobs.putBuffer(buf, 'image/png'))
+    const second = unwrapWrite(await $_blobs.putBuffer(buf, 'image/png'))
 
     expect(first.blob.id).toMatch(/^[0-9a-f]{64}$/)
     expect(second.blob.id).toBe(first.blob.id)
@@ -52,8 +53,8 @@ describe('blob store', () => {
   })
 
   it('大一些的 buffer 也是同样的 hash', async () => {
-    const a = await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain')
-    const b = await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain')
+    const a = unwrapWrite(await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain'))
+    const b = unwrapWrite(await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain'))
     expect(a.blob.id).toBe(b.blob.id)
     expect(a.blob.size).toBe(5)
     expect(a.blob.width).toBeNull()
@@ -62,15 +63,15 @@ describe('blob store', () => {
 
 describe('blob GC', () => {
   it('只删除无引用且超过宽限期的 blob', async () => {
-    const referenced = await $_blobs.putBuffer(testPng(), 'image/png')
-    const orphan = await $_blobs.putBuffer(Buffer.from('orphan'), 'application/pdf')
+    const referenced = unwrapWrite(await $_blobs.putBuffer(testPng(), 'image/png'))
+    const orphan = unwrapWrite(await $_blobs.putBuffer(Buffer.from('orphan'), 'application/pdf'))
 
-    await createItem($_db, {
+    unwrapWrite(await createItem($_db, {
       role: 'image',
       title: 'image',
       blob_id: referenced.blob.id,
       attributes: { filename: 'pixel.png' },
-    }, $_blobs)
+    }, $_blobs))
 
     const old = new Date(Date.now() - 2 * DAY)
     await $_db.update(blobs_table).set({ create_date: old }).where(eq(blobs_table.id, orphan.blob.id))
@@ -91,7 +92,7 @@ describe('blob GC', () => {
   })
 
   it('宽限期内的孤儿保留', async () => {
-    const orphan = await $_blobs.putBuffer(Buffer.from('new orphan'), 'application/pdf')
+    const orphan = unwrapWrite(await $_blobs.putBuffer(Buffer.from('new orphan'), 'application/pdf'))
     const result = await cleanUnreferencedBlobs({
     db: $_db,
     blobs: $_blobs,

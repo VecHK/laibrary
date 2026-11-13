@@ -5,11 +5,12 @@ import { THUMBNAIL_SIZES } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items, thumbnails } from '../db/schema'
 import { errorsNotFound, errorsPgCode, errorsStorage, errorsValidation } from '../errors'
+import { type WriteResult, unwrapWrite, writeRun } from '../write-result'
 import type { BlobService } from '../blob/service'
 
 export type ThumbnailService = {
   readonly getExisting: (image_id: ItemID, size: ThumbSize) => Promise<BlobMeta | null>
-  readonly ensure: (image_id: ItemID, size: number) => Promise<BlobMeta>
+  readonly ensure: (image_id: ItemID, size: number) => Promise<WriteResult<BlobMeta>>
 }
 
 export type CreateThumbnailServiceOptions = {
@@ -72,7 +73,7 @@ export function CreateThumbnailService({
           throw errorsStorage(`生成缩略图失败: image(${image_id}) size=${size}`, cause)
         }
 
-        const thumb = await _blobs.putBuffer($output.data, 'image/avif')
+        const thumb = unwrapWrite(await _blobs.putBuffer($output.data, 'image/avif'))
         try {
           await _db
             .insert(thumbnails)
@@ -98,7 +99,7 @@ export function CreateThumbnailService({
     }
   }
 
-  const ensure = async (image_id: ItemID, size: number): Promise<BlobMeta> => {
+  const ensure = (image_id: ItemID, size: number): Promise<WriteResult<BlobMeta>> => writeRun(async () => {
     if (!Number.isSafeInteger(image_id) || image_id <= 0) {
       throw errorsValidation('非法的 image id')
     } else if (!isThumbSize(size)) {
@@ -111,17 +112,17 @@ export function CreateThumbnailService({
         const key = `${image_id}:${size}`
         const running = $_in_flight.get(key)
         if (running !== undefined) {
-          return running
+          return await running
         } else {
           const task = generate(image_id, size).finally(() => {
             $_in_flight.delete(key)
           })
           $_in_flight.set(key, task)
-          return task
+          return await task
         }
       }
     }
-  }
+  })
 
   return { getExisting, ensure }
 }

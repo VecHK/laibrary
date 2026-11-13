@@ -9,6 +9,7 @@ import { zBlobID } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
 import type { BlobService } from '../blob/service'
 import { errorsIsAppError, errorsBadRequest, errorsNotFound, errorsPayloadTooLarge, errorsStorage } from '../errors'
+import { unwrapWrite } from '../write-result'
 import { directoryInitSync } from '../utils/directory'
 
 const UPLOAD_HARD_LIMIT_BYTES = 1024 * 1024 * 1024
@@ -143,9 +144,9 @@ export function CreateBlobRouter({
       const mime = typeof uploaded.mimetype === 'string' && uploaded.mimetype.length > 0
                    ? uploaded.mimetype
                    : 'application/octet-stream'
-      const result = await _blobs.putFile(upload_path, mime)
+      const put = unwrapWrite(await _blobs.putFile(upload_path, mime))
       $temp_path = null
-      return c.json(result, 200)
+      return c.json(put, 200)
     } catch (err) {
       if ($temp_path !== null) {
         await fs.promises.unlink($temp_path).catch(() => undefined)

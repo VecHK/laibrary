@@ -10,6 +10,7 @@ import type { DbLike } from '../db/client'
 import { items } from '../db/schema'
 import { errorsBadRequest, errorsConflict, errorsNotFound, errorsPgCode } from '../errors'
 import type { BlobService } from '../blob/service'
+import { writeRun, type WriteResult } from '../write-result'
 import {
   findItemRow, getItemRow, getItemRowForUpdate, getWireItem,
   getWireItemByUnityName, getWireItems,
@@ -25,9 +26,9 @@ function isSystemUnityName(unity_name: string | null | undefined): boolean {
 
 async function maxOrderIndex(db: DbLike, parent_id: ItemID | null): Promise<number> {
   const rows = await db
-    .select({ m: max(items.order_index) })
-    .from(items)
-    .where(parent_id === null ? isNull(items.parent_id) : eq(items.parent_id, parent_id))
+                      .select({ m: max(items.order_index) })
+                      .from(items)
+                      .where(parent_id === null ? isNull(items.parent_id) : eq(items.parent_id, parent_id))
   return rows[0]?.m ?? 0
 }
 
@@ -91,11 +92,14 @@ async function validateTagIds(db: DbLike, tag_ids: readonly ItemID[]): Promise<I
   if (ids.length === 0) {
     return []
   } else {
-    const rows = await db
-      .select({ id: items.id, role: items.role })
-      .from(items)
-      .where(inArray(items.id, ids))
-    const valid = new Set(rows.filter(row => row.role === 'tag').map(row => row.id))
+    const valid = new Set(
+      (
+        await db
+              .select({ id: items.id, role: items.role })
+              .from(items)
+              .where(inArray(items.id, ids))
+      ).filter(row => row.role === 'tag').map(row => row.id)
+    )
     const missing = ids.filter(id => !valid.has(id))
     if (missing.length !== 0) {
       throw errorsBadRequest(`tag 不存在或不是 tag: ${missing.join(', ')}`)
@@ -145,9 +149,10 @@ async function validateBlob(
     const meta = await blobs_service.getMeta(blob_id)
     if (meta === null) {
       throw errorsNotFound(`blob(${blob_id}) not found`)
-    } else if (role === 'image' && (
-      !meta.mime.startsWith('image/') || meta.width === null || meta.height === null
-    )) {
+    } else if (
+      role === 'image' &&
+      (!meta.mime.startsWith('image/') || meta.width === null || meta.height === null)
+    ) {
       throw errorsBadRequest(`blob(${blob_id}) 不是有效图片`)
     } else {
       return meta.id
@@ -168,10 +173,12 @@ function roleKindCheck(role: Role, kind: string | undefined): string | null {
     } else {
       return zKind.parse(kind)
     }
-  } else if (kind !== undefined) {
-    throw errorsBadRequest('只有 entity 允许 kind')
   } else {
-    return null
+    if (kind !== undefined) {
+      throw errorsBadRequest('只有 entity 允许 kind')
+    } else {
+      return null
+    }
   }
 }
 
@@ -184,73 +191,92 @@ export async function createItem(
   form: AddItemForm,
   blobs_service: BlobService,
   options: CreateItemOptions = {},
-): Promise<Item> {
-  const role = zRole.parse(form.role)
-  const kind = roleKindCheck(role, form.kind)
-  const unity_name = form.unity_name === undefined ? null : zUnityName.parse(form.unity_name)
-  assertUnityWritable(form.unity_name, options.allow_system === true)
+): Promise<WriteResult<Item>> {
+  return writeRun(async () => {
+    const role = zRole.parse(form.role)
+    const kind = roleKindCheck(role, form.kind)
+    const unity_name = form.unity_name === undefined ? null : zUnityName.parse(form.unity_name)
+    assertUnityWritable(form.unity_name, options.allow_system === true)
 
-  let $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, form.attributes ?? {}))
+    let $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, form.attributes ?? {}))
 
-  const parent_id = form.parent_id ?? null
-  if (parent_id !== null) {
-    await assertParent(db, parent_id)
-  }
-
-  const schema = await findDatabaseSchema(db, parent_id)
-  if (schema !== null) {
-    if (schemaNeedsUnityName(schema) && unity_name === null) {
-      throw errorsBadRequest('该 database 的 schema 要求 unity_name')
+    const parent_id = form.parent_id ?? null
+    if (parent_id !== null) {
+      await assertParent(db, parent_id)
     }
-    $attributes = itemBuildRowValidator(schema).parse($attributes)
-  }
 
-  const blob_id = await validateBlob(blobs_service, role, form.blob_id)
+    const schema = await findDatabaseSchema(db, parent_id)
+    if (schema !== null) {
+      if (schemaNeedsUnityName(schema) && unity_name === null) {
+        throw errorsBadRequest('该 database 的 schema 要求 unity_name')
+      } else {
+        $attributes = itemBuildRowValidator(schema).parse($attributes)
+      }
+    }
 
-  if (role === 'itemlink') {
-    if (form.target_id === undefined) {throw errorsBadRequest('itemlink 必须提供 target_id')}
-  } else if (form.target_id !== undefined) {
-    throw errorsBadRequest('只有 itemlink 允许 target_id')
-  }
-  const target_id = form.target_id ?? null
-  if (target_id !== null) {await validateTarget(db, target_id)}
+    const blob_id = await validateBlob(blobs_service, role, form.blob_id)
 
-  const tags = await validateTagIds(db, form.tags ?? [])
+    if (role === 'itemlink') {
+      if (form.target_id === undefined) {
+        throw errorsBadRequest('itemlink 必须提供 target_id')
+      }
+    } else {
+      if (form.target_id !== undefined) {
+        throw errorsBadRequest('只有 itemlink 允许 target_id')
+      }
+    }
 
-  const title = form.title ?? ''
-  if (isTextBlockRole(role)) {
-    await validateInlineTokens(db, title)
-  }
+    const target_id = form.target_id ?? null
+    if (target_id !== null) {
+      await validateTarget(db, target_id)
+    }
 
-  const order_index = form.order_index !== undefined
-                      ? form.order_index
-                      : (await maxOrderIndex(db, parent_id) + 1)
+    const tags = await validateTagIds(db, form.tags ?? [])
 
-  try {
-    const new_rows = await db
-      .insert(items)
-      .values({
-        role,
-        kind,
-        unity_name,
-        title,
-        attributes: $attributes,
-        tags,
-        parent_id,
-        order_index,
-        blob_id,
-        target_id,
-      })
-      .returning()
-    const row = new_rows[0]
-    if (row === undefined) {throw new Error('insert returned no row')}
-    return await getWireItem(db, row.id)
-  } catch (err) {
-    const code = errorsPgCode(err)
-    if (code === '23505') {throw errorsConflict('unity_name 或 tag 名重复')}
-    if (code === '23503') {throw errorsConflict('父项或 blob 引用无效')}
-    throw err
-  }
+    const title = form.title ?? ''
+    if (isTextBlockRole(role)) {
+      await validateInlineTokens(db, title)
+    }
+
+    const order_index = form.order_index !== undefined
+                        ? form.order_index
+                        : (await maxOrderIndex(db, parent_id) + 1)
+
+    try {
+      const [row] = (
+        await db
+          .insert(items)
+          .values({
+            role,
+            kind,
+            unity_name,
+            title,
+            attributes: $attributes,
+            tags,
+            parent_id,
+            order_index,
+            blob_id,
+            target_id,
+          })
+          .returning()
+      )
+      if (row === undefined) {
+        throw new Error('insert returned no row')
+      } else {
+        return await getWireItem(db, row.id)
+      }
+    } catch (err) {
+      const code = errorsPgCode(err)
+      switch (code) {
+        case '23505':
+          throw errorsConflict('unity_name 或 tag 名重复')
+        case '23503':
+          throw errorsConflict('父项或 blob 引用无效')
+        default:
+          throw err
+      }
+    }
+  })
 }
 
 export async function getItem(db: DbLike, id: ItemID): Promise<Item> {
@@ -273,76 +299,94 @@ export async function updateItem(
   id: ItemID,
   data: UpdateItemForm,
   _blobs_service: BlobService,
-): Promise<Item> {
-  const prev = await getItemRowForUpdate(db, id)
-  if (isSystemUnityName(prev.unity_name)) {
-    throw errorsBadRequest('系统 item 不能通过通用接口修改')
-  }
-
-  const role = prev.role
-  let $attributes = prev.attributes
-  if (data.attributes !== undefined) {
-    $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, data.attributes))
-  }
-
-  const parent_changed = data.parent_id !== undefined
-  const new_parent_id = parent_changed ? (data.parent_id ?? null) : prev.parent_id
-
-  if (parent_changed && new_parent_id !== null) {
-    await assertParent(db, new_parent_id)
-    if (new_parent_id === id) {throw errorsBadRequest('parent 不能指向自己')}
-    const ancestors = await findAncestorIds(db, new_parent_id, 1000)
-    if (ancestors.includes(id)) {throw errorsConflict('不能移动到自己的后代之下')}
-  }
-
-  const schema = await findDatabaseSchema(db, new_parent_id)
-  if (schema !== null) {
-    if (schemaNeedsUnityName(schema) && prev.unity_name === null) {
-      throw errorsBadRequest('该 database 的 schema 要求 unity_name')
+): Promise<WriteResult<Item>> {
+  return writeRun(async () => {
+    const prev = await getItemRowForUpdate(db, id)
+    if (isSystemUnityName(prev.unity_name)) {
+      throw errorsBadRequest('系统 item 不能通过通用接口修改')
     }
-    $attributes = itemBuildRowValidator(schema).parse($attributes)
-  }
 
-  let $target_id = prev.target_id
-  if (role === 'itemlink') {
-    $target_id = data.target_id ?? prev.target_id
-    if ($target_id === null) {throw errorsBadRequest('itemlink 必须提供 target_id')}
-    await validateTarget(db, $target_id, id)
-  } else if (data.target_id !== undefined) {
-    throw errorsBadRequest('只有 itemlink 允许 target_id')
-  }
+    const role = prev.role
+    let $attributes = prev.attributes
+    if (data.attributes !== undefined) {
+      $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, data.attributes))
+    }
 
-  const tags = data.tags !== undefined
-               ? await validateTagIds(db, data.tags)
-               : prev.tags
+    const parent_changed = data.parent_id !== undefined
+    const new_parent_id = parent_changed ? (data.parent_id ?? null) : prev.parent_id
 
-  const title = data.title ?? prev.title
-  if (isTextBlockRole(role) && (data.title !== undefined || data.attributes !== undefined)) {
-    await validateInlineTokens(db, title, id)
-  }
+    if (parent_changed && new_parent_id !== null) {
+      await assertParent(db, new_parent_id)
+      if (new_parent_id === id) {
+        throw errorsBadRequest('parent 不能指向自己')
+      } else {
+        const ancestors = await findAncestorIds(db, new_parent_id, 1000)
+        if (ancestors.includes(id)) {
+          throw errorsConflict('不能移动到自己的后代之下')
+        }
+      }
+    }
 
-  try {
-    const updated = await db
-      .update(items)
-      .set({
-        title,
-        attributes: $attributes,
-        tags,
-        parent_id: new_parent_id,
-        order_index: data.order_index ?? prev.order_index,
-        target_id: $target_id,
-        update_date: new Date(),
-      })
-      .where(eq(items.id, id))
-      .returning()
-    const row = updated[0]
-    if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
-    return await getWireItem(db, row.id)
-  } catch (err) {
-    const code = errorsPgCode(err)
-    if (code === '23503') {throw errorsConflict('父项或引用无效')}
-    throw err
-  }
+    const schema = await findDatabaseSchema(db, new_parent_id)
+    if (schema !== null) {
+      if (schemaNeedsUnityName(schema) && prev.unity_name === null) {
+        throw errorsBadRequest('该 database 的 schema 要求 unity_name')
+      } else {
+        $attributes = itemBuildRowValidator(schema).parse($attributes)
+      }
+    }
+
+    let $target_id = prev.target_id
+    if (role === 'itemlink') {
+      $target_id = data.target_id ?? prev.target_id
+      if ($target_id === null) {
+        throw errorsBadRequest('itemlink 必须提供 target_id')
+      } else {
+        await validateTarget(db, $target_id, id)
+      }
+    } else if (data.target_id !== undefined) {
+      throw errorsBadRequest('只有 itemlink 允许 target_id')
+    }
+
+    const tags = data.tags !== undefined
+                 ? await validateTagIds(db, data.tags)
+                 : prev.tags
+
+    const title = data.title ?? prev.title
+    if (isTextBlockRole(role) && (data.title !== undefined || data.attributes !== undefined)) {
+      await validateInlineTokens(db, title, id)
+    }
+
+    try {
+      const [updated_row] = (
+        await db
+              .update(items)
+              .set({
+                title,
+                attributes: $attributes,
+                tags,
+                parent_id: new_parent_id,
+                order_index: data.order_index ?? prev.order_index,
+                target_id: $target_id,
+                update_date: new Date(),
+              })
+              .where(eq(items.id, id))
+              .returning()
+      )
+      if (updated_row === undefined) {
+        throw errorsNotFound(`item(id=${id}) not found`)
+      } else {
+        return await getWireItem(db, updated_row.id)
+      }
+    } catch (err) {
+      const code = errorsPgCode(err)
+      if (code === '23503') {
+        throw errorsConflict('父项或引用无效')
+      } else {
+        throw err
+      }
+    }
+  })
 }
 
 export async function convertTextBlock(
@@ -351,52 +395,68 @@ export async function convertTextBlock(
   role: TextBlockRole,
   title: string | undefined,
   attributes: Readonly<Record<string, unknown>> | undefined,
-): Promise<Item> {
-  const prev = await getItemRowForUpdate(db, id)
-  if (!isTextBlockRole(prev.role)) {
-    throw errorsBadRequest(`item(id=${id}) 不是文本块，不能转换 role`)
-  } else if (!isTextBlockRole(role)) {
-    throw errorsBadRequest(`role=${role} 不是文本块`)
-  } else {
-    const next_title = title ?? prev.title
-    if (title !== undefined) {
-      await validateInlineTokens(db, next_title, id)
+): Promise<WriteResult<Item>> {
+  return writeRun(async () => {
+    const prev = await getItemRowForUpdate(db, id)
+    if (!isTextBlockRole(prev.role)) {
+      throw errorsBadRequest(`item(id=${id}) 不是文本块，不能转换 role`)
+    } else if (!isTextBlockRole(role)) {
+      throw errorsBadRequest(`role=${role} 不是文本块`)
+    } else {
+      const next_title = title ?? prev.title
+      if (title !== undefined) {
+        await validateInlineTokens(db, next_title, id)
+      }
+
+      const updated = await db
+        .update(items)
+        .set({
+          role,
+          title: next_title,
+          update_date: new Date(),
+          attributes: (
+            attributes === undefined
+            ? prev.attributes
+            : as<Record<string, unknown>>(itemCheckAttributes(role, attributes))
+          ),
+        })
+        .where(eq(items.id, id))
+        .returning()
+      const row = updated[0]
+      if (row === undefined) {
+        throw errorsNotFound(`item(id=${id}) not found`)
+      } else {
+        return await getWireItem(db, row.id)
+      }
     }
-    const next_attributes = attributes === undefined
-                            ? prev.attributes
-                            : as<Record<string, unknown>>(itemCheckAttributes(role, attributes))
-    const updated = await db
-      .update(items)
-      .set({ role, title: next_title, attributes: next_attributes, update_date: new Date() })
-      .where(eq(items.id, id))
-      .returning()
-    const row = updated[0]
-    if (row === undefined) {throw errorsNotFound(`item(id=${id}) not found`)}
-    return await getWireItem(db, row.id)
-  }
+  })
+}
+
+function hasChildrenItem(db: DbLike, id: ItemID): Promise<boolean> {
+  return db
+          .select({ id: items.id })
+          .from(items)
+          .where(eq(items.parent_id, id))
+          .limit(1)
+          .then(rows => rows.length !== 0)
 }
 
 export async function deleteItem(db: DbLike, id: ItemID): Promise<void> {
   const found = await getItemRowForUpdate(db, id)
   if (isSystemUnityName(found.unity_name)) {
     throw errorsBadRequest('系统 item 不能通过通用接口删除')
-  }
+  } else {
+    if (await hasChildrenItem(db, id)) {
+      throw errorsConflict(`item(id=${id}) 存在子项，不能删除`)
+    } else {
+      if (found.role === 'tag') {
+        await db
+              .update(items)
+              .set({ tags: sql`array_remove(${items.tags}, ${id})` })
+              .where(sql`${id} = ANY(${items.tags})`)
+      }
 
-  const child_rows = await db
-    .select({ id: items.id })
-    .from(items)
-    .where(eq(items.parent_id, id))
-    .limit(1)
-  if (child_rows.length !== 0) {
-    throw errorsConflict(`item(id=${id}) 存在子项，不能删除`)
+      await db.delete(items).where(eq(items.id, id))
+    }
   }
-
-  if (found.role === 'tag') {
-    await db
-      .update(items)
-      .set({ tags: sql`array_remove(${items.tags}, ${id})` })
-      .where(sql`${id} = ANY(${items.tags})`)
-  }
-
-  await db.delete(items).where(eq(items.id, id))
 }

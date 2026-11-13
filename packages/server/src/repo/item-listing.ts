@@ -16,7 +16,8 @@ function escapeLike(input: string): string {
 }
 
 function ruleToCondition(rule: FilterRule): SQL {
-  const cond = match(rule)
+  const cond =
+    match(rule)
     .with({ name: 'role' }, value => (
       Array.isArray(value.input)
       ? inArray(items.role, value.input)
@@ -53,9 +54,10 @@ export function itemBuildFilterCondition(
   filter_rules: readonly FilterRule[],
   filter_groups: readonly FilterGroup[],
 ): SQL | undefined {
-  const combined_groups: FilterGroup[] = filter_rules.length !== 0
-    ? [{ logic: 'and', invert: false, rules: [...filter_rules] }]
-    : []
+  const combined_groups: FilterGroup[] =
+                  filter_rules.length !== 0
+                  ? [{ logic: 'and', invert: false, rules: [...filter_rules] }]
+                  : []
   const groups: readonly FilterGroup[] = [...filter_groups, ...combined_groups]
 
   let $and_conds: SQL[] = []
@@ -133,8 +135,8 @@ export async function listItems(
     params.filter_groups ?? [],
   )
   const system_cond = options.include_system !== true
-    ? sql`(${items.unity_name} IS NULL OR ${items.unity_name} NOT LIKE 'sys.%')`
-    : undefined
+                      ? sql`(${items.unity_name} IS NULL OR ${items.unity_name} NOT LIKE 'sys.%')`
+                      : undefined
 
   let $order_clause: SQL
   let $after_cond: SQL | undefined = undefined
@@ -170,9 +172,9 @@ export async function listItems(
   const where_conds: (SQL | undefined)[] = [filter_cond, system_cond, $after_cond]
   const conds = where_conds.filter((cond): cond is SQL => cond !== undefined)
   const query = db
-    .select({ item: items, blob: blobs })
-    .from(items)
-    .leftJoin(blobs, eq(items.blob_id, blobs.id))
+                .select({ item: items, blob: blobs })
+                .from(items)
+                .leftJoin(blobs, eq(items.blob_id, blobs.id))
 
   if (conds.length === 1) {
     const first_cond = conds[0]
@@ -182,7 +184,9 @@ export async function listItems(
   }
 
   query.orderBy($order_clause, desc_order ? desc(items.id) : asc(items.id))
-  if (limit !== 0) {query.limit(limit)}
+  if (limit !== 0) {
+    query.limit(limit)
+  }
 
   const rows = await query
   return rows.map(row => toWireItem(row.item, row.blob))

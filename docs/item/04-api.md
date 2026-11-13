@@ -17,7 +17,7 @@
   - 413 请求体/上传过大（PAYLOAD_TOO_LARGE）
   - 500 内部/存储（INTERNAL/STORAGE_ERROR）
 
-未知 action 按 `__RPC_ACTION_NAMES__` 白名单查找，不会命中对象原型。
+未知 action 按 `RPC_ACTION_NAMES` 白名单查找，不会命中对象原型。
 
 ## 2. Item
 

@@ -7,6 +7,7 @@ import type { BlobService } from '../src/blob/service'
 import { CreateConfigStore } from '../src/config/store'
 import { createItem, getItemByUnityName, updateItem } from '../src/repo/items'
 import { listItems } from '../src/repo/item-listing'
+import type { WriteResult } from '../src/write-result'
 
 let $_db: DB
 let $_blobs: BlobService
@@ -33,6 +34,18 @@ async function config() {
   await service.ensure()
   await service.reload()
   return service
+}
+
+async function expectWriteFailure(
+  write: Promise<WriteResult<unknown>>,
+  message: string,
+): Promise<void> {
+  const result = await write
+  if (result.ok) {
+    expect.fail('expected write failure')
+  } else {
+    expect(result.error.message).toContain(message)
+  }
 }
 
 describe('system config', () => {
@@ -69,11 +82,11 @@ describe('system config', () => {
 
     const database = await getItemByUnityName($_db, 'sys.config')
     expect(database).not.toBeNull()
-    await expect(updateItem($_db, defined(database).id, { title: 'hack' }, $_blobs)).rejects.toThrow('系统 item')
-    await expect(createItem($_db, {
+    await expectWriteFailure(updateItem($_db, defined(database).id, { title: 'hack' }, $_blobs), '系统 item')
+    await expectWriteFailure(createItem($_db, {
       role: 'page',
       title: 'sys item',
       unity_name: 'sys.fake',
-    }, $_blobs)).rejects.toThrow('系统保留前缀')
+    }, $_blobs), '系统保留前缀')
   })
 })

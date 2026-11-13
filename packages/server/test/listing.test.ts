@@ -6,6 +6,7 @@ import type { DB } from '../src/db/client'
 import type { BlobService } from '../src/blob/service'
 import { createItem } from '../src/repo/items'
 import { listItems } from '../src/repo/item-listing'
+import { unwrapWrite } from '../src/write-result'
 
 let $_db: DB
 let $_blobs: BlobService
@@ -30,11 +31,11 @@ afterAll(async () => {
 async function fillPages(count = 30) {
   let $ids: number[] = []
   for (let $i = 1; $i <= count; $i += 1) {
-    const item = await createItem($_db, {
+    const item = unwrapWrite(await createItem($_db, {
       role: 'page',
       title: `条目${$i}`,
       attributes: { group: $i % 2 === 0 ? 'even' : 'odd', score: $i },
-    }, $_blobs)
+    }, $_blobs))
     $ids = [...$ids, item.id]
   }
   return $ids
@@ -60,8 +61,8 @@ describe('listing', () => {
     })
     expect(titled).toHaveLength(11)
 
-    const parent = await createItem($_db, { role: 'page', title: 'parent' }, $_blobs)
-    await createItem($_db, { role: 'page', title: 'child', parent_id: parent.id }, $_blobs)
+    const parent = unwrapWrite(await createItem($_db, { role: 'page', title: 'parent' }, $_blobs))
+    unwrapWrite(await createItem($_db, { role: 'page', title: 'child', parent_id: parent.id }, $_blobs))
     const children = await listItems($_db, {
       limit: 0,
       filter_rules: [{ name: 'parent', input: parent.id, logic: 'and' }],
@@ -70,12 +71,12 @@ describe('listing', () => {
   })
 
   it('kind / unity_name / role 过滤', async () => {
-    const manga = await createItem($_db, {
+    const manga = unwrapWrite(await createItem($_db, {
       role: 'entity', kind: 'manga', title: 'manga', unity_name: 'manga.one',
-    }, $_blobs)
-    const page = await createItem($_db, {
+    }, $_blobs))
+    const page = unwrapWrite(await createItem($_db, {
       role: 'page', title: 'page', unity_name: 'page.one',
-    }, $_blobs)
+    }, $_blobs))
 
     const by_kind = await listItems($_db, {
       limit: 0,
@@ -97,9 +98,9 @@ describe('listing', () => {
   })
 
   it('attribute_equal / tag / group invert', async () => {
-    const tag = await createItem($_db, { role: 'tag', title: 't' }, $_blobs)
-    await createItem($_db, { role: 'page', title: 'tagged', tags: [tag.id] }, $_blobs)
-    await createItem($_db, { role: 'page', title: 'plain' }, $_blobs)
+    const tag = unwrapWrite(await createItem($_db, { role: 'tag', title: 't' }, $_blobs))
+    unwrapWrite(await createItem($_db, { role: 'page', title: 'tagged', tags: [tag.id] }, $_blobs))
+    unwrapWrite(await createItem($_db, { role: 'page', title: 'plain' }, $_blobs))
 
     const evens = await listItems($_db, {
       limit: 0,
@@ -125,10 +126,10 @@ describe('listing', () => {
   })
 
   it('sort_field number：字符串值不报错并沉底', async () => {
-    const a = await createItem($_db, { role: 'page', title: 'a', attributes: { score: 1 } }, $_blobs)
-    const b = await createItem($_db, { role: 'page', title: 'b', attributes: { score: 2 } }, $_blobs)
-    const bad = await createItem($_db, { role: 'page', title: 'bad', attributes: { score: 'not-number' } }, $_blobs)
-    const empty = await createItem($_db, { role: 'page', title: 'empty', attributes: {} }, $_blobs)
+    const a = unwrapWrite(await createItem($_db, { role: 'page', title: 'a', attributes: { score: 1 } }, $_blobs))
+    const b = unwrapWrite(await createItem($_db, { role: 'page', title: 'b', attributes: { score: 2 } }, $_blobs))
+    const bad = unwrapWrite(await createItem($_db, { role: 'page', title: 'bad', attributes: { score: 'not-number' } }, $_blobs))
+    const empty = unwrapWrite(await createItem($_db, { role: 'page', title: 'empty', attributes: {} }, $_blobs))
 
     const rows = await listItems($_db, {
       limit: 0,
@@ -144,11 +145,11 @@ describe('listing', () => {
     const values = [3, 1, 2, null, 5, 4, null, 7, 6]
     let $ids: number[] = []
     for (const [index, value] of values.entries()) {
-      const item = await createItem($_db, {
+      const item = unwrapWrite(await createItem($_db, {
         role: 'page',
         title: `item${index}`,
         attributes: value === null ? {} : { score: value },
-      }, $_blobs)
+      }, $_blobs))
       $ids = [...$ids, item.id]
     }
 
