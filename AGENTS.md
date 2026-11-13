@@ -101,13 +101,13 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 
 [docs/methods.md](docs/methods.md) 是硬规则。最重要的几条：
 
-- 代码是一棵完整的树；不用 early return 剪断分支；同级互斥用 `else if`，父子层级用 `else { if }`；超过 4 层拆函数。
+- 树状决策写完整 `if / else`（入口并列校验按 `if / else if / else`）；线性操作是顺序步骤、不补 `else`；两者都不用 early return；同级互斥用 `else if`，父子层级用 `else { if }`；超过 4 层拆函数。
 - 不写 class / `this`（错误类型例外）；用闭包工厂、对象字面量、函数组合。
 - 状态只允许一个所有者；不导出可变绑定；不用模块级 `let`。
 - 副作用集中到可数的点；纯函数优先；入参不可变。
 - 不用 `continue` / `break`；查找用 `find`/抽函数。
-- 命名：函数 camelCase、数据 snake_case、工厂 PascalCase、React 组件 PascalCase、hook `useX`；口诀：`foo_bar` 不可变，`__` 在前跨作用域、`__` 在后可变；导出常量 `VAR_NAME`。
-- 不用 `any`、不用 `!`、不滥用 `as`；外部数据用 `parseX` 收窄；品牌类型用于领域 ID。
+- 命名：函数 camelCase、数据 snake_case、工厂 PascalCase、React 组件 PascalCase、hook `useX`；口诀：`foo_bar` 不可变，`_` 前缀跨作用域，`$` 前缀可变，`$_` 两者；自有组件 props、`useState` / `useMemo` 的值用 `foo_bar`，`useRef` 对象用 `$name`；导出常量 `VAR_NAME`。
+- 不用 `any`、不用 `!`、不滥用 `as`；外部数据先用 zod（能 `.refine` / `.transform` / `.brand` 表达的不手写 `parseX`/`checkX`/`isX`）；品牌类型用于领域 ID。
 - 空值默认 `null`；`undefined` 只用于语言强制的可选位置。
 - `catch` 必须负责：包装并保留 `cause`、判别后真正处理，或不 catch；禁止静默吞掉。
 - 顶层有统一兜底；错误只在兜底记录一次；并发错误用 `AggregateError`。

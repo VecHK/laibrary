@@ -17,7 +17,7 @@
 
 ## 总纲：六条原则
 
-1. **决策是树，操作是线。** 树状决策写完整 `if / else`；线性操作可以用 `throw` 守卫；两者都不 early return。
+1. **决策是树，操作是线。** 树状决策写完整 `if / else`；线性操作是顺序步骤；两者都不 early return。
 2. **行为靠组合，不靠封装状态。** 用函数、闭包、对象字面量组合逻辑，不用对象持有状态再用方法操作它。
 3. **上下文显式传递。** 函数需要什么就写在参数里，不依赖"我身处何处"。
 4. **副作用可控，核心引用透明。** 脏事集中到边界；核心表达式尽量能被结果替换而不改变行为。
@@ -32,16 +32,16 @@
 
 **先分清目的**：
 
-- **树状决策**：函数要在多个结果/业务分支之间选择。必须写完整 `if / else` 树；`else if` 只用于同级互斥，跨层用 `else { if }` 或抽函数；分支用 `{}` 包裹；超过 4 层是拆函数信号。
-- **线性操作**：函数主体是单向流程（事务、多级校验、命令），前置检查只负责阻断。允许平铺 `if (错误) { throw }`，不补 `else`；happy path 保持在下面。
+- **树状决策**：函数要在互斥的结果/业务分支之间选择，或决定"放行还是拒绝"。必须写完整 `if / else` 树；`else if` 只用于同级互斥，跨层用 `else { if }` 或抽函数；分支用 `{}` 包裹；超过 4 层是拆函数信号。**入口处一组并列校验即使都 `throw`，也是同一层的兄弟分支**：写成 `if / else if / else`，主逻辑放最后的 `else`。
+- **线性操作**：函数是一串按顺序执行的步骤。每步可以有自己的 `if (cond) { 动作 }`，不补 `else`，执行完继续下一步；条件用 boolean 谓词或局部 `const`。中途某步失败要中断流程时，用 `if (bad) { throw }`（不补 `else`），因为它不是与其它分支互斥的选择。
 - **循环筛子**：过滤/查找用 `if` 或 `find` / `filter`，不补 `else`；不允许 `continue` / `break`（见第四节）。
 
-**判断标准**：前置检查的目的是"阻断流程"还是"产生分支结果"？
+**判断标准**：是在互斥结果里选一个（包括"放行还是拒绝"），还是依次做几件事？
 
-- **产生结果**（如 `getStatus`）：必须写成完整的 `if / else` 树。
-- **阻断流程**（如 `deleteItem`）：写成直线型安检门，遇到错误直接 `throw`，让读者一眼看清主干逻辑（Happy Path）。
+- **选结果 / 判决**（如 `getStatus`、`deleteItem` 的入口校验）：完整 `if / else` 树，所有兄弟分支在同一层。
+- **做步骤**（如 `linearOperation`）：直线流程，条件只决定"这一步做不做"，做完继续。
 
-**仍然不允许 early return**：线性守卫只能 `throw`；不能 `if (bad) return ...`。完整 `if / else` 分支里的 `return` 是该分支的结果，不算 early return。失败要作为正常返回值（`Result` / 联合类型）时，按树状决策/Result 写，不用 `throw` 守卫。
+**仍然不允许 early return**：不能 `if (bad) return ...`；完整 `if / else` 分支里的 `return` 是该分支的结果，不算 early return。失败要作为正常返回值（`Result` / 联合类型）时，按树状决策/Result 写。
 
 ```ts
 // 树状决策：完整 if/else，两层就写两层
@@ -57,15 +57,31 @@ function getStatus(order: Order | null): Status {
   }
 }
 
-// 线性操作：平铺守卫，不补 else；happy path 在下面
+// 判决：入口校验是同一层的兄弟分支，主逻辑放最后的 else
 function deleteItem(item: Item, db: DbLike): void {
   if (item.id <= 0) {
     throw new Error('invalid item id')
-  }
-  if (item.unity_name?.startsWith('sys.') === true) {
+  } else if (item.unity_name?.startsWith('sys.') === true) {
     throw new Error('system item')
+  } else {
+    db.delete(item.id)
   }
-  db.delete(item.id)
+}
+
+// 线性操作：按顺序执行步骤；每个 if 只决定"这一步做不做"
+function publishPage(page: Page, db: DbLike): void {
+  if (page.has_cover) {
+    renderCover(page)
+  }
+  const body = renderPage(page)
+  const is_valid = isPageValid(page)
+  if (is_valid) {
+    db.update(page.id, body)
+  }
+  if (is_valid && page.publish_now) {
+    notifySubscribers(page.id)
+  }
+  recordPublished(page.id)
 }
 ```
 
@@ -140,10 +156,10 @@ const label = value !== null ? 'x' : 'y'
 
 ```ts
 function CreateCounter() {
-  let __count__ = 0
+  let $_count = 0
   return function increment() {
-    __count__ += 1
-    return __count__
+    $_count += 1
+    return $_count
   }
 }
 ```
@@ -230,10 +246,10 @@ function CreateCounter() {
 ```ts
 // State 是深度不可变的值；get 返回它，调用方不能改
 function CreateStateCell<State>(initial: State) {
-  let __state__ = initial                 // 唯一所有者
+  let $_state = initial                 // 唯一所有者
   return {
-    get: () => __state__,
-    update: (next: State) => { __state__ = next },   // 低层 set；对外用领域操作
+    get: () => $_state,
+    update: (next: State) => { $_state = next },   // 低层 set；对外用领域操作
   }
 }
 ```
@@ -297,19 +313,43 @@ function Pipe(...fns) { /* 返回函数 */ }
 
 ### 5.4 作用域与可变性写进名字
 
-> **口诀**：`foo_bar` 不可变，`__` 在前为跨作用域，`__` 在后为可变量（mutable），前后都有 `__` 既是跨作用域又是可变量。
+> **口诀**：`foo_bar` 不可变；`_` 前缀表示跨作用域；`$` 前缀表示可变；`$_` 前缀表示既是可变又是跨作用域。
 
 | 形态 | 命名 | 例 |
 |---|---|---|
 | 全局/模块级常量（不可变） | `FOO_BAR`（导出带模块/领域名） | `GALLERY_MAX_PHOTOS`、非导出 `MAX_PHOTOS` |
 | 本地 const / 只读参数 | `foo_bar` | `base_url`、`user_id` |
-| 本地可变值 | `foo_bar__` | `retry_count__` |
-| 跨作用域、不可变 | `__foo_bar` | `__db`、`__config` |
-| 跨作用域且可变 | `__foo_bar__` | `__count__`、`__state__` |
+| 本地可变值 | `$foo_bar` | `$retry_count` |
+| 跨作用域、不可变 | `_foo_bar` | `_db`、`_config` |
+| 跨作用域且可变 | `$_foo_bar` | `$_count`、`$_state` |
 
-- "可变"包括重新赋值和内容变更；共享容器内容会变时用 `__foo_bar__`，只读共享依赖用 `__foo_bar`。
-- 函数参数默认 `foo_bar`（即使被闭包捕获）；重新赋值/改变才用 `foo_bar__`；不要修改入参对象。
-- 全局常量用 UPPER_SNAKE，不带 `__`；导出的带模块/领域名，非导出的省略模块前缀。不导出可变绑定。
+- "可变"包括重新赋值和内容变更；内容会变的共享容器用 `$_foo_bar`，只读共享依赖用 `_foo_bar`。
+- 不可变值用 `const` 声明；只有需要重新赋值/改内容才用 `let`，并按 `$` 前缀命名。
+- 形参默认不可变：`function renderBlock(base_url: string) { ... }`；被闭包捕获（跨作用域）写 `_base_url`。确实需要重新赋值/改内容时写 `$base_url`（优先改成局部变量），两者都成立写 `$_base_url`；不要修改入参对象。
+
+```ts
+function createReader(_base_url: string) {
+  return () => fetch(_base_url)
+}
+
+function countDown(start: number): void {
+  let $remain = start
+  $remain -= 1
+  render($remain)
+}
+```
+
+- 自有 React 组件的 props 属性名用 `foo_bar`（`refresh_key`、`base_url`）；第三方组件的 props 沿用其库约定，不改写。
+- `useState` / `useMemo` 的值一律写 `foo_bar`，不加 `_`：它们在当前渲染帧内固定不可变，跨渲染帧由 React 换新值，不是闭包捕获的可变状态。setter 按 React 约定写 `setFooBar`。
+- `useRef` 得到的 ref 对象写 `$foo_bar`：对象本身不换，但 `.current` 会跨渲染帧变化，按可变值处理。
+
+```tsx
+const [foo_bar, setFooBar] = useState('')
+const sorted_items = useMemo(() => sortItems(items), [items])
+const $input_ref = useRef<HTMLInputElement | null>(null)
+```
+
+- 全局常量用 UPPER_SNAKE，不加前缀；导出的带模块/领域名，非导出的省略模块前缀。不导出可变绑定。
 
 ### 5.5 其他
 
@@ -327,17 +367,27 @@ function Pipe(...fns) { /* 返回函数 */ }
 | 导出的工厂，返回可调用物/能力集合 | 能力 | `CreateModuleX` | `CreateGalleryStore` |
 | 非导出函数/数据 | 函数/数据 | 省略模块名 | `inEvent` / `max_photos` |
 | React 组件 | 框架约定 | PascalCase | `GalleryCard` |
+| React props（自有组件） | 属性值 | `foo_bar` | `refresh_key`、`base_url` |
+| `useState` / `useMemo` 值 | 渲染帧内不可变 | `foo_bar`（不加 `_`） | `foo_bar`、`sorted_items` |
+| `useRef` 对象 | 内容可变的稳定容器 | `$name` | `$input_ref`、`$timer_ref` |
 | Hook | 框架约定 | `useX` | `useGalleryVotes` |
 | 类型/接口 | 类型层 | PascalCase | `UserId` |
 | 品牌符号 | 类型层 | PascalCase | `UserIdBrand` |
 | 通用工具函数 | 无领域类型或全泛型、在 `utils/` | 描述性，可用类型后缀 | `findList`、`target_num` |
-| 跨作用域可变状态 | 会变、跨作用域 | `__name__` | `__count__`、`__loaded_data__` |
+| 本地可变值 | 会变、不跨作用域 | `$name` | `$retry_count` |
+| 跨作用域只读 | 跨作用域、不变 | `_name` | `_db`、`_config` |
+| 跨作用域且可变 | 会变、跨作用域 | `$_name` | `$_count`、`$_loaded_data` |
 | 布尔 | 判断 | `is` / `has` / `can` / `should` | `is_voted`、`has_children` |
 | 内部哨兵 | 不导出 | `NONE` | `const NONE = Symbol('NONE')` |
 
-### 5.7 `parse` / `check` / `is` / `as` / `to`
+### 5.7 校验工具：zod 优先，`parse` / `check` / `is` / `as` / `to` 兜底
 
-外部输入先过 zod（见 6.4）；`parseX` / `checkX` 只处理 zod 之后的领域转换/不变量，或内部可信数据，不做外部形状的入口。
+外部输入先过 zod（见 6.4）；zod 能表达的约束就写在 schema 里，不要另建一套手写校验。选择次序：
+
+1. **zod schema**：用 `.refine` 表达跨字段/业务不变量，`.transform` 做归一化/转换，`.brand` 标记品牌；这三者能覆盖的，不再写 `parseX` / `checkX` / `isX`。
+2. **复用已有 schema**：用 `.extend` / `.pick` / `.merge` 组合，或把已有的 `isX` 谓词交给 `.refine(isX)`，不要复制同一组规则。
+3. **手写工具**：只有 zod 表达不了时才用——需要 DB/上下文、跨 Item 查询、热路径性能敏感，或内部可信数据的领域不变量。
+4. **`as<T>` / `Is<T>`**：`as<T>` 只用于测试/fixture/已校验边界；`Is<T>` 只用于把 boolean 检查构造成类型谓词。
 
 **已有实现，直接 import，不要重写**：
 
@@ -435,6 +485,7 @@ function isUserId(raw: unknown): raw is UserId {
 ```
 
 - 外部 raw 先过 zod（见 6.4）；`isUserId` / `parseUserId` / `checkUserId` 是 zod 之后的领域守卫/转换，不是外部形状入口。
+- 品牌优先在 schema 里标记：新品牌用 `z.string().startsWith('u-').brand<'UserId'>()`，类型由 `z.infer` 产出；已有 `unique symbol` 品牌（如 `BlobID`）用 `.transform(as<BlobID>)` 接入，不要为同一个概念再造一套不兼容的品牌。
 - 品牌只用在领域身份重要、容易被混淆的地方（id 是典型），不要给所有原始类型套品牌。
 
 ### 6.3 让非法状态不可表示
@@ -468,6 +519,8 @@ const gallery = zGallery.parse(raw) // raw: unknown
 ```
 
 - 类型由 `z.infer` 产出，不手写 interface 再 `as`。
+- 能 `.refine`（跨字段/业务不变量）、`.transform`（归一化/转换）、`.brand`（品牌）表达的约束都放进 schema，不要另写一套 `parseX` / `checkX` / `isX`。
+- 复用已有 schema/谓词：`.extend` / `.pick` / `.merge` 组合，或 `.refine(isX)` 接已有守卫；不要复制同一组规则。
 - `parse` 用于边界抛错；`safeParse` 用于可预期失败，返回 Result，不吞掉。
 - zod 之后的值才进入业务；内部函数信任静态类型，不再重复判空。
 - 不要把 `as`、手写 `parseX`、手写具体守卫当作外部形状入口；它们没有运行时证据。`parseX` / `checkX` 只做 zod 之后的领域不变量/转换，或内部可信数据。
@@ -511,7 +564,7 @@ const view = match(state)
 - 参数过多用对象参数；不用布尔参数（`render(true)` 是语义黑洞）；错误构造器的 `options?: ErrorOptions` 是唯一例外。
 - 不修改入参；用组合构建逻辑（纯函数 + `Pipe`），不写大函数套大判断。
 - 箭头函数用于匿名/作为值：`map` / `filter` 回调、`Pipe` 内联步骤、React 事件、短小纯转换。具名函数优先考虑 `function xxx() {}`：模块级/导出、React 组件、需要重载/泛型声明/提升/互相递归、多行逻辑；不要用 `const foo = () => {}` 只给具名函数套壳。
-- 控制流遵循第一节：树状决策完整 if/else；线性操作只允许 throw 守卫，不 early return。
+- 控制流遵循第一节：树状决策完整 `if/else`；线性操作是顺序步骤、不补 `else`；两者都不 early return。
 - 单一职责：一个函数做一件事；行数是信号不是门槛，判断标准是可读性、重要性、必要性。
 - 导出函数/方法显式标注返回类型（与第六节呼应）。
 
@@ -677,7 +730,7 @@ type Result<T, E> =
 ### 12.1 提交前自查
 
 - [ ] **术语一致吗？** 与 `glossary.md` 一致；没有把 `Item` 这类领域术语用在通用工具函数上。
-- [ ] **决策形态对了吗？** 树状决策是完整 `if / else`、没有 early return；线性操作只有 `throw` 守卫、没有 `return` 提前结束。
+- [ ] **决策形态对了吗？** 树状决策是完整 `if / else`、入口并列校验按 `if / else if / else`；线性操作是顺序步骤、不补 `else`；都不 early return。
 - [ ] **`else if` / `else { if }` 分清了吗？** 同级兄弟才用 `else if`，跨层用嵌套；深了抽函数。
 - [ ] **三元合规吗？** 多行 `?` / `:` 与条件第一个字符平齐；JSX 条件渲染是例外；条件都是 boolean，没有 truthiness。
 - [ ] **有类 / this / getter / setter / Proxy 吗？** 除错误类型外都不该有；属性访问没有藏计算/校验/副作用。
@@ -688,12 +741,13 @@ type Result<T, E> =
 - [ ] **控制反转 / 偏应用合规吗？** 只有需要选择时才加回调；偏应用只固定依赖/配置，没固定业务数据、没三层以上柯里化、没模块顶层绑定。
 - [ ] **没有重度函数式吧？** 业务代码仍用普通 TS 的 `if` / `for` / `try`；没有为"纯粹"引入 `fp-ts` / `Effect` / monad。
 - [ ] **多分支联合用 ts-pattern 了吗？** 3+ 分支/exhaustive；2 分支不过度用。
-- [ ] **副作用集中吗？** 循环里没有 `continue` / `break`；查找用 `find` 或抽函数。
-- [ ] **命名合规吗？** 导出带模块名、非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；跨作用域可变状态 `__name__`；本地可变 `name__`。
+- [ ] **副作用集中吗？** I/O、时钟、随机、日志是否都在边界？核心是否保持引用透明？
+- [ ] **循环里没有跳转吗？** 没有 `continue` / `break`；查找用 `find` 或抽函数。
+- [ ] **命名合规吗？** 导出带模块名、非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；本地可变 `$name`；跨作用域 `_name` / `$_name`；自有组件 props 用 `foo_bar`；`useState` / `useMemo` 值用 `foo_bar`（不加 `_`）；`useRef` 对象用 `$name`。
 - [ ] **常量放对了吗？** `constants.ts`、命名导出、计算常量 re-export 收口；没有 `export default { ... }` 或可变对象。
 - [ ] **类型契约还在吗？** 无 `any` / `!`；导出有返回类型；外部输入由 zod 产出，zod 之后才 parse/check；品牌用对。
 - [ ] **外部输入过 zod 了吗？** `JSON.parse` / `request.body` / `query` / `env` / `fetch` / 文件没有直接 `as` 或信任静态类型。
-- [ ] **具体守卫 / `as` / `Is` 合规吗？** 守卫是 `value is X`；`Is<T>` 显式给 `T`；`as<T>` 只用于测试/fixture/已校验边界；没有重复造 `as` / `Is`。
+- [ ] **校验工具选对了吗？** 能用 zod `.refine` / `.transform` / `.brand` 的没有手写 `parse`/`check`/`is`；手写工具只用于 zod 表达不了的约束；守卫是 `value is X`；`Is<T>` 显式给 `T`；`as<T>` 只用于测试/fixture/已校验边界。
 - [ ] **空值 / 参数合规吗？** 默认 `null`；`undefined` 只在语言强加处；`NONE` 不参与 JSON；位置参数没有 `?`；默认值有真实语义。
 - [ ] **catch 负责吗？** 包装 + cause / 判别后处理 / 不 catch；没有吞错；错误可判别；顶层有兜底且只记一次。
 - [ ] **新增/变更行为有测试吗？** 注释是否多余？diff 是否只含本次任务相关改动？偏离有 `// justify` 吗？
@@ -720,7 +774,7 @@ type Result<T, E> =
 | `class Foo` / `this.` | 闭包工厂 / 对象字面量工厂 / 显式参数 | 第二节 |
 | `const foo = () => { ... }`（模块级/导出/多行） | `function foo() { ... }`；箭头留给回调和函数值 | 第七节 |
 | `{ get name() {} }` / `set name(v) {}` / `Proxy` | 显式函数 / `Signal` / `Memo` / `Map` | 2.3 |
-| `if (x) return` 后接逻辑 | 树状决策写完整 `if / else`；线性操作 `if (错误) { throw }`；都不 early return | 第一节 |
+| `if (x) return` 后接逻辑 | 树状决策写完整 `if / else`；入口并列校验 `if / else if / else`；线性操作按顺序做步骤；都不 early return | 第一节 |
 | `else if` 压平子层 | `else { if }` 嵌套，或抽命名函数 | 第一节 |
 | 多行三元按固定缩进 | `?` / `:` 与条件第一个字符对齐；JSX 条件渲染例外 | 1.1 |
 | `if (items.length)` / `value ? ...` | `if (items.length > 0)` / `value !== null ? ...`；条件必须 boolean | 1.2 |
@@ -729,6 +783,7 @@ type Result<T, E> =
 | `catch (e) { log(e); throw e }` | 删掉 log，让兜底记一次 | 9.2 |
 | `any` / `!` | `unknown` + zod/parse/check；显式判空 | 第六节 |
 | 外部数据上 `as Foo` / 手写 `parseFoo` | 先过 `zFoo.parse(raw)`；类型用 `z.infer`；zod 之后才 parse/check | 6.4 |
+| 手写 `parseX` / `checkX` / `isX` 做 zod 能做的校验 | 用 `.refine` / `.transform` / `.brand` 写进 schema，或复用已有 schema/谓词 | 5.7 |
 | `request.body as Body` / `JSON.parse(x) as Foo` / `process.env as Env` | 先过 zod schema；静态类型只在可信/可控时信任 | 6.4 |
 | `asUserId` / `asGallery` | `as<UserID>` / `as<Gallery>`（只测试/已校验边界） | 5.7 |
 | 临时写 `function Is` / `function as` | 从 `@laibrary/types` 导入；来源 `packages/types/src/is.ts` / `as.ts` | 5.7 |
@@ -736,7 +791,8 @@ type Result<T, E> =
 | `isGallery(v): boolean` | `isGallery(v): v is Gallery`；用 `Is<T>` 或具体谓词 | 5.7 |
 | `Is(...)` 不写 `<T>` | 写 `Is<Gallery>(...)`；否则收窄成 unknown | 5.7 |
 | 业务数据被偏应用固定 / `f(a)(b)(c)` | 数据显式传；最多偏应用一次，不做多层柯里化 | 2.1 |
-| `let count` / `__state` | 本地可变 `count__`；跨作用域 `__state` / `__state__`；全局常量 `FOO_BAR`；口诀见 5.4 | 5.4 |
+| `let count` / 可变的 `_state` | 本地可变 `$count`；跨作用域只读 `const _state`；跨作用域可变 `$_state`；全局常量 `FOO_BAR`；口诀见 5.4 | 5.4 |
+| camelCase props / 形参跨作用域 | 自有组件 props 用 `foo_bar`；形参默认不可变，跨作用域 `_foo_bar`，可变 `$foo_bar` | 5.4 |
 | 引入 ts-effect / fp-ts / monad / functor | 普通 TS：if/for/try + Result | 2.2 |
 | Result 的 error 用 Error 子类 / 在 Result 函数里 throw 预期失败 | 失败数据（可辨识联合）；边界转换才 catch | 9.5 |
 | `emit('event name')` / 用 Memo 当事件总线 | `signals.sig_name.receive(...)`（Signal）/ 发布 `trigger`；普通状态用闭包 | 8.2 |
