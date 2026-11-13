@@ -67,8 +67,8 @@ export async function updateTag(
   }
 
   const new_attrs = data.attributes !== undefined
-    ? as<Record<string, unknown>>(itemCheckAttributes('tag', data.attributes))
-    : prev.attributes
+                    ? as<Record<string, unknown>>(itemCheckAttributes('tag', data.attributes))
+                    : prev.attributes
 
   try {
     const updated = await db

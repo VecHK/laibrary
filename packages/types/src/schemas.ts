@@ -161,9 +161,9 @@ export function itemBuildRowValidator(
   const shape: Record<string, z.ZodTypeAny> = {}
   for (const field of fields) {
     if (field.type !== 'unity_name') {
-      shape[field.name] = (
-        field.type === 'string'
-      ) ? z.string().nullable().optional() : z.number().nullable().optional()
+      shape[field.name] = field.type === 'string'
+                          ? z.string().nullable().optional()
+                          : z.number().nullable().optional()
     }
   }
   return z.object(shape).passthrough()

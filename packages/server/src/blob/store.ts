@@ -225,8 +225,8 @@ export function CreateBlobStore({
         return { id, size: stat.size, mime, ...meta }
       } else {
         const metadata = mime.startsWith('image/')
-                          ? await inspect(temp_path, mime)
-                          : { width: null, height: null }
+                         ? await inspect(temp_path, mime)
+                         : { width: null, height: null }
         const stored = await commitTemp(temp_path, id, metadata)
         return { ...stored, mime }
       }

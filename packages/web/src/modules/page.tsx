@@ -514,11 +514,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     try {
       await ctx.api.rpc.updateItem({ id: current.id, data: { title: left } })
       const next_role = current.role === 'text-list'
-        ? 'text-list'
-        : (current.role === 'text-todo' ? 'text-todo' : 'text-block')
+                        ? 'text-list'
+                        : (current.role === 'text-todo' ? 'text-todo' : 'text-block')
       const next_attributes = current.role === 'text-list'
-        ? { list_kind: listKindOf(current) }
-        : (current.role === 'text-todo' ? { checked: false } : undefined)
+                              ? { list_kind: listKindOf(current) }
+                              : (current.role === 'text-todo' ? { checked: false } : undefined)
       const created = await ctx.api.rpc.addItem({
         role: next_role,
         title: right,
@@ -663,8 +663,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         const before = without[insert_index - 1]
         const after = without[insert_index]
         const order_index = before === undefined
-          ? (after === undefined ? appendOrder() : after.order_index - 1)
-          : (after === undefined ? before.order_index + 1 : orderAfter(before.order_index, after.order_index))
+                            ? (after === undefined ? appendOrder() : after.order_index - 1)
+                            : (after === undefined ? before.order_index + 1 : orderAfter(before.order_index, after.order_index))
         const next = [...without]
         next.splice(insert_index, 0, { ...source, order_index })
         syncChildren(next)
@@ -759,13 +759,17 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       if (upload_failed) {
         // 出错后不再继续上传，等待当前批次收尾。
       } else {
-        const order_index = anchor === null ? appendOrder() : (
-          anchor.id === placeholder?.id ? placeholder.order_index : orderAfterItem(anchor)
-        )
+        const order_index = anchor === null
+                            ? appendOrder()
+                            : (
+                                anchor.id === placeholder?.id
+                                ? placeholder.order_index
+                                : orderAfterItem(anchor)
+                              )
         try {
           const created = kind === 'image'
-            ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
-            : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
+                          ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
+                          : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
 
           if (anchor !== null && anchor.id === placeholder?.id) {
             await ctx.api.rpc.deleteItem({ id: anchor.id })
@@ -794,11 +798,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   ) => {
     const list = children_ref.current
     const target_index = target_id === null
-      ? -1
-      : list.findIndex(child => child.id === target_id)
+                         ? -1
+                         : list.findIndex(child => child.id === target_id)
     const insert_index = target_index >= 0
-      ? target_index + (position === 'after' ? 1 : 0)
-      : list.length
+                         ? target_index + (position === 'after' ? 1 : 0)
+                         : list.length
     let previous = list[insert_index - 1]
     const next = list[insert_index]
     let last_created: Item | undefined
@@ -808,13 +812,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         // 出错后停止后续文件，保留已经成功的 block。
       } else {
         const order_index = previous === undefined
-          ? (next === undefined ? appendOrder() : next.order_index - 1)
-          : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+                            ? (next === undefined ? appendOrder() : next.order_index - 1)
+                            : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
         try {
           const kind = mediaKindForFile(file)
           const created = kind === 'image'
-            ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
-            : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
+                          ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
+                          : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
           insertChild(created)
           previous = created
           last_created = created
@@ -838,11 +842,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const blocks = splitTextBlocks(text)
     const list = children_ref.current
     const target_index = target_id === null
-      ? -1
-      : list.findIndex(child => child.id === target_id)
+                         ? -1
+                         : list.findIndex(child => child.id === target_id)
     const insert_index = target_index >= 0
-      ? target_index + (position === 'after' ? 1 : 0)
-      : list.length
+                         ? target_index + (position === 'after' ? 1 : 0)
+                         : list.length
     let previous = list[insert_index - 1]
     const next = list[insert_index]
     let last: Item | null = null
@@ -852,8 +856,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         // 保持已经成功的 block，后续由 reload 校正。
       } else {
         const order_index = previous === undefined
-          ? (next === undefined ? appendOrder() : next.order_index - 1)
-          : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+                            ? (next === undefined ? appendOrder() : next.order_index - 1)
+                            : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
         try {
           const created = await ctx.api.rpc.addItem({
             role: 'text-block',
@@ -889,14 +893,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handlePageDrop = (event: React.DragEvent<HTMLDivElement>) => {
     setDropIndicator(null)
     const block = event.target instanceof Element
-      ? event.target.closest<HTMLElement>('.page-block')
-      : null
+                  ? event.target.closest<HTMLElement>('.page-block')
+                  : null
     const parsed_id = block === null
-      ? null
-      : zItemID.safeParse(Number(block.dataset['blockId']))
+                      ? null
+                      : zItemID.safeParse(Number(block.dataset['blockId']))
     const position = block !== null && event.clientY < block.getBoundingClientRect().top + block.getBoundingClientRect().height / 2
-      ? 'before'
-      : 'after'
+                     ? 'before'
+                     : 'after'
     if (event.dataTransfer.files.length !== 0) {
       event.preventDefault()
       const files = [...event.dataTransfer.files]
@@ -1109,8 +1113,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             />
           ) : (
             module.Block !== undefined
-              ? module.Block(child, ctx)
-              : module.Presenter.card(child, ctx)
+            ? module.Block(child, ctx)
+            : module.Presenter.card(child, ctx)
           )
 
           return (

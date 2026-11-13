@@ -19,8 +19,8 @@ function ruleToCondition(rule: FilterRule): SQL {
   const cond = match(rule)
     .with({ name: 'role' }, value => (
       Array.isArray(value.input)
-        ? inArray(items.role, value.input)
-        : eq(items.role, value.input)
+      ? inArray(items.role, value.input)
+      : eq(items.role, value.input)
     ))
     .with({ name: 'kind' }, value => eq(items.kind, value.input))
     .with({ name: 'unity_name' }, value => eq(items.unity_name, value.input))

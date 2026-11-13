@@ -53,8 +53,8 @@ function useFirstImage(item: Item, ctx: ViewerCtx): Item | null {
 function MangaInline({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const first = useFirstImage(item, ctx)
   return first === null
-    ? <span className="block-entity-emoji">📖</span>
-    : <img className="block-entity-thumb" src={thumbUrl(ctx.api.base_url, first.id, 96)} alt="" />
+         ? <span className="block-entity-emoji">📖</span>
+         : <img className="block-entity-thumb" src={thumbUrl(ctx.api.base_url, first.id, 96)} alt="" />
 }
 
 function MangaCard({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
@@ -177,8 +177,8 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         const target = container.querySelector<HTMLImageElement>(`img[data-page-id="${pages[index]?.id}"]`)
         if (target !== null) {
           container.scrollLeft = direction === 'rtl'
-            ? container.scrollWidth - target.offsetLeft - target.clientWidth
-            : target.offsetLeft
+                                 ? container.scrollWidth - target.offsetLeft - target.clientWidth
+                                 : target.offsetLeft
         }
       }
       updateVisibility()

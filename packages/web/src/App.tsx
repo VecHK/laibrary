@@ -96,17 +96,17 @@ export default function App() {
   }, [connect, showError])
 
   const ctx: ViewerCtx | null = session === null
-    ? null
-    : {
-        api: { base_url: session.base_url, rpc: session.rpc },
-        tags: session.tags,
-        modules: session.modules,
-        navigate: navigateTarget,
-        refresh,
-        refreshSidebar,
-        showError,
-        showNotice,
-      }
+                                ? null
+                                : {
+                                    api: { base_url: session.base_url, rpc: session.rpc },
+                                    tags: session.tags,
+                                    modules: session.modules,
+                                    navigate: navigateTarget,
+                                    refresh,
+                                    refreshSidebar,
+                                    showError,
+                                    showNotice,
+                                  }
 
   return (
     <>

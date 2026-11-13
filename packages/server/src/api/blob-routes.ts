@@ -141,8 +141,8 @@ export function CreateBlobRouter({
         throw errorsPayloadTooLarge(`上传文件超过上限 ${max_bytes} 字节`)
       }
       const mime = typeof uploaded.mimetype === 'string' && uploaded.mimetype.length > 0
-        ? uploaded.mimetype
-        : 'application/octet-stream'
+                   ? uploaded.mimetype
+                   : 'application/octet-stream'
       const result = await blobs.putFile(upload_path, mime)
       temp_path = null
       return c.json(result, 200)

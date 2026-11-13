@@ -123,16 +123,16 @@ function TextBlockEditor({
         node.focus()
         skip_blur_save_ref.current = false
         const position = caret === 'end'
-          ? node.value.length
-          : Math.max(0, Math.min(caret, node.value.length))
+                         ? node.value.length
+                         : Math.max(0, Math.min(caret, node.value.length))
         node.setSelectionRange(position, position)
         resize()
         // Controlled textarea 的值更新可能发生在 focus 之后，用 macrotask 再落一次 caret。
         settle_timer = window.setTimeout(() => {
           if (alive_ref.current) {
             const settled = caret === 'end'
-              ? node.value.length
-              : Math.max(0, Math.min(caret, node.value.length))
+                            ? node.value.length
+                            : Math.max(0, Math.min(caret, node.value.length))
             node.setSelectionRange(settled, settled)
             onFocusHandled()
           }
@@ -306,8 +306,8 @@ function TextBlockEditor({
               list_shortcut.role,
               list_shortcut.title,
               list_shortcut.role === 'text-list'
-                ? { list_kind: list_shortcut.list_kind }
-                : { checked: false },
+              ? { list_kind: list_shortcut.list_kind }
+              : { checked: false },
             )
           } else {
             value_ref.current = next
@@ -315,8 +315,8 @@ function TextBlockEditor({
             onTitleChange(item.id, next)
             scheduleSave(next)
             const query = onSlashCommand === undefined
-              ? null
-              : detectSlashQuery(next, ev.target.selectionStart)
+                          ? null
+                          : detectSlashQuery(next, ev.target.selectionStart)
             setSlashQuery(query)
             if (query !== null) {
               const rect = ev.currentTarget.getBoundingClientRect()
@@ -465,10 +465,10 @@ function TextBlockCard({ item }: { item: Item }) {
     <div className="card text-block-card">
       <div className="card-title">
         {tokens.length === 0
-          ? '(空行)'
-          : tokens.map((token, index) => token.type === 'text'
-            ? <span key={index}>{token.text}</span>
-            : <span key={index} className="inline-link-text">@{token.label ?? token.target_id}</span>)}
+         ? '(空行)'
+         : tokens.map((token, index) => token.type === 'text'
+                                        ? <span key={index}>{token.text}</span>
+                                        : <span key={index} className="inline-link-text">@{token.label ?? token.target_id}</span>)}
       </div>
       <div className="card-sub">{level === null ? '文本' : `${level} 级标题`}</div>
     </div>

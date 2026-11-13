@@ -207,8 +207,8 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               </td>
               {fields.map(field => {
                 const value = field.type === 'unity_name'
-                  ? row.unity_name
-                  : zAnyAttributes.parse(row.attributes)[field.name]
+                              ? row.unity_name
+                              : zAnyAttributes.parse(row.attributes)[field.name]
                 const is_editing = (
                   field.type !== 'unity_name' &&
                   editing_cell !== null &&

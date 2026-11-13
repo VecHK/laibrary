@@ -11,8 +11,8 @@ import { ImageLightbox } from './image-lightbox'
 function imageAttrsOf(item: Item): ImageAttributes {
   const parsed = zImageAttributes.safeParse(item.attributes)
   return parsed.success
-    ? parsed.data
-    : { filename: item.title || 'image' }
+         ? parsed.data
+         : { filename: item.title || 'image' }
 }
 
 function AlignIcon({ align }: { align: ImageAlignment }) {
@@ -81,8 +81,8 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [available_width, setAvailableWidth] = useState(0)
   const [thumb, setThumb] = useState<ThumbState | null>(() => (
     item.blob === null
-      ? null
-      : { size: 384, src: thumbUrl(ctx.api.base_url, item.id, 384) }
+    ? null
+    : { size: 384, src: thumbUrl(ctx.api.base_url, item.id, 384) }
   ))
   const [thumb_failed, setThumbFailed] = useState(false)
   const [resizing, setResizing] = useState(false)
@@ -120,10 +120,14 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   useEffect(() => {
     thumb_request_ref.current += 1
     setThumbFailed(false)
-    setThumb(item.blob === null ? null : {
-      size: 384,
-      src: thumbUrl(ctx.api.base_url, item.id, 384),
-    })
+    setThumb(
+      (item.blob === null)
+      ? null
+      : {
+        size: 384,
+        src: thumbUrl(ctx.api.base_url, item.id, 384),
+      }
+    )
   }, [item.id, item.blob?.id])
 
   const natural_width = item.blob?.width ?? 0
@@ -241,8 +245,8 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const blob_width = item.blob?.width ?? null
   const blob_height = item.blob?.height ?? null
   const aspect_ratio = blob_width !== null && blob_height !== null
-    ? `${blob_width} / ${blob_height}`
-    : undefined
+                       ? `${blob_width} / ${blob_height}`
+                       : undefined
 
   return (
     <div

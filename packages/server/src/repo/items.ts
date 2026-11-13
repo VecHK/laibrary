@@ -222,9 +222,9 @@ export async function createItem(
     await validateInlineTokens(db, title)
   }
 
-  const order_index = (
-    form.order_index !== undefined
-  ) ? form.order_index : (await maxOrderIndex(db, parent_id) + 1)
+  const order_index = form.order_index !== undefined
+                      ? form.order_index
+                      : (await maxOrderIndex(db, parent_id) + 1)
 
   try {
     const new_rows = await db
@@ -313,8 +313,8 @@ export async function updateItem(
   }
 
   const tags = data.tags !== undefined
-    ? await validateTagIds(db, data.tags)
-    : prev.tags
+               ? await validateTagIds(db, data.tags)
+               : prev.tags
 
   const title = data.title ?? prev.title
   if (isTextBlockRole(role) && (data.title !== undefined || data.attributes !== undefined)) {
@@ -363,8 +363,8 @@ export async function convertTextBlock(
       await validateInlineTokens(db, next_title, id)
     }
     const next_attributes = attributes === undefined
-      ? prev.attributes
-      : as<Record<string, unknown>>(itemCheckAttributes(role, attributes))
+                            ? prev.attributes
+                            : as<Record<string, unknown>>(itemCheckAttributes(role, attributes))
     const updated = await db
       .update(items)
       .set({ role, title: next_title, attributes: next_attributes, update_date: new Date() })
