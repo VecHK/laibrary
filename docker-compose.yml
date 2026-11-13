@@ -43,4 +43,6 @@ services:
     volumes:
       - ./:/app
       - /app/node_modules
-    command: sh -c "corepack enable pnpm && pnpm install && pnpm dev"
+      - /app/.pnpm-store
+    # Node 26 不再内置 corepack，直接装 pnpm
+    command: sh -c "npm install -g pnpm@12.18.0 && pnpm install && pnpm dev"

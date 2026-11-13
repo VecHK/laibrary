@@ -1,10 +1,13 @@
 packages:
   - 'packages/*'
 
+# 项目内 store：某些文件系统/沙箱下跨目录硬链接会失败（ERR_PNPM_UNEXPECTED_STORE）。
+# .gitignore 已忽略；容器里由 compose 的匿名卷接住，避免写回宿主仓库。
 storeDir: .pnpm-store
 
 allowBuilds:
   esbuild: true
 
+# pnpm 供应链策略（minimumReleaseAge）自动写入的豁免；升级该依赖后应重新评估。
 minimumReleaseAgeExclude:
   - '@hono/node-server@2.1.8'

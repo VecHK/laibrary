@@ -22,7 +22,11 @@ Laibrary 是一个“一切皆 Item”的个人数据基座：结构化数据、
 
 要求：Node 26.13.1+、pnpm 12+、Docker（PostgreSQL 18）。
 
+> Node 26 不再内置 corepack；没装 pnpm 时先 `npm install -g pnpm@12`。
+> 用 nvm 时先 `nvm use`，版本由 [.nvmrc](.nvmrc) 指定。
+
 ```bash
+nvm use            # 已安装 Node 26.13.1 时
 cp .env.example .env
 docker compose up -d postgres
 pnpm install
