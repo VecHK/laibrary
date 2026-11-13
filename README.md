@@ -109,7 +109,7 @@ OS 环境变量优先于根 `.env`；`.env` 不提交，只提交 [`.env.example
 
 ```text
 packages/types   @laibrary/types：类型、zod、RPC 客户端、token parser、blob/thumb URL
-packages/server  @laibrary/server：Koa RPC、drizzle/PG、blob、缩略图、配置服务
+packages/server  @laibrary/server：Hono RPC、drizzle/PG、blob、缩略图、配置服务
 packages/web         @laibrary/web：React 19 + Vite 客户端
 docs             设计、规格、愿景、术语表、方法论
 ```

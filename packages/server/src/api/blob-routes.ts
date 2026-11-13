@@ -1,39 +1,34 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import Router, { type RouterContext } from '@koa/router'
-import type { Context } from 'koa'
-import { koaBody } from 'koa-body'
+import { Readable } from 'node:stream'
+import type { HttpBindings } from '@hono/node-server'
+import { Hono, type Context } from 'hono'
+import formidable from 'formidable'
+import type { File as FormidableFile, Files } from 'formidable'
 import { zBlobID } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
 import type { BlobService } from '../blob/service'
 import { errorsIsAppError, errorsBadRequest, errorsNotFound, errorsPayloadTooLarge, errorsStorage } from '../errors'
 import { directoryInitSync } from '../utils/directory'
 
-function json(ctx: Context, status: number, body: unknown): void {
-  ctx.status = status
-  ctx.type = 'application/json'
-  ctx.body = body
-}
+const __UPLOAD_HARD_LIMIT_BYTES__ = 1024 * 1024 * 1024
 
-function errorJson(ctx: Context, err: unknown): void {
-  if (errorsIsAppError(err)) {
-    json(ctx, err.status, { message: err.message, code: err.code })
-    return
+function detectSingleFile(files: Files): FormidableFile {
+  const value = files['file']
+  if (value === undefined) {
+    throw errorsBadRequest("upload failure: require 'file' field")
+  } else {
+    // formidable v3 的 files 始终是数组，单文件取第一个
+    const list = Array.isArray(value) ? value : [value]
+    const file = list[0]
+    if (file === undefined) {
+      throw errorsBadRequest("upload failure: require 'file' field")
+    } else if (list.length > 1) {
+      throw errorsBadRequest('upload failure: single upload required')
+    } else {
+      return file
+    }
   }
-  const message = err instanceof Error ? err.message : String(err)
-  json(ctx, 500, { message, code: 'INTERNAL' })
-}
-
-function detectSingleFile(ctx: Context) {
-  const { files } = ctx.request
-  if (files === undefined) {throw errorsBadRequest('upload failure: missing files')}
-  if (Object.keys(files).length > 1) {
-    throw errorsBadRequest("upload failure: only 'file' field is allowed")
-  }
-  const file = files['file']
-  if (file === undefined) {throw errorsBadRequest("upload failure: require 'file' field")}
-  if (Array.isArray(file)) {throw errorsBadRequest('upload failure: single upload required')}
-  return file
 }
 
 type ParsedRange =
@@ -74,6 +69,31 @@ function parseRange(range: string | undefined, size: number): ParsedRange {
   }
 }
 
+function isPayloadTooLarge(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'httpCode' in err && err.httpCode === 413
+}
+
+function baseBlobHeaders(mime: string, blob_id: string): Record<string, string> {
+  return {
+    'Content-Type': mime,
+    'ETag': `"${blob_id}"`,
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Accept-Ranges': 'bytes',
+  }
+}
+
+function streamResponse(
+  file_path: string,
+  status: number,
+  headers: Record<string, string>,
+  range: { start: number, end: number } | null,
+): Response {
+  const node_stream = range === null
+    ? fs.createReadStream(file_path)
+    : fs.createReadStream(file_path, { start: range.start, end: range.end })
+  return new Response(Readable.toWeb(node_stream), { status, headers })
+}
+
 export type CreateBlobRouterOptions = {
   config: BootstrapConfig
   blobs: BlobService
@@ -85,7 +105,7 @@ export function CreateBlobRouter({
   blobs,
   get_max_upload_bytes,
 }: CreateBlobRouterOptions) {
-  const router = new Router()
+  const app = new Hono<{ Bindings: HttpBindings }>()
   directoryInitSync(config.upload_temp_path)
   for (const temp_file of fs.readdirSync(config.upload_temp_path)) {
     try {
@@ -95,24 +115,20 @@ export function CreateBlobRouter({
     }
   }
 
-  const upload = koaBody({
-    multipart: true,
-    formidable: {
-      maxFileSize: 1024 * 1024 * 1024,
-      multiples: false,
-      maxFiles: 1,
-      maxFields: 1,
-      allowEmptyFiles: false,
-      keepExtensions: true,
-      uploadDir: config.upload_temp_path,
-      filter: (part) => part.name === 'file',
-    },
-  })
-
-  router.post('/blob', upload, async (ctx) => {
+  app.post('/blob', async c => {
     let temp_path: string | null = null
     try {
-      const uploaded = detectSingleFile(ctx)
+      const form = formidable({
+        maxFileSize: __UPLOAD_HARD_LIMIT_BYTES__,
+        maxFiles: 1,
+        maxFields: 1,
+        allowEmptyFiles: false,
+        keepExtensions: true,
+        uploadDir: config.upload_temp_path,
+        filter: part => part.name === 'file',
+      })
+      const [, files] = await form.parse(c.env.incoming)
+      const uploaded = detectSingleFile(files)
       const upload_path: string = uploaded.filepath
       temp_path = upload_path
       const max_bytes = await get_max_upload_bytes()
@@ -125,56 +141,52 @@ export function CreateBlobRouter({
         : 'application/octet-stream'
       const result = await blobs.putFile(upload_path, mime)
       temp_path = null
-      json(ctx, 200, result)
+      return c.json(result, 200)
     } catch (err) {
       if (temp_path !== null) {
         await fs.promises.unlink(temp_path).catch(() => undefined)
       }
-      if (err instanceof Error && 'code' in err && err.code === 'LIMIT_FILE_SIZE') {
-        json(ctx, 413, { message: '上传文件过大', code: 'PAYLOAD_TOO_LARGE' })
+      if (isPayloadTooLarge(err)) {
+        throw errorsPayloadTooLarge('上传文件过大')
+      } else if (errorsIsAppError(err)) {
+        throw err
       } else {
-        if (errorsIsAppError(err)) {errorJson(ctx, err)}
-        else {errorJson(ctx, errorsStorage('upload failure', err))}
+        throw errorsStorage('upload failure', err)
       }
     }
   })
 
-  const readBlob = async (ctx: RouterContext) => {
-    try {
-      const parsed = zBlobID.parse(ctx.params.blob_id)
-      const meta = await blobs.getMeta(parsed)
-      if (meta === null) {throw errorsNotFound(`blob(${parsed}) not found`)}
-      if (!(await blobs.exists(parsed))) {
-        throw errorsNotFound(`blob(${parsed}) 文件不存在`)
-      }
-      const stat = await blobs.stat(parsed)
-      const range = parseRange(ctx.request.headers.range, stat.size)
+  const readBlob = async (c: Context<{ Bindings: HttpBindings }>) => {
+    const parsed = zBlobID.safeParse(c.req.param('blob_id'))
+    if (!parsed.success) {
+      throw errorsBadRequest('非法的 blob id')
+    }
+    const meta = await blobs.getMeta(parsed.data)
+    if (meta === null) {
+      throw errorsNotFound(`blob(${parsed.data}) not found`)
+    }
+    if (!(await blobs.exists(parsed.data))) {
+      throw errorsNotFound(`blob(${parsed.data}) 文件不存在`)
+    }
+    const stat = await blobs.stat(parsed.data)
+    const range = parseRange(c.req.header('range'), stat.size)
+    const headers = baseBlobHeaders(meta.mime, meta.id)
 
-      ctx.set('Content-Type', meta.mime)
-      ctx.set('ETag', `"${meta.id}"`)
-      ctx.set('Cache-Control', 'public, max-age=31536000, immutable')
-      ctx.set('Accept-Ranges', 'bytes')
-
-      if (range.kind !== 'range') {
-        ctx.status = 200
-        ctx.set('Content-Length', String(stat.size))
-        ctx.body = fs.createReadStream(blobs.pathFor(parsed))
-      } else {
-        ctx.status = 206
-        ctx.set('Content-Range', `bytes ${range.start}-${range.end}/${stat.size}`)
-        ctx.set('Content-Length', String(range.end - range.start + 1))
-        ctx.body = fs.createReadStream(blobs.pathFor(parsed), {
-          start: range.start,
-          end: range.end,
-        })
-      }
-    } catch (err) {
-      errorJson(ctx, err)
+    if (c.req.method === 'HEAD') {
+      headers['Content-Length'] = String(stat.size)
+      return new Response(null, { status: 200, headers })
+    } else if (range.kind !== 'range') {
+      headers['Content-Length'] = String(stat.size)
+      return streamResponse(blobs.pathFor(parsed.data), 200, headers, null)
+    } else {
+      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`
+      headers['Content-Length'] = String(range.end - range.start + 1)
+      return streamResponse(blobs.pathFor(parsed.data), 206, headers, range)
     }
   }
 
-  router.get('/blob/:blob_id', readBlob)
-  router.head('/blob/:blob_id', readBlob)
+  // Hono 会把 HEAD 请求按 GET 派发并自动去掉 body
+  app.get('/blob/:blob_id', readBlob)
 
-  return router
+  return app
 }

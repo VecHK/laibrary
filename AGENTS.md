@@ -209,7 +209,7 @@ pnpm build
 
 ## 环境备注（会变化）
 
-- Node 26.13.1（nvm，见 `.nvmrc`）、pnpm 12、PostgreSQL 18、drizzle、Koa、zod、sharp、React 19、Vite、Vitest。
+- Node 26.13.1（nvm，见 `.nvmrc`）、pnpm 12、PostgreSQL 18、drizzle、Hono、zod、sharp、React 19、Vite、Vitest。
 - 默认 API `http://127.0.0.1:44998`，Web `http://127.0.0.1:5173`。
 - bootstrap 在根 `.env`；`.env` 不提交；`config.json` 已移除。
 - Docker 开发库与测试库分离；开发数据可能被用户继续使用。

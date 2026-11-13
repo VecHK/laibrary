@@ -159,7 +159,7 @@ multipart，字段 `file`；大小上限来自 runtime `sys.config.upload_max_by
 
 ## 5. CORS / 鉴权
 
-- `@koa/cors` 默认开放，适配前后端分离与 NAS。
+- `hono/cors` 默认开放，适配前后端分离与 NAS。
 - 当前无鉴权；只应在可信局域网使用。公网需交付层 Access/反代，未来再做 token。
 
 ## 6. 错误消息示例

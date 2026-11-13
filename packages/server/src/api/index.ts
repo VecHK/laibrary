@@ -1,7 +1,8 @@
-import Koa, { type Context } from 'koa'
-import Router from '@koa/router'
-import cors from '@koa/cors'
-import { bodyParser } from '@koa/bodyparser'
+import type { HttpBindings } from '@hono/node-server'
+import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
+import { cors } from 'hono/cors'
+import { methodNotAllowed } from 'hono/method-not-allowed'
 import { z, ZodError } from 'zod'
 import type { ActionName } from '@laibrary/types'
 import { __RPC_ACTION_NAMES__, zActionPayloads } from '@laibrary/types'
@@ -14,6 +15,8 @@ import { errorsIsAppError, errorsBadRequest } from '../errors'
 import { CreateActionRoute } from './actions'
 import { CreateBlobRouter } from './blob-routes'
 import { CreateThumbRouter } from './thumb-routes'
+
+const __ACTION_BODY_LIMIT_BYTES__ = 4 * 1024 * 1024
 
 const zActionRequest = z.object({
   action: z.string(),
@@ -42,11 +45,14 @@ function errorBody(err: unknown): { status: number, body: unknown } {
   }
 }
 
-function sendJson(ctx: Context, status: number, body: unknown): void {
-  ctx.status = status
-  ctx.type = 'application/json'
-  ctx.body = body
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
 }
+
+export type ApiApp = Hono<{ Bindings: HttpBindings }>
 
 export type CreateApiOptions = {
   config: BootstrapConfig
@@ -62,27 +68,23 @@ export async function CreateApi({
   blobs,
   config_store,
   thumbnails,
-}: CreateApiOptions) {
-  const app = new Koa()
-  const router = new Router()
+}: CreateApiOptions): Promise<ApiApp> {
+  const app = new Hono<{ Bindings: HttpBindings }>()
   const actions = CreateActionRoute({ db, blobs, config_store })
 
-  app.use(cors())
+  app.use('*', cors())
 
-  const blob_router = CreateBlobRouter({
+  const blob_app = CreateBlobRouter({
     config,
     blobs,
     get_max_upload_bytes: async () => (
       await config_store.getValue('sys.config.upload_max_bytes', value => z.number().parse(value))
     ) ?? 256 * 1024 * 1024,
   })
-  app.use(blob_router.routes())
-  app.use(blob_router.allowedMethods())
-  const thumb_router = CreateThumbRouter({ thumbnails, blobs })
-  app.use(thumb_router.routes())
-  app.use(thumb_router.allowedMethods())
+  app.route('/', blob_app)
 
-  app.use(bodyParser({ jsonLimit: '4mb' }))
+  const thumb_app = CreateThumbRouter({ thumbnails, blobs })
+  app.route('/', thumb_app)
 
   const handlers = {
     addItem: async payload => actions.addItem(zActionPayloads.addItem.parse(payload)),
@@ -111,28 +113,44 @@ export async function CreateApi({
     updateConfig: async payload => actions.updateConfig(zActionPayloads.updateConfig.parse(payload)),
   } satisfies Record<ActionName, (payload: unknown) => Promise<unknown>>
 
-  router.post('/action', async ctx => {
-    try {
-      const request = zActionRequest.parse(ctx.request.body)
+  app.post(
+    '/action',
+    bodyLimit({
+      maxSize: __ACTION_BODY_LIMIT_BYTES__,
+      onError: c => c.json({ message: '请求体超过上限', code: 'PAYLOAD_TOO_LARGE' }, 413),
+    }),
+    async c => {
+      const raw_body = await c.req.json<unknown>().catch(() => {
+        throw errorsBadRequest('请求体不是合法 JSON')
+      })
+      const request = zActionRequest.parse(raw_body)
       const action = __RPC_ACTION_NAMES__.find(each => each === request.action)
       if (action === undefined) {
         throw errorsBadRequest(`unknown ACTION: ${request.action}`)
       } else {
         const handler = handlers[action]
         const result = await handler(request.payload)
-        sendJson(ctx, 200, result)
+        return c.json(result, 200)
       }
-    } catch (err) {
-      const { status, body } = errorBody(err)
-      if (status >= 500) {
-        console.error('[action]', err)
-      }
-      sendJson(ctx, status, body)
-    }
-  })
+    },
+  )
 
-  app.use(router.routes())
-  app.use(router.allowedMethods())
+  app.use(methodNotAllowed({
+    app,
+    onMethodNotAllowed: (c, methods) => c.json(
+      { message: 'method not allowed', code: 'BAD_REQUEST' },
+      405,
+      { Allow: methods.join(', ') },
+    ),
+  }))
+
+  app.onError(err => {
+    const { status, body } = errorBody(err)
+    if (status >= 500) {
+      console.error('[api]', err)
+    }
+    return jsonResponse(status, body)
+  })
 
   return app
 }

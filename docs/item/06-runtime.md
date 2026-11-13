@@ -58,7 +58,7 @@ bootstrapLoadEnv() + bootstrapLoadConfig()
 
 ## 4. API 进程
 
-- Koa 3 + CORS + koa-body(multipart) + @koa/bodyparser(JSON 4mb)。
+- Hono 4 + `hono/cors` + formidable(multipart，直接消费 Node 原始请求) + `hono/body-limit`(JSON 4mb)。
 - `/action` 统一 zod payload；AppError/ZodError 映射状态码；未知 action 400。
 - 无鉴权；仅可信局域网。
 - 单实例假设：缩略图生成用进程内 per-key promise；配置缓存单实例。
