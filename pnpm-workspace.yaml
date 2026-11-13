@@ -1,5 +1,10 @@
 packages:
   - 'packages/*'
 
+storeDir: .pnpm-store
+
 allowBuilds:
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@hono/node-server@2.1.8'

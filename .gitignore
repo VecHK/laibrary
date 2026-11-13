@@ -4,6 +4,7 @@ node_modules/
 .DS_Store
 *.log
 pnpm-debug.log*
+.pnpm-store/
 packages/server/storage/
 dist/
 /.env
