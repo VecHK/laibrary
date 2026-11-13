@@ -92,8 +92,8 @@ function streamResponse(
   range: { start: number, end: number } | null,
 ): Response {
   const node_stream = range === null
-    ? fs.createReadStream(file_path)
-    : fs.createReadStream(file_path, { start: range.start, end: range.end })
+                      ? fs.createReadStream(file_path)
+                      : fs.createReadStream(file_path, { start: range.start, end: range.end })
   return new Response(Readable.toWeb(node_stream), { status, headers })
 }
 
@@ -170,24 +170,24 @@ export function CreateBlobRouter({
     const meta = await blobs.getMeta(parsed)
     if (meta === null) {
       throw errorsNotFound(`blob(${parsed}) not found`)
-    }
-    if (!(await blobs.exists(parsed))) {
+    } else if (!(await blobs.exists(parsed))) {
       throw errorsNotFound(`blob(${parsed}) 文件不存在`)
-    }
-    const stat = await blobs.stat(parsed)
-    const range = parseRange(c.req.header('range'), stat.size)
-    const headers = baseBlobHeaders(meta.mime, meta.id)
-
-    if (c.req.method === 'HEAD') {
-      headers['Content-Length'] = String(stat.size)
-      return new Response(null, { status: 200, headers })
-    } else if (range.kind !== 'range') {
-      headers['Content-Length'] = String(stat.size)
-      return streamResponse(blobs.pathFor(parsed), 200, headers, null)
     } else {
-      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`
-      headers['Content-Length'] = String(range.end - range.start + 1)
-      return streamResponse(blobs.pathFor(parsed), 206, headers, range)
+      const stat = await blobs.stat(parsed)
+      const range = parseRange(c.req.header('range'), stat.size)
+      const headers = baseBlobHeaders(meta.mime, meta.id)
+
+      if (c.req.method === 'HEAD') {
+        headers['Content-Length'] = String(stat.size)
+        return new Response(null, { status: 200, headers })
+      } else if (range.kind !== 'range') {
+        headers['Content-Length'] = String(stat.size)
+        return streamResponse(blobs.pathFor(parsed), 200, headers, null)
+      } else {
+        headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`
+        headers['Content-Length'] = String(range.end - range.start + 1)
+        return streamResponse(blobs.pathFor(parsed), 206, headers, range)
+      }
     }
   }
 
