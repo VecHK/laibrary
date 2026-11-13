@@ -43,6 +43,8 @@
 
 **仍然不允许 early return**：不能 `if (bad) return ...`；完整 `if / else` 分支里的 `return` 是该分支的结果，不算 early return。失败要作为正常返回值（`Result` / 联合类型）时，按树状决策/Result 写。
 
+**单入口检查也是判决**：入口即使只有一条“放行 / 拒绝”检查，也要写成 `if (bad) { throw } else { main() }`，不能写成 `if (bad) throw; main()`。线性操作只适用于“按顺序做几步”（如 `publishPage`）；“先检查，再执行主逻辑”属于判决树。
+
 ```ts
 // 树状决策：完整 if/else，两层就写两层
 function getStatus(order: Order | null): Status {
@@ -157,9 +159,9 @@ const label = value !== null ? 'x' : 'y'
 ```ts
 function CreateCounter() {
   let $_count = 0
-  return function increment() {
-    $_count += 1
-    return $_count
+  return {
+    increment: () => { $_count += 1 },
+    get: () => $_count,
   }
 }
 ```
@@ -220,6 +222,8 @@ function CreateCounter() {
 **因此**：
 
 - 数据默认不可变：修改 = 创建新对象/新数组，不原地改；函数不修改入参。
+- 有副作用（I/O / 网络 / 日志 / 时间 / 随机 / 状态变更）或 mutation 的函数，返回值只能是 `void`（`Promise<void>`）或 `Result<T, E>`；不要返回裸数据、布尔、数组长度。纯查询（无副作用）可以返回数据；可能失败的查询用 `Result`。
+- 数组禁止原地改：不用 `push` / `pop` / `shift` / `unshift` / `splice` / `sort` / `reverse` / `fill` / `copyWithin`。要变就 `let $arr`，然后 `$arr = [...$arr, x]` / `$arr = $arr.slice(0, 3)`；只有性能瓶颈（有测量依据）才用原地方法，并写 `// justify: 3 <理由>`。
 - 纯函数是默认形态；中间计算保持纯净，脏事在明确的位置一次做完。
 - 副作用集中到可数的点：要么一个函数统一做，要么在流程的固定阶段统一处理。
 - 引用透明被破坏时，把时间/随机/I/O/可变全局移到边界或参数注入，不要让它藏在核心函数里。
@@ -295,17 +299,25 @@ function findNumber(list: number[], target_num: number): null | number {
 - 非导出省略模块名：`inEvent`、`canSubmit`、`memberIsVoted`。
 - 名字本身已含领域名（`fetchUser`、`parseUserId`、`CreateUserApi`）就不重复加前缀；规则是"不能省掉领域名"，不是"必须多一个前缀"。
 - 导出的数据值/全局常量用 `MODULE_VAR_NAME`（`GALLERY_MAX_PHOTOS`）；非导出全局常量省略模块前缀（`MAX_PHOTOS`）。不再用两端的 `__`。
+- **模块 API 对象**（带方法/行为、被其他模块作为接口使用的对象）保留稳定接口名：Drizzle table（`items` / `blobs`）、zod schema（`zItem` / `zGallery`）、React module descriptor（`__PAGE_MODULE__` 等）。它们不套纯数据命名；纯数据对象仍按 5.4。
 - 工厂 `CreateGalleryStore`，不要只写 `CreateStore`（除非是 `utils/` 通用工具）。
 - `as<T>` / `Is<T>` 是通用工具（像 `Pipe`），不加模块前缀；放在 `packages/types`。
 - ❌ 导出的 `voteCountByPhoto` / `memberHasVoted` / `memberHasSubmitted`：应带 `gallery`。
 
-### 5.3 返回函数的函数 → PascalCase
+### 5.3 返回可调用物/方法集合的函数 → PascalCase
 
 函数如果产出可调用对象（返回函数、方法集合、能力元组如 `[get, set]`），本质是工厂/构造器，用 PascalCase 让调用处看出"拿到的是能力，不是结果"。
 
 ```ts
-function CreateCounter() { /* 返回函数 */ }
-function CreateUserApi(base_url: string) { /* 返回方法集合 */ }
+function CreateCounter() { /* 返回对象/可调用物 */ }
+
+function CreateUserApi(_base_url: string) {
+  return {
+    userUrl: (id: UserId) => `${_base_url}/users/${id}`,
+    usersUrl: () => `${_base_url}/users`,
+  }
+}
+
 function Pipe(...fns) { /* 返回函数 */ }
 ```
 
@@ -318,18 +330,18 @@ function Pipe(...fns) { /* 返回函数 */ }
 | 形态 | 命名 | 例 |
 |---|---|---|
 | 全局/模块级常量（不可变） | `FOO_BAR`（导出带模块/领域名） | `GALLERY_MAX_PHOTOS`、非导出 `MAX_PHOTOS` |
-| 本地 const / 只读参数 | `foo_bar` | `base_url`、`user_id` |
+| 本地 const / 未跨作用域只读参数 | `foo_bar` | `base_url`、`user_id` |
 | 本地可变值 | `$foo_bar` | `$retry_count` |
 | 跨作用域、不可变 | `_foo_bar` | `_db`、`_config` |
 | 跨作用域且可变 | `$_foo_bar` | `$_count`、`$_state` |
 
 - "可变"包括重新赋值和内容变更；内容会变的共享容器用 `$_foo_bar`，只读共享依赖用 `_foo_bar`。
-- 不可变值用 `const` 声明；只有需要重新赋值/改内容才用 `let`，并按 `$` 前缀命名。
+- `const` 表示绑定不重新赋值；`let` 表示会重新赋值。纯数据要变就整体替换（新对象/新数组），不通过修改 `const` 对象的字段来省 `let`；可变值用 `let $foo_bar`。
 - 形参默认不可变：`function renderBlock(base_url: string) { ... }`；被闭包捕获（跨作用域）写 `_base_url`。确实需要重新赋值/改内容时写 `$base_url`（优先改成局部变量），两者都成立写 `$_base_url`；不要修改入参对象。
 
 ```ts
-function createReader(_base_url: string) {
-  return () => fetch(_base_url)
+function createLabeler(_prefix: string) {
+  return (name: string) => `${_prefix}${name}`
 }
 
 function countDown(start: number): void {
@@ -341,11 +353,13 @@ function countDown(start: number): void {
 
 - 自有 React 组件的 props 属性名用 `foo_bar`（`refresh_key`、`base_url`）；第三方组件的 props 沿用其库约定，不改写。
 - `useState` / `useMemo` 的值一律写 `foo_bar`，不加 `_`：它们在当前渲染帧内固定不可变，跨渲染帧由 React 换新值，不是闭包捕获的可变状态。setter 按 React 约定写 `setFooBar`。
+- `useCallback` 返回函数值，按 camelCase `foo_bar`；它与 `useState` / `useMemo` 一样是渲染帧内的稳定值，不加 `$` / `_`。
 - `useRef` 得到的 ref 对象写 `$foo_bar`：对象本身不换，但 `.current` 会跨渲染帧变化，按可变值处理。
 
 ```tsx
 const [foo_bar, setFooBar] = useState('')
 const sorted_items = useMemo(() => sortItems(items), [items])
+const formatUsers = useCallback((users: User[]) => users.map(formatUser), [])
 const $input_ref = useRef<HTMLInputElement | null>(null)
 ```
 
@@ -363,12 +377,14 @@ const $input_ref = useRef<HTMLInputElement | null>(null)
 | 东西 | 形态 | 命名 | 例 |
 |---|---|---|---|
 | 导出的数据值 | 不可调用 | `MODULE_VAR_NAME` | `GALLERY_MAX_PHOTOS` |
+| 模块 API 对象 | 带方法/接口的稳定对象 | 保留稳定接口名 | `items` / `zItem` / `__PAGE_MODULE__` |
 | 导出的函数，返回数据 | 动作 | `moduleAction` | `galleryInEvent` |
 | 导出的工厂，返回可调用物/能力集合 | 能力 | `CreateModuleX` | `CreateGalleryStore` |
 | 非导出函数/数据 | 函数/数据 | 省略模块名 | `inEvent` / `max_photos` |
 | React 组件 | 框架约定 | PascalCase | `GalleryCard` |
 | React props（自有组件） | 属性值 | `foo_bar` | `refresh_key`、`base_url` |
 | `useState` / `useMemo` 值 | 渲染帧内不可变 | `foo_bar`（不加 `_`） | `foo_bar`、`sorted_items` |
+| `useCallback` 返回值 | 函数值 | `foo_bar` | `formatUsers` |
 | `useRef` 对象 | 内容可变的稳定容器 | `$name` | `$input_ref`、`$timer_ref` |
 | Hook | 框架约定 | `useX` | `useGalleryVotes` |
 | 类型/接口 | 类型层 | PascalCase | `UserId` |
@@ -517,6 +533,8 @@ type Gallery = z.infer<typeof zGallery>
 
 const gallery = zGallery.parse(raw) // raw: unknown
 ```
+
+- `zGallery` 是 zod schema（模块 API 对象），保持稳定名；纯数据对象才按 5.4。
 
 - 类型由 `z.infer` 产出，不手写 interface 再 `as`。
 - 能 `.refine`（跨字段/业务不变量）、`.transform`（归一化/转换）、`.brand`（品牌）表达的约束都放进 schema，不要另写一套 `parseX` / `checkX` / `isX`。
@@ -731,6 +749,7 @@ type Result<T, E> =
 
 - [ ] **术语一致吗？** 与 `glossary.md` 一致；没有把 `Item` 这类领域术语用在通用工具函数上。
 - [ ] **决策形态对了吗？** 树状决策是完整 `if / else`、入口并列校验按 `if / else if / else`；线性操作是顺序步骤、不补 `else`；都不 early return。
+- [ ] **单入口检查是树吗？** 单入口“放行/拒绝”写成 `if (bad) { throw } else { main() }`，不是 `if (bad) throw; main()`。
 - [ ] **`else if` / `else { if }` 分清了吗？** 同级兄弟才用 `else if`，跨层用嵌套；深了抽函数。
 - [ ] **三元合规吗？** 多行 `?` / `:` 与条件第一个字符平齐；JSX 条件渲染是例外；条件都是 boolean，没有 truthiness。
 - [ ] **有类 / this / getter / setter / Proxy 吗？** 除错误类型外都不该有；属性访问没有藏计算/校验/副作用。
@@ -742,8 +761,12 @@ type Result<T, E> =
 - [ ] **没有重度函数式吧？** 业务代码仍用普通 TS 的 `if` / `for` / `try`；没有为"纯粹"引入 `fp-ts` / `Effect` / monad。
 - [ ] **多分支联合用 ts-pattern 了吗？** 3+ 分支/exhaustive；2 分支不过度用。
 - [ ] **副作用集中吗？** I/O、时钟、随机、日志是否都在边界？核心是否保持引用透明？
+- [ ] **副作用 / mutation 返回值合规吗？** 只返回 `void` / `Promise<void>` 或 `Result`；没有返回裸数据、布尔、数组长度。
+- [ ] **数组整体替换吗？** 没有 `push` / `splice` / `sort` / `reverse` 等原地方法；用 `let $arr` + 新数组。
 - [ ] **循环里没有跳转吗？** 没有 `continue` / `break`；查找用 `find` 或抽函数。
 - [ ] **命名合规吗？** 导出带模块名、非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；本地可变 `$name`；跨作用域 `_name` / `$_name`；自有组件 props 用 `foo_bar`；`useState` / `useMemo` 值用 `foo_bar`（不加 `_`）；`useRef` 对象用 `$name`。
+- [ ] **模块 API 对象保留稳定名了吗？** Drizzle table / zod schema / React module descriptor 没有套纯数据命名。
+- [ ] **`useCallback` 命名对了吗？** 返回函数值，按 `foo_bar` camelCase，没有加 `$` / `_`。
 - [ ] **常量放对了吗？** `constants.ts`、命名导出、计算常量 re-export 收口；没有 `export default { ... }` 或可变对象。
 - [ ] **类型契约还在吗？** 无 `any` / `!`；导出有返回类型；外部输入由 zod 产出，zod 之后才 parse/check；品牌用对。
 - [ ] **外部输入过 zod 了吗？** `JSON.parse` / `request.body` / `query` / `env` / `fetch` / 文件没有直接 `as` 或信任静态类型。
@@ -775,10 +798,13 @@ type Result<T, E> =
 | `const foo = () => { ... }`（模块级/导出/多行） | `function foo() { ... }`；箭头留给回调和函数值 | 第七节 |
 | `{ get name() {} }` / `set name(v) {}` / `Proxy` | 显式函数 / `Signal` / `Memo` / `Map` | 2.3 |
 | `if (x) return` 后接逻辑 | 树状决策写完整 `if / else`；入口并列校验 `if / else if / else`；线性操作按顺序做步骤；都不 early return | 第一节 |
+| `if (bad) throw; main`（单入口） | `if (bad) { throw } else { main() }`；单入口也是判决树 | 第一节 |
 | `else if` 压平子层 | `else { if }` 嵌套，或抽命名函数 | 第一节 |
 | 多行三元按固定缩进 | `?` / `:` 与条件第一个字符对齐；JSX 条件渲染例外 | 1.1 |
 | `if (items.length)` / `value ? ...` | `if (items.length > 0)` / `value !== null ? ...`；条件必须 boolean | 1.2 |
 | 循环里 `break` / `continue` | `find` / 抽查找函数 / `if` 包裹 | 第四节 |
+| `arr.push` / `splice` / `sort` / `reverse` | `let $arr`；`$arr = [...$arr, x]` / `$arr = $arr.slice(0, 3)`；不原地改 | 第三节 |
+| 有副作用 / mutation 却返回裸数据 | 返回 `void` / `Promise<void>` 或 `Result`；纯查询才返回数据 | 第三节 |
 | `catch { return null }` / `return []` | 包装 + cause / 判别后处理 / Result | 9.1 |
 | `catch (e) { log(e); throw e }` | 删掉 log，让兜底记一次 | 9.2 |
 | `any` / `!` | `unknown` + zod/parse/check；显式判空 | 第六节 |
@@ -793,6 +819,9 @@ type Result<T, E> =
 | 业务数据被偏应用固定 / `f(a)(b)(c)` | 数据显式传；最多偏应用一次，不做多层柯里化 | 2.1 |
 | `let count` / 可变的 `_state` | 本地可变 `$count`；跨作用域只读 `const _state`；跨作用域可变 `$_state`；全局常量 `FOO_BAR`；口诀见 5.4 | 5.4 |
 | camelCase props / 形参跨作用域 | 自有组件 props 用 `foo_bar`；形参默认不可变，跨作用域 `_foo_bar`，可变 `$foo_bar` | 5.4 |
+| `CreateUserApi(base_url)`（闭包捕获） | `CreateUserApi(_base_url)`；未捕获 `base_url`，可变 `$base_url`，两者 `$_base_url` | 5.3 / 5.4 |
+| `useCallback` 返回值 | `foo_bar` camelCase，不加 `$` / `_` | 5.4 |
+| 模块 API 对象 | 保留稳定接口名（`items` / `zItem` / `__PAGE_MODULE__`） | 5.2 |
 | 引入 ts-effect / fp-ts / monad / functor | 普通 TS：if/for/try + Result | 2.2 |
 | Result 的 error 用 Error 子类 / 在 Result 函数里 throw 预期失败 | 失败数据（可辨识联合）；边界转换才 catch | 9.5 |
 | `emit('event name')` / 用 Memo 当事件总线 | `signals.sig_name.receive(...)`（Signal）/ 发布 `trigger`；普通状态用闭包 | 8.2 |
