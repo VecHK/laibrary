@@ -67,7 +67,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 配置分两层：bootstrap 只在根 `.env`/OS env；runtime 只在 `sys.config` Item；runtime 不接受 env 覆盖。
 - 系统项（`sys.`）不出现在公共 listing，不能被通用 item 写接口修改/删除。
 - 术语表是领域契约：领域术语先更新 `docs/glossary.md`，前端/编辑器术语更新 `docs/frontend/glossary.md`；不要发明同义词。
-- 常量用 `__MODULE_NAME__`；Drizzle table、zod schema、React module descriptor 是模块 API 对象，保留其稳定接口名。
+- 常量用 `MODULE_NAME`（UPPER_SNAKE）；Drizzle table、zod schema、React module descriptor 是模块 API 对象，保留其稳定接口名。
 
 ## 文档权威与冲突处理
 
@@ -106,7 +106,7 @@ Laibrary 是一个“一切皆 Item”的个人数据基座；当前是 v2 POC�
 - 状态只允许一个所有者；不导出可变绑定；不用模块级 `let`。
 - 副作用集中到可数的点；纯函数优先；入参不可变。
 - 不用 `continue` / `break`；查找用 `find`/抽函数。
-- 命名：函数 camelCase、数据 snake_case、工厂 PascalCase、React 组件 PascalCase、hook `useX`；被写入的闭包状态 `__name`；导出数据值 `__VAR_NAME__`。
+- 命名：函数 camelCase、数据 snake_case、工厂 PascalCase、React 组件 PascalCase、hook `useX`；口诀：`foo_bar` 不可变，`__` 在前跨作用域、`__` 在后可变；导出常量 `VAR_NAME`。
 - 不用 `any`、不用 `!`、不滥用 `as`；外部数据用 `parseX` 收窄；品牌类型用于领域 ID。
 - 空值默认 `null`；`undefined` 只用于语言强制的可选位置。
 - `catch` 必须负责：包装并保留 `cause`、判别后真正处理，或不 catch；禁止静默吞掉。

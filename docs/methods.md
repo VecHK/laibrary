@@ -140,10 +140,10 @@ const label = value !== null ? 'x' : 'y'
 
 ```ts
 function CreateCounter() {
-  let __count = 0
+  let __count__ = 0
   return function increment() {
-    __count += 1
-    return __count
+    __count__ += 1
+    return __count__
   }
 }
 ```
@@ -230,10 +230,10 @@ function CreateCounter() {
 ```ts
 // State 是深度不可变的值；get 返回它，调用方不能改
 function CreateStateCell<State>(initial: State) {
-  let __state = initial                 // 唯一所有者
+  let __state__ = initial                 // 唯一所有者
   return {
-    get: () => __state,
-    update: (next: State) => { __state = next },   // 低层 set；对外用领域操作
+    get: () => __state__,
+    update: (next: State) => { __state__ = next },   // 低层 set；对外用领域操作
   }
 }
 ```
@@ -278,7 +278,7 @@ function findNumber(list: number[], target_num: number): null | number {
 - 导出的函数/变量带模块/领域名：`galleryInEvent`、`galleryCanSubmit`、`galleryMemberIsVoted`。
 - 非导出省略模块名：`inEvent`、`canSubmit`、`memberIsVoted`。
 - 名字本身已含领域名（`fetchUser`、`parseUserId`、`CreateUserApi`）就不重复加前缀；规则是"不能省掉领域名"，不是"必须多一个前缀"。
-- 导出的数据值用 `__MODULE_VAR_NAME__`（`__GALLERY_MAX_PHOTOS__`）；非导出数据值不加模块名。
+- 导出的数据值/全局常量用 `MODULE_VAR_NAME`（`GALLERY_MAX_PHOTOS`）；非导出全局常量省略模块前缀（`MAX_PHOTOS`）。不再用两端的 `__`。
 - 工厂 `CreateGalleryStore`，不要只写 `CreateStore`（除非是 `utils/` 通用工具）。
 - `as<T>` / `Is<T>` 是通用工具（像 `Pipe`），不加模块前缀；放在 `packages/types`。
 - ❌ 导出的 `voteCountByPhoto` / `memberHasVoted` / `memberHasSubmitted`：应带 `gallery`。
@@ -295,25 +295,34 @@ function Pipe(...fns) { /* 返回函数 */ }
 
 判断标准是产物，不是声明形式：用 `const` 声明的可调用物，仍按函数命名。
 
-### 5.4 作用域可见性写进名字
+### 5.4 作用域与可变性写进名字
 
-- 普通局部数据：`var_name`。
-- 被写入的跨作用域状态：`__var_name`；双下划线是"会被改"的信号（如 `__count`）。
-- 只读的闭包捕获：保持普通命名，不加 `__`（`base_url` 就是 `base_url`）。
-- 顶级导出：`__MODULE_VAR_NAME__`，只用于导出的数据值；导出的函数/工厂按 5.1、5.3 命名，即便用 `const` 声明。
+> **口诀**：`foo_bar` 不可变，`__` 在前为跨作用域，`__` 在后为可变量（mutable），前后都有 `__` 既是跨作用域又是可变量。
+
+| 形态 | 命名 | 例 |
+|---|---|---|
+| 全局/模块级常量（不可变） | `FOO_BAR`（导出带模块/领域名） | `GALLERY_MAX_PHOTOS`、非导出 `MAX_PHOTOS` |
+| 本地 const / 只读参数 | `foo_bar` | `base_url`、`user_id` |
+| 本地可变值 | `foo_bar__` | `retry_count__` |
+| 跨作用域、不可变 | `__foo_bar` | `__db`、`__config` |
+| 跨作用域且可变 | `__foo_bar__` | `__count__`、`__state__` |
+
+- "可变"包括重新赋值和内容变更；共享容器内容会变时用 `__foo_bar__`，只读共享依赖用 `__foo_bar`。
+- 函数参数默认 `foo_bar`（即使被闭包捕获）；重新赋值/改变才用 `foo_bar__`；不要修改入参对象。
+- 全局常量用 UPPER_SNAKE，不带 `__`；导出的带模块/领域名，非导出的省略模块前缀。不导出可变绑定。
 
 ### 5.5 其他
 
 - 布尔值带 `is` / `has` / `can` / `should` 前缀；状态/角色用 `is`，拥有/包含用 `has`。
 - 禁止 `data`、`temp`、`obj`、`flag` 这类占位符；变量名不带类型信息（`user_list` → `users`）。
 - 类型/接口用 PascalCase；泛型用 `T` / `TValue` / `TResult`，不要用撞领域术语的 `TItem`。
-- 品牌符号（`declare const UserIdBrand: unique symbol`）用 PascalCase，不走 `__MODULE_VAR_NAME__`。
+- 品牌符号（`declare const UserIdBrand: unique symbol`）用 PascalCase，不走全局常量的 `MODULE_VAR_NAME`。
 
 ### 5.6 命名决策表
 
 | 东西 | 形态 | 命名 | 例 |
 |---|---|---|---|
-| 导出的数据值 | 不可调用 | `__MODULE_VAR_NAME__` | `__GALLERY_MAX_PHOTOS__` |
+| 导出的数据值 | 不可调用 | `MODULE_VAR_NAME` | `GALLERY_MAX_PHOTOS` |
 | 导出的函数，返回数据 | 动作 | `moduleAction` | `galleryInEvent` |
 | 导出的工厂，返回可调用物/能力集合 | 能力 | `CreateModuleX` | `CreateGalleryStore` |
 | 非导出函数/数据 | 函数/数据 | 省略模块名 | `inEvent` / `max_photos` |
@@ -322,8 +331,7 @@ function Pipe(...fns) { /* 返回函数 */ }
 | 类型/接口 | 类型层 | PascalCase | `UserId` |
 | 品牌符号 | 类型层 | PascalCase | `UserIdBrand` |
 | 通用工具函数 | 无领域类型或全泛型、在 `utils/` | 描述性，可用类型后缀 | `findList`、`target_num` |
-| 闭包内被写入的状态 | 所有者 | `__name` | `__count`、`__loaded_data` |
-| 只读捕获/局部数据 | 值 | snake_case | `base_url` |
+| 跨作用域可变状态 | 会变、跨作用域 | `__name__` | `__count__`、`__loaded_data__` |
 | 布尔 | 判断 | `is` / `has` / `can` / `should` | `is_voted`、`has_children` |
 | 内部哨兵 | 不导出 | `NONE` | `const NONE = Symbol('NONE')` |
 
@@ -533,22 +541,17 @@ const view = match(state)
 ### 8.1 常量：统一位置，命名导出
 
 - 导出的常量统一放 `constants.ts`（每个包/领域一个；不要把所有包堆进一个全局文件）。
-- 用命名导出，不要 `export default { ... }`：
-
-```ts
-export const __GALLERY_VIEWPORT_MAX_WIDTH__ = 1440
-export const __BASE_PG_RETRY_COUNT__ = 5
-```
+- 用命名导出，不要 `export default { ... }`；例如 `GALLERY_VIEWPORT_MAX_WIDTH`、`BASE_PG_RETRY_COUNT`。
 
 - 如果常量在某个 module 里计算出来，`constants.ts` 用 re-export 收口；调用方只从 `constants.ts` 取：
 
 ```ts
-export { __MODULE_CALCULATED__ } from './module'
+export { MODULE_CALCULATED } from './module'
 ```
 
 - 计算必须纯、便宜；依赖运行期配置/时间/随机的值不是常量，走组合根。
 - 被 re-export 的模块不要反向 import `constants`，否则形成循环；原始常量下沉到更底层（如 `base-constants.ts`）。
-- 名字按 5.2 的 `__MODULE_VAR_NAME__`；`__FOO__` 只适合演示/真正全局常量。文件内常量留在本地；对象/数组用 `as const`（必要时 `Object.freeze`），不导出可变对象。运行期配置不是常量。
+- 名字按 5.2 的 `MODULE_VAR_NAME`；`FOO` 只适合演示/真正全局常量。文件内常量留在本地；对象/数组用 `as const`（必要时 `Object.freeze`），不导出可变对象。运行期配置不是常量。
 
 ### 8.2 事件与订阅：用 `vait` 的 `Signal()`
 
@@ -561,7 +564,7 @@ export { __MODULE_CALCULATED__ } from './module'
 - 事件用于通知，不用于请求/响应：需要返回值/可能失败，用函数 + `Result`（见 9.5），不要用事件回传。
 - **订阅必须及时卸载**：`receive` 返回的 `off()` 要在组件卸载/模块销毁/任务结束时调用；否则 handler 和其捕获对象会被 signal 一直引用，造成内存泄漏。不要重复订阅不取消。
 - 订阅回调里的错误按 §9 处理；不要静默消失。
-- 如果 `signals` 要跨模块导出，按 5.2 带模块名（如 `__ORDER_SIGNALS__`）。
+- 如果 `signals` 要跨模块导出，按 5.2 带模块名（如 `ORDER_SIGNALS`）。
 
 ```ts
 const off = signals.sig_order_created.receive((order_id) => { ... })
@@ -686,7 +689,7 @@ type Result<T, E> =
 - [ ] **没有重度函数式吧？** 业务代码仍用普通 TS 的 `if` / `for` / `try`；没有为"纯粹"引入 `fp-ts` / `Effect` / monad。
 - [ ] **多分支联合用 ts-pattern 了吗？** 3+ 分支/exhaustive；2 分支不过度用。
 - [ ] **副作用集中吗？** 循环里没有 `continue` / `break`；查找用 `find` 或抽函数。
-- [ ] **命名合规吗？** 导出带模块名、非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；写入捕获 `__name`。
+- [ ] **命名合规吗？** 导出带模块名、非导出省略；函数 camelCase；工厂 PascalCase；数据 snake_case；跨作用域可变状态 `__name__`；本地可变 `name__`。
 - [ ] **常量放对了吗？** `constants.ts`、命名导出、计算常量 re-export 收口；没有 `export default { ... }` 或可变对象。
 - [ ] **类型契约还在吗？** 无 `any` / `!`；导出有返回类型；外部输入由 zod 产出，zod 之后才 parse/check；品牌用对。
 - [ ] **外部输入过 zod 了吗？** `JSON.parse` / `request.body` / `query` / `env` / `fetch` / 文件没有直接 `as` 或信任静态类型。
@@ -733,17 +736,14 @@ type Result<T, E> =
 | `isGallery(v): boolean` | `isGallery(v): v is Gallery`；用 `Is<T>` 或具体谓词 | 5.7 |
 | `Is(...)` 不写 `<T>` | 写 `Is<Gallery>(...)`；否则收窄成 unknown | 5.7 |
 | 业务数据被偏应用固定 / `f(a)(b)(c)` | 数据显式传；最多偏应用一次，不做多层柯里化 | 2.1 |
-| 模块顶层 `export const saveOrder = CreateSaveOrder(globalDb)` | 在入口绑定，通过参数传 | 2.1 |
+| `let count` / `__state` | 本地可变 `count__`；跨作用域 `__state` / `__state__`；全局常量 `FOO_BAR`；口诀见 5.4 | 5.4 |
 | 引入 ts-effect / fp-ts / monad / functor | 普通 TS：if/for/try + Result | 2.2 |
 | Result 的 error 用 Error 子类 / 在 Result 函数里 throw 预期失败 | 失败数据（可辨识联合）；边界转换才 catch | 9.5 |
-| 模块级 `let` | 单一所有者闭包 / 显式传入 | 3.1 |
 | `emit('event name')` / 用 Memo 当事件总线 | `signals.sig_name.receive(...)`（Signal）/ 发布 `trigger`；普通状态用闭包 | 8.2 |
 | `receive` / `watch` 后不取消 | 卸载/销毁时调用返回的 `off` | 8.2 |
 | 导出 `inEvent` / `canSubmit` | `galleryInEvent` / `galleryCanSubmit` | 5.2 |
-| `export default { __FOO__ }` | `export const __MODULE_FOO__ = ...`（`constants.ts` 命名导出） | 5.2 / 8.1 |
-| `null` / `undefined` 混用 | 默认 `null`，边界归一 | 6.1 |
+| `export default { FOO }` | `export const MODULE_FOO = ...`（`constants.ts` 命名导出） | 5.2 / 8.1 |
 | 函数读 Date.now / Math.random / 可变全局 | 参数注入或推到边界；核心保持引用透明 | 第三节 |
-| 悬浮 Promise | `await` / `void` / `.catch()` | 9.4 |
 
 ---
 
