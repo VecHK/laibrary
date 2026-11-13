@@ -13,10 +13,11 @@
   - 400 未知 action / payload zod / 业务校验（VALIDATION/BAD_REQUEST）
   - 404 不存在（NOT_FOUND）
   - 409 冲突（CONFLICT）
-  - 413 上传过大（PAYLOAD_TOO_LARGE）
+  - 405 方法不允许（路径存在但 method 不匹配）
+  - 413 请求体/上传过大（PAYLOAD_TOO_LARGE）
   - 500 内部/存储（INTERNAL/STORAGE_ERROR）
 
-未知 action 用 `Object.hasOwn` 白名单，不会命中对象原型。
+未知 action 按 `__RPC_ACTION_NAMES__` 白名单查找，不会命中对象原型。
 
 ## 2. Item
 
@@ -30,7 +31,7 @@
 }
 ```
 
-- `file/image`：`blob` 必填；attributes 只有 `{ filename }`。
+- `file/image`：`blob` 必填。`file` 的 attributes 只有 `{ filename }`；`image` 为 `{ filename, display_width?, align?, caption? }`（见 [01-data-model.md](01-data-model.md)）。
 - `entity`：kind 非空；page：kind null。
 - 无 `src`/`cover_src`/`image_width`/`image_height`。
 

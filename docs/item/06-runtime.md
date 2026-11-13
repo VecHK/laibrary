@@ -93,7 +93,7 @@ pnpm --filter @laibrary/web test
 - 测试 helper 重置 public + drizzle schema，再迁移。
 - 测试串行（共享测试库）。
 - web 测试为 pure functions/registry；无浏览器渲染测试。
-- 当前：server 46、types 22、web 47。
+- 测试覆盖 server/types/web；具体数量以 `pnpm test` 输出为准。
 
 ## 7. Web
 

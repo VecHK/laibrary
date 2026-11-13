@@ -160,7 +160,7 @@ docs             规格、愿景、名词表、方法论、重构记录
 - 文本 block 编辑器、inline itemlink、块级 itemlink、图片/附件。
 - Server 使用闭包工厂（BlobStore/BlobService/ConfigStore/ThumbnailService）与组合根；Web 使用显式 session/tag store/module registry，无 RPC/标签模块单例。
 - 漫画阅读器；局域网可运行。
-- 测试：server 46、types 22、web 47；lint/typecheck/build 通过。
+- 测试：server/types/web 全过；lint/typecheck/build 通过。数量以 `pnpm test` 输出为准。
 
 待做：
 
