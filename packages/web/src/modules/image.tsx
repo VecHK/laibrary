@@ -87,13 +87,13 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [thumb_failed, setThumbFailed] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [lightbox_open, setLightboxOpen] = useState(false)
-  const root_ref = useRef<HTMLDivElement>(null)
-  const resize_ref = useRef<{
+  const $root_ref = useRef<HTMLDivElement>(null)
+  const $resize_ref = useRef<{
     side: 'left' | 'right'
     start_x: number
     start_width: number
   } | null>(null)
-  const thumb_request_ref = useRef(0)
+  const $thumb_request_ref = useRef(0)
 
   useEffect(() => {
     const next = imageAttrsOf(item)
@@ -104,7 +104,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }, [item.id, item.update_date])
 
   useEffect(() => {
-    const node = root_ref.current
+    const node = $root_ref.current
     if (node === null) {
       return undefined
     } else {
@@ -118,7 +118,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }, [])
 
   useEffect(() => {
-    thumb_request_ref.current += 1
+    $thumb_request_ref.current += 1
     setThumbFailed(false)
     setThumb(
       (item.blob === null)
@@ -140,18 +140,18 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     if (thumb === null || item.blob === null || desired_thumb <= thumb.size) {
       return undefined
     } else {
-      const request_id = ++thumb_request_ref.current
+      const request_id = ++$thumb_request_ref.current
       const next_src = thumbUrl(ctx.api.base_url, item.id, desired_thumb)
       const image = new Image()
       image.decoding = 'async'
       image.onload = () => {
-        if (request_id === thumb_request_ref.current) {
+        if (request_id === $thumb_request_ref.current) {
           setThumb({ size: desired_thumb, src: next_src })
           setThumbFailed(false)
         }
       }
       image.onerror = () => {
-        if (request_id === thumb_request_ref.current) {
+        if (request_id === $thumb_request_ref.current) {
           setThumbFailed(true)
         }
       }
@@ -208,7 +208,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   ) => {
     event.preventDefault()
     event.stopPropagation()
-    resize_ref.current = {
+    $resize_ref.current = {
       side,
       start_x: event.clientX,
       start_width: shown_width,
@@ -218,7 +218,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const handleResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = resize_ref.current
+    const state = $resize_ref.current
     if (state !== null) {
       const delta = event.clientX - state.start_x
       const delta_width = state.side === 'right' ? delta : -delta
@@ -227,12 +227,12 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const handleResizeEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = resize_ref.current
+    const state = $resize_ref.current
     if (state !== null) {
       const delta = event.clientX - state.start_x
       const delta_width = state.side === 'right' ? delta : -delta
       const next_width = Math.round(clampImageWidth(state.start_width + delta_width, max_width))
-      resize_ref.current = null
+      $resize_ref.current = null
       setResizing(false)
       setWidth(next_width)
       event.currentTarget.releasePointerCapture(event.pointerId)
@@ -251,7 +251,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   return (
     <div
       className={`block-image image-align-${align}${resizing ? ' is-resizing' : ''}`}
-      ref={root_ref}
+      ref={$root_ref}
     >
       <div
         className="image-frame"
@@ -284,7 +284,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onPointerDown={event => handleResizeStart('left', event)}
               onPointerMove={handleResizeMove}
               onPointerUp={handleResizeEnd}
-              onPointerCancel={() => { resize_ref.current = null; setResizing(false) }}
+              onPointerCancel={() => { $resize_ref.current = null; setResizing(false) }}
             />
             <div
               className="image-resizer right"
@@ -293,7 +293,7 @@ function ImageBlock({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               onPointerDown={event => handleResizeStart('right', event)}
               onPointerMove={handleResizeMove}
               onPointerUp={handleResizeEnd}
-              onPointerCancel={() => { resize_ref.current = null; setResizing(false) }}
+              onPointerCancel={() => { $resize_ref.current = null; setResizing(false) }}
             />
             <div className="image-toolbar" onPointerDown={event => event.stopPropagation()}>
               <button

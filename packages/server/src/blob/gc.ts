@@ -6,19 +6,19 @@ import type { DB } from '../db/client'
 import { blobs, items } from '../db/schema'
 import type { BlobService } from './service'
 
-export const __BLOB_GC_GRACE_PERIOD_MS__ = 24 * 60 * 60 * 1000
+export const BLOB_GC_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000
 
 const zBlobIdRow = z.object({ id: zBlobID })
 const zThumbBlobRow = z.object({ blob_id: zBlobID })
 
 export async function collectReferencedBlobIds(db: DB): Promise<Set<BlobID>> {
-  const refs = new Set<BlobID>()
+  const $refs = new Set<BlobID>()
   const item_rows = await db
     .select({ blob_id: items.blob_id })
     .from(items)
   for (const row of item_rows) {
     if (row.blob_id !== null) {
-      refs.add(row.blob_id)
+      $refs.add(row.blob_id)
     }
   }
   const thumb_result = await db.execute(sql`
@@ -26,9 +26,9 @@ export async function collectReferencedBlobIds(db: DB): Promise<Set<BlobID>> {
   `)
   const thumb_rows = z.array(zThumbBlobRow).parse(thumb_result.rows)
   for (const row of thumb_rows) {
-    refs.add(row.blob_id)
+    $refs.add(row.blob_id)
   }
-  return refs
+  return $refs
 }
 
 export type CleanUnreferencedBlobsOptions = {
@@ -47,17 +47,17 @@ export type CleanUnreferencedBlobsOptions = {
 export async function cleanUnreferencedBlobs({
   db,
   blobs: blobs_service,
-  grace_ms = __BLOB_GC_GRACE_PERIOD_MS__,
+  grace_ms = BLOB_GC_GRACE_PERIOD_MS,
   now = Date.now(),
   batch_size = 1000,
   on_error,
 }: CleanUnreferencedBlobsOptions): Promise<{ scanned: number, deleted: number }> {
   const cutoff = new Date(now - grace_ms)
-  let scanned = 0
-  let deleted = 0
-  let has_more = true
+  let $scanned = 0
+  let $deleted = 0
+  let $has_more = true
 
-  while (has_more) {
+  while ($has_more) {
     const result = await db.execute(sql`
       SELECT b.id AS id
       FROM blobs b
@@ -68,24 +68,24 @@ export async function cleanUnreferencedBlobs({
     `)
     const rows = z.array(zBlobIdRow).parse(result.rows)
     if (rows.length === 0) {
-      has_more = false
+      $has_more = false
     } else {
       const ids = rows.map(row => row.id)
-      scanned += ids.length
+      $scanned += ids.length
       await db.delete(blobs).where(inArray(blobs.id, ids))
 
       for (const id of ids) {
         try {
           await blobs_service.store.delete(id)
-          deleted += 1
+          $deleted += 1
         } catch (error) {
           on_error(error)
         }
       }
 
-      has_more = rows.length >= batch_size
+      $has_more = rows.length >= batch_size
     }
   }
 
-  return { scanned, deleted }
+  return { scanned: $scanned, deleted: $deleted }
 }

@@ -27,24 +27,24 @@ export default function App() {
   const [refresh_key, setRefreshKey] = useState(0)
   const [sidebar_key, setSidebarKey] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
-  const toast_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const $toast_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useTagStoreVersion(session?.tags ?? null)
 
   useEffect(() => () => {
-    if (toast_timer_ref.current !== null) {
-      clearTimeout(toast_timer_ref.current)
+    if ($toast_timer_ref.current !== null) {
+      clearTimeout($toast_timer_ref.current)
     }
   }, [])
 
   const showError = useCallback((message: string) => {
-    if (toast_timer_ref.current !== null) {
-      clearTimeout(toast_timer_ref.current)
+    if ($toast_timer_ref.current !== null) {
+      clearTimeout($toast_timer_ref.current)
     }
     setToast(message)
-    toast_timer_ref.current = setTimeout(() => {
+    $toast_timer_ref.current = setTimeout(() => {
       setToast(null)
-      toast_timer_ref.current = null
+      $toast_timer_ref.current = null
     }, 4000)
   }, [])
 

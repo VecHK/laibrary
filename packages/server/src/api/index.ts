@@ -5,7 +5,7 @@ import { cors } from 'hono/cors'
 import { methodNotAllowed } from 'hono/method-not-allowed'
 import { z, ZodError } from 'zod'
 import type { ActionName } from '@laibrary/types'
-import { __RPC_ACTION_NAMES__, zActionPayloads } from '@laibrary/types'
+import { RPC_ACTION_NAMES, zActionPayloads } from '@laibrary/types'
 import type { BootstrapConfig } from '../config/bootstrap'
 import type { DB } from '../db/client'
 import type { BlobService } from '../blob/service'
@@ -16,7 +16,7 @@ import { CreateActionRoute } from './actions'
 import { CreateBlobRouter } from './blob-routes'
 import { CreateThumbRouter } from './thumb-routes'
 
-const __ACTION_BODY_LIMIT_BYTES__ = 4 * 1024 * 1024
+const ACTION_BODY_LIMIT_BYTES = 4 * 1024 * 1024
 
 const zActionRequest = z.object({
   action: z.string(),
@@ -63,27 +63,27 @@ export type CreateApiOptions = {
 }
 
 export async function CreateApi({
-  config,
-  db,
-  blobs,
-  config_store,
-  thumbnails,
+  config: _config,
+  db: _db,
+  blobs: _blobs,
+  config_store: _config_store,
+  thumbnails: _thumbnails,
 }: CreateApiOptions): Promise<ApiApp> {
   const app = new Hono<{ Bindings: HttpBindings }>()
-  const actions = CreateActionRoute({ db, blobs, config_store })
+  const actions = CreateActionRoute({ db: _db, blobs: _blobs, config_store: _config_store })
 
   app.use('*', cors())
 
   const blob_app = CreateBlobRouter({
-    config,
-    blobs,
+    config: _config,
+    blobs: _blobs,
     get_max_upload_bytes: async () => (
-      await config_store.getValue('sys.config.upload_max_bytes', value => z.number().parse(value))
+      await _config_store.getValue('sys.config.upload_max_bytes', value => z.number().parse(value))
     ) ?? 256 * 1024 * 1024,
   })
   app.route('/', blob_app)
 
-  const thumb_app = CreateThumbRouter({ thumbnails, blobs })
+  const thumb_app = CreateThumbRouter({ thumbnails: _thumbnails, blobs: _blobs })
   app.route('/', thumb_app)
 
   const handlers = {
@@ -116,7 +116,7 @@ export async function CreateApi({
   app.post(
     '/action',
     bodyLimit({
-      maxSize: __ACTION_BODY_LIMIT_BYTES__,
+      maxSize: ACTION_BODY_LIMIT_BYTES,
       onError: c => c.json({ message: '请求体超过上限', code: 'PAYLOAD_TOO_LARGE' }, 413),
     }),
     async c => {
@@ -124,7 +124,7 @@ export async function CreateApi({
         throw errorsBadRequest('请求体不是合法 JSON')
       })
       const request = zActionRequest.parse(raw_body)
-      const action = __RPC_ACTION_NAMES__.find(each => each === request.action)
+      const action = RPC_ACTION_NAMES.find(each => each === request.action)
       if (action === undefined) {
         throw errorsBadRequest(`unknown ACTION: ${request.action}`)
       } else {

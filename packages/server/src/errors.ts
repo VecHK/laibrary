@@ -77,12 +77,12 @@ function hasCode(value: unknown): value is { code?: unknown, cause?: unknown } {
 
 /** Drizzle wraps driver errors; walk the cause chain for PostgreSQL error codes. */
 export function errorsPgCode(err: unknown): string | undefined {
-  let current: unknown = err
-  for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
-    if (hasCode(current) && typeof current.code === 'string') {
-      return current.code
+  let $current: unknown = err
+  for (let $depth = 0; $depth < 5 && $current !== null && $current !== undefined; $depth += 1) {
+    if (hasCode($current) && typeof $current.code === 'string') {
+      return $current.code
     }
-    current = hasCode(current) ? current.cause : undefined
+    $current = hasCode($current) ? $current.cause : undefined
   }
   return undefined
 }

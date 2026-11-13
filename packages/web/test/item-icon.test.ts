@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Item } from '@laibrary/types'
-import { itemIconAttributes, itemIconOf } from '../src/modules/item-icon'
+import { ICON_PALETTE, itemIconAttributes, itemIconOf } from '../src/modules/item-icon'
 
 function item(overrides: Partial<Item>): Item {
   return {
@@ -31,6 +31,10 @@ describe('item icons', () => {
   it('reads valid custom icons and ignores invalid ones', () => {
     expect(itemIconOf(item({ attributes: { icon: '📚' } }))).toBe('📚')
     expect(itemIconOf(item({ attributes: { icon: 1 } }))).toBe('📄')
+  })
+
+  it('exports a non-empty icon palette', () => {
+    expect(ICON_PALETTE).toContain('📄')
   })
 
   it('preserves database schema and removes icon', () => {

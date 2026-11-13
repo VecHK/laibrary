@@ -13,8 +13,8 @@ export type CreateThumbRouterOptions = {
 }
 
 export function CreateThumbRouter({
-  thumbnails,
-  blobs,
+  thumbnails: _thumbnails,
+  blobs: _blobs,
 }: CreateThumbRouterOptions) {
   const app = new Hono<{ Bindings: HttpBindings }>()
 
@@ -27,12 +27,12 @@ export function CreateThumbRouter({
     } else if (!size_parsed.success) {
       throw errorsValidation(`不支持的缩略图尺寸: ${size_raw}`)
     } else {
-      const meta = await thumbnails.ensure(image_parsed.data, size_parsed.data)
-      if (!(await blobs.exists(meta.id))) {
+      const meta = await _thumbnails.ensure(image_parsed.data, size_parsed.data)
+      if (!(await _blobs.exists(meta.id))) {
         throw new Error(`thumb blob(${meta.id}) 文件不存在`)
       } else {
-        const stat = await blobs.stat(meta.id)
-        return new Response(Readable.toWeb(fs.createReadStream(blobs.pathFor(meta.id))), {
+        const stat = await _blobs.stat(meta.id)
+        return new Response(Readable.toWeb(fs.createReadStream(_blobs.pathFor(meta.id))), {
           status: 200,
           headers: {
             'Content-Type': meta.mime,

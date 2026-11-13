@@ -19,48 +19,48 @@ export function formatItemToken(
 
 /** Split a plain-text block into text and inline item-link tokens. */
 export function parseItemTokens(text: string): ItemToken[] {
-  const tokens: ItemToken[] = []
-  let cursor = 0
-  TOKEN_PATTERN.lastIndex = 0
+  let $tokens: ItemToken[] = []
+  let $cursor = 0
 
-  let match = TOKEN_PATTERN.exec(text)
-  while (match !== null) {
-    const index = match.index
-    if (index > cursor) {
-      tokens.push({ type: 'text', text: text.slice(cursor, index) })
+  for (const match of text.matchAll(TOKEN_PATTERN)) {
+    const index = match.index ?? 0
+    if (index > $cursor) {
+      $tokens = [...$tokens, { type: 'text', text: text.slice($cursor, index) }]
     }
 
     const raw_id = match[1] ?? ''
     const id = Number.parseInt(raw_id, 10)
     if (Number.isSafeInteger(id) && id > 0) {
-      tokens.push({
-        type: 'item',
-        target_id: as<ItemID>(id),
-        label: match[2] === undefined || match[2].length === 0 ? null : match[2],
-        raw: match[0],
-      })
+      $tokens = [
+        ...$tokens,
+        {
+          type: 'item',
+          target_id: as<ItemID>(id),
+          label: match[2] === undefined || match[2].length === 0 ? null : match[2],
+          raw: match[0],
+        },
+      ]
     } else {
-      tokens.push({ type: 'text', text: match[0] })
+      $tokens = [...$tokens, { type: 'text', text: match[0] }]
     }
 
-    cursor = index + match[0].length
-    match = TOKEN_PATTERN.exec(text)
+    $cursor = index + match[0].length
   }
 
-  if (cursor < text.length) {
-    tokens.push({ type: 'text', text: text.slice(cursor) })
+  if ($cursor < text.length) {
+    $tokens = [...$tokens, { type: 'text', text: text.slice($cursor) }]
   }
-  return tokens
+  return $tokens
 }
 
 export function extractItemTokenIds(text: string): ItemID[] {
-  const ids = new Set<ItemID>()
+  const $ids = new Set<ItemID>()
   for (const token of parseItemTokens(text)) {
     if (token.type === 'item') {
-      ids.add(token.target_id)
+      $ids.add(token.target_id)
     }
   }
-  return [...ids]
+  return [...$ids]
 }
 
 export function unescapeItemTokenText(text: string): string {

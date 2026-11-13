@@ -11,7 +11,7 @@ import type { BlobService } from '../blob/service'
 import { errorsIsAppError, errorsBadRequest, errorsNotFound, errorsPayloadTooLarge, errorsStorage } from '../errors'
 import { directoryInitSync } from '../utils/directory'
 
-const __UPLOAD_HARD_LIMIT_BYTES__ = 1024 * 1024 * 1024
+const UPLOAD_HARD_LIMIT_BYTES = 1024 * 1024 * 1024
 
 function detectSingleFile(files: Files): FormidableFile {
   // formidable v3 的 Files 值恒为数组
@@ -104,38 +104,38 @@ export type CreateBlobRouterOptions = {
 }
 
 export function CreateBlobRouter({
-  config,
-  blobs,
-  get_max_upload_bytes,
+  config: _config,
+  blobs: _blobs,
+  get_max_upload_bytes: _get_max_upload_bytes,
 }: CreateBlobRouterOptions) {
   const app = new Hono<{ Bindings: HttpBindings }>()
-  directoryInitSync(config.upload_temp_path)
-  for (const temp_file of fs.readdirSync(config.upload_temp_path)) {
+  directoryInitSync(_config.upload_temp_path)
+  for (const temp_file of fs.readdirSync(_config.upload_temp_path)) {
     try {
-      fs.unlinkSync(path.join(config.upload_temp_path, temp_file))
+      fs.unlinkSync(path.join(_config.upload_temp_path, temp_file))
     } catch (err) {
       console.error('清理上传临时文件失败', err)
     }
   }
 
   app.post('/blob', async c => {
-    let temp_path: string | null = null
+    let $temp_path: string | null = null
     try {
-      const max_bytes = await get_max_upload_bytes()
+      const max_bytes = await _get_max_upload_bytes()
       const form = formidable({
         // 解析前就按 runtime 上限拒绝，避免把超限文件完整写进临时目录
-        maxFileSize: Math.min(__UPLOAD_HARD_LIMIT_BYTES__, max_bytes),
+        maxFileSize: Math.min(UPLOAD_HARD_LIMIT_BYTES, max_bytes),
         maxFiles: 1,
         maxFields: 1,
         allowEmptyFiles: false,
         keepExtensions: true,
-        uploadDir: config.upload_temp_path,
+        uploadDir: _config.upload_temp_path,
         filter: part => part.name === 'file',
       })
       const [, files] = await form.parse(c.env.incoming)
       const uploaded = detectSingleFile(files)
       const upload_path: string = uploaded.filepath
-      temp_path = upload_path
+      $temp_path = upload_path
       const stat = await fs.promises.stat(upload_path)
       if (stat.size > max_bytes) {
         throw errorsPayloadTooLarge(`上传文件超过上限 ${max_bytes} 字节`)
@@ -143,12 +143,12 @@ export function CreateBlobRouter({
       const mime = typeof uploaded.mimetype === 'string' && uploaded.mimetype.length > 0
                    ? uploaded.mimetype
                    : 'application/octet-stream'
-      const result = await blobs.putFile(upload_path, mime)
-      temp_path = null
+      const result = await _blobs.putFile(upload_path, mime)
+      $temp_path = null
       return c.json(result, 200)
     } catch (err) {
-      if (temp_path !== null) {
-        await fs.promises.unlink(temp_path).catch(() => undefined)
+      if ($temp_path !== null) {
+        await fs.promises.unlink($temp_path).catch(() => undefined)
       }
       if (errorsIsAppError(err)) {
         throw err
@@ -167,26 +167,39 @@ export function CreateBlobRouter({
 
   const readBlob = async (c: Context<{ Bindings: HttpBindings }>) => {
     const parsed = zBlobID.parse(c.req.param('blob_id'))
-    const meta = await blobs.getMeta(parsed)
+    const meta = await _blobs.getMeta(parsed)
     if (meta === null) {
       throw errorsNotFound(`blob(${parsed}) not found`)
-    } else if (!(await blobs.exists(parsed))) {
+    } else if (!(await _blobs.exists(parsed))) {
       throw errorsNotFound(`blob(${parsed}) 文件不存在`)
     } else {
-      const stat = await blobs.stat(parsed)
+      const stat = await _blobs.stat(parsed)
       const range = parseRange(c.req.header('range'), stat.size)
-      const headers = baseBlobHeaders(meta.mime, meta.id)
+      const base_headers = baseBlobHeaders(meta.mime, meta.id)
 
       if (c.req.method === 'HEAD') {
-        headers['Content-Length'] = String(stat.size)
-        return new Response(null, { status: 200, headers })
+        return new Response(null, {
+          status: 200,
+          headers: { ...base_headers, 'Content-Length': String(stat.size) },
+        })
       } else if (range.kind !== 'range') {
-        headers['Content-Length'] = String(stat.size)
-        return streamResponse(blobs.pathFor(parsed), 200, headers, null)
+        return streamResponse(
+          _blobs.pathFor(parsed),
+          200,
+          { ...base_headers, 'Content-Length': String(stat.size) },
+          null,
+        )
       } else {
-        headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`
-        headers['Content-Length'] = String(range.end - range.start + 1)
-        return streamResponse(blobs.pathFor(parsed), 206, headers, range)
+        return streamResponse(
+          _blobs.pathFor(parsed),
+          206,
+          {
+            ...base_headers,
+            'Content-Range': `bytes ${range.start}-${range.end}/${stat.size}`,
+            'Content-Length': String(range.end - range.start + 1),
+          },
+          range,
+        )
       }
     }
   }

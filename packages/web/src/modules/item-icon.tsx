@@ -3,7 +3,7 @@ import type { Item, Role, RoleAttributes } from '@laibrary/types'
 import { zAnyAttributes, zDatabaseAttributes, zIcon } from '@laibrary/types'
 import type { ViewerCtx } from './types'
 
-export const __ICON_PALETTE__ = [
+export const ICON_PALETTE = [
   '📄', '📝', '📚', '📖', '🗂️', '🗃️',
   '📊', '📈', '🗄️', '💡', '🎯', '✅',
   '⭐', '🔥', '🧠', '🧪', '🛠️', '🌱',
@@ -80,7 +80,7 @@ export function ItemIconButton({
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState('')
   const [icon, setIcon] = useState(() => itemIconOf(item))
-  const root_ref = useRef<HTMLDivElement>(null)
+  const $root_ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setIcon(itemIconOf(item))
@@ -91,7 +91,7 @@ export function ItemIconButton({
       return undefined
     } else {
       const onPointerDown = (event: PointerEvent) => {
-        if (event.target instanceof Node && root_ref.current !== null && !root_ref.current.contains(event.target)) {
+        if (event.target instanceof Node && $root_ref.current !== null && !$root_ref.current.contains(event.target)) {
           setOpen(false)
         }
       }
@@ -137,7 +137,7 @@ export function ItemIconButton({
   }
 
   return (
-    <div className="item-icon-control" ref={root_ref}>
+    <div className="item-icon-control" ref={$root_ref}>
       <button
         type="button"
         className="item-icon-button"
@@ -151,7 +151,7 @@ export function ItemIconButton({
         <div className="icon-picker" role="dialog" aria-label="选择图标">
           <div className="icon-picker-title">选择图标</div>
           <div className="icon-picker-grid">
-            {__ICON_PALETTE__.map(emoji => (
+            {ICON_PALETTE.map(emoji => (
               <button
                 key={emoji}
                 type="button"

@@ -53,38 +53,38 @@ export function itemBuildFilterCondition(
   filter_rules: readonly FilterRule[],
   filter_groups: readonly FilterGroup[],
 ): SQL | undefined {
-  const groups: FilterGroup[] = [...filter_groups]
-  if (filter_rules.length !== 0) {
-    groups.push({ logic: 'and', invert: false, rules: [...filter_rules] })
-  }
+  const combined_groups: FilterGroup[] = filter_rules.length !== 0
+    ? [{ logic: 'and', invert: false, rules: [...filter_rules] }]
+    : []
+  const groups: readonly FilterGroup[] = [...filter_groups, ...combined_groups]
 
-  const and_conds: SQL[] = []
-  const or_conds: SQL[] = []
+  let $and_conds: SQL[] = []
+  let $or_conds: SQL[] = []
   for (const group of groups) {
     const cond = groupToCondition(group)
     if (cond !== undefined) {
       if (group.logic === 'and') {
-        and_conds.push(cond)
+        $and_conds = [...$and_conds, cond]
       } else {
-        or_conds.push(cond)
+        $or_conds = [...$or_conds, cond]
       }
     }
   }
 
-  const final_conds: SQL[] = [...and_conds]
-  if (or_conds.length !== 0) {
-    const combined = or(...or_conds)
+  let $final_conds: SQL[] = [...$and_conds]
+  if ($or_conds.length !== 0) {
+    const combined = or(...$or_conds)
     if (combined !== undefined) {
-      final_conds.push(combined)
+      $final_conds = [...$final_conds, combined]
     }
   }
 
-  if (final_conds.length === 0) {
+  if ($final_conds.length === 0) {
     return undefined
-  } else if (final_conds.length === 1) {
-    return final_conds[0]
+  } else if ($final_conds.length === 1) {
+    return $final_conds[0]
   } else {
-    return and(...final_conds)
+    return and(...$final_conds)
   }
 }
 
@@ -132,46 +132,42 @@ export async function listItems(
     params.filter_rules ?? [],
     params.filter_groups ?? [],
   )
-  const where_conds: (SQL | undefined)[] = [filter_cond]
+  const system_cond = options.include_system !== true
+    ? sql`(${items.unity_name} IS NULL OR ${items.unity_name} NOT LIKE 'sys.%')`
+    : undefined
 
-  if (options.include_system !== true) {
-    where_conds.push(sql`(${items.unity_name} IS NULL OR ${items.unity_name} NOT LIKE 'sys.%')`)
-  }
-
-  let order_clause: SQL
+  let $order_clause: SQL
+  let $after_cond: SQL | undefined = undefined
   if (sort_field !== undefined) {
     const expression = sortFieldExpression(sort_field)
-    order_clause = sql`${expression} ${sql.raw(desc_order ? 'DESC' : 'ASC')} NULLS LAST`
+    $order_clause = sql`${expression} ${sql.raw(desc_order ? 'DESC' : 'ASC')} NULLS LAST`
 
     if (params.after_id !== undefined) {
       await getItemRow(db, params.after_id)
       const after_value = await readSortFieldValue(db, expression, params.after_id)
       const cmp = desc_order ? '<' : '>'
       if (after_value === null || after_value === undefined) {
-        where_conds.push(
-          sql`${expression} IS NULL AND ${items.id} ${sql.raw(cmp)} ${params.after_id}`,
-        )
+        $after_cond = sql`${expression} IS NULL AND ${items.id} ${sql.raw(cmp)} ${params.after_id}`
       } else {
-        where_conds.push(sql`
+        $after_cond = sql`
           (${expression} IS NOT NULL AND (${expression}, ${items.id}) ${sql.raw(cmp)} (${after_value}, ${params.after_id}))
           OR ${expression} IS NULL
-        `)
+        `
       }
     }
   } else {
     const sort_col = SORT_COLUMNS[sort_by]
-    order_clause = desc_order ? desc(sort_col) : asc(sort_col)
+    $order_clause = desc_order ? desc(sort_col) : asc(sort_col)
 
     if (params.after_id !== undefined) {
       const after_row = await getItemRow(db, params.after_id)
       const after_sort_value = after_row[sort_by]
       const cmp = desc_order ? '<' : '>'
-      where_conds.push(
-        sql`(${sort_col}, ${items.id}) ${sql.raw(cmp)} (${after_sort_value}, ${params.after_id})`,
-      )
+      $after_cond = sql`(${sort_col}, ${items.id}) ${sql.raw(cmp)} (${after_sort_value}, ${params.after_id})`
     }
   }
 
+  const where_conds: (SQL | undefined)[] = [filter_cond, system_cond, $after_cond]
   const conds = where_conds.filter((cond): cond is SQL => cond !== undefined)
   const query = db
     .select({ item: items, blob: blobs })
@@ -185,7 +181,7 @@ export async function listItems(
     query.where(and(...conds))
   }
 
-  query.orderBy(order_clause, desc_order ? desc(items.id) : asc(items.id))
+  query.orderBy($order_clause, desc_order ? desc(items.id) : asc(items.id))
   if (limit !== 0) {query.limit(limit)}
 
   const rows = await query

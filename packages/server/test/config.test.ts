@@ -8,28 +8,28 @@ import { CreateConfigStore } from '../src/config/store'
 import { createItem, getItemByUnityName, updateItem } from '../src/repo/items'
 import { listItems } from '../src/repo/item-listing'
 
-let db: DB
-let blobs: BlobService
-let cleanup: () => Promise<void>
+let $_db: DB
+let $_blobs: BlobService
+let $_cleanup: () => Promise<void>
 
 beforeAll(async () => {
-  db = await prepareTestDb()
-  const prepared = await prepareTestBlobs(db)
-  blobs = prepared.blobs
-  cleanup = prepared.cleanup
+  $_db = await prepareTestDb()
+  const prepared = await prepareTestBlobs($_db)
+  $_blobs = prepared.blobs
+  $_cleanup = prepared.cleanup
 })
 
 beforeEach(async () => {
-  await truncateAll(db)
+  await truncateAll($_db)
 })
 
 afterAll(async () => {
-  await cleanup()
-  await closeDb(db)
+  await $_cleanup()
+  await closeDb($_db)
 })
 
 async function config() {
-  const service = CreateConfigStore({ db, on_error: error => console.error('test config', error) })
+  const service = CreateConfigStore({ db: $_db, on_error: error => console.error('test config', error) })
   await service.ensure()
   await service.reload()
   return service
@@ -43,7 +43,7 @@ describe('system config', () => {
     expect(snapshot.entries.find(e => e.key === 'sys.config.gc_grace_hours')?.value).toBe(24)
     expect(snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')?.value).toBe('rtl')
 
-    const database = await getItemByUnityName(db, 'sys.config')
+    const database = await getItemByUnityName($_db, 'sys.config')
     expect(database?.role).toBe('database')
     expect(database?.unity_name).toBe('sys.config')
   })
@@ -64,16 +64,16 @@ describe('system config', () => {
 
   it('系统项不出现在公共 listing，且不能被通用接口修改/删除', async () => {
     await config()
-    const listed = await listItems(db, { limit: 0 })
+    const listed = await listItems($_db, { limit: 0 })
     expect(listed).toHaveLength(0)
 
-    const database = await getItemByUnityName(db, 'sys.config')
+    const database = await getItemByUnityName($_db, 'sys.config')
     expect(database).not.toBeNull()
-    await expect(updateItem(db, defined(database).id, { title: 'hack' }, blobs)).rejects.toThrow('系统 item')
-    await expect(createItem(db, {
+    await expect(updateItem($_db, defined(database).id, { title: 'hack' }, $_blobs)).rejects.toThrow('系统 item')
+    await expect(createItem($_db, {
       role: 'page',
       title: 'sys item',
       unity_name: 'sys.fake',
-    }, blobs)).rejects.toThrow('系统保留前缀')
+    }, $_blobs)).rejects.toThrow('系统保留前缀')
   })
 })

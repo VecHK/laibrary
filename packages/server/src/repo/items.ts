@@ -3,7 +3,7 @@ import type {
   AddItemForm, BlobID, DatabaseFieldDef, Item, ItemID, Role, TextBlockRole, UpdateItemForm,
 } from '@laibrary/types'
 import {
-  __SYSTEM_UNITY_PREFIX__, as, isTextBlockRole, itemBuildRowValidator, itemCheckAttributes, extractItemTokenIds,
+  SYSTEM_UNITY_PREFIX, as, isTextBlockRole, itemBuildRowValidator, itemCheckAttributes, extractItemTokenIds,
   zDatabaseAttributes, zKind, zRole, zUnityName,
 } from '@laibrary/types'
 import type { DbLike } from '../db/client'
@@ -20,7 +20,7 @@ function unique<T>(list: readonly T[]): T[] {
 }
 
 function isSystemUnityName(unity_name: string | null | undefined): boolean {
-  return typeof unity_name === 'string' && unity_name.startsWith(__SYSTEM_UNITY_PREFIX__)
+  return typeof unity_name === 'string' && unity_name.startsWith(SYSTEM_UNITY_PREFIX)
 }
 
 async function maxOrderIndex(db: DbLike, parent_id: ItemID | null): Promise<number> {
@@ -157,7 +157,7 @@ async function validateBlob(
 
 function assertUnityWritable(unity_name: string | undefined, allow_system: boolean): void {
   if (unity_name !== undefined && !allow_system && isSystemUnityName(unity_name)) {
-    throw errorsBadRequest(`unity_name 使用了系统保留前缀: ${__SYSTEM_UNITY_PREFIX__}`)
+    throw errorsBadRequest(`unity_name 使用了系统保留前缀: ${SYSTEM_UNITY_PREFIX}`)
   }
 }
 
@@ -190,7 +190,7 @@ export async function createItem(
   const unity_name = form.unity_name === undefined ? null : zUnityName.parse(form.unity_name)
   assertUnityWritable(form.unity_name, options.allow_system === true)
 
-  let attributes = as<Record<string, unknown>>(itemCheckAttributes(role, form.attributes ?? {}))
+  let $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, form.attributes ?? {}))
 
   const parent_id = form.parent_id ?? null
   if (parent_id !== null) {
@@ -202,7 +202,7 @@ export async function createItem(
     if (schemaNeedsUnityName(schema) && unity_name === null) {
       throw errorsBadRequest('该 database 的 schema 要求 unity_name')
     }
-    attributes = itemBuildRowValidator(schema).parse(attributes)
+    $attributes = itemBuildRowValidator(schema).parse($attributes)
   }
 
   const blob_id = await validateBlob(blobs_service, role, form.blob_id)
@@ -234,7 +234,7 @@ export async function createItem(
         kind,
         unity_name,
         title,
-        attributes,
+        attributes: $attributes,
         tags,
         parent_id,
         order_index,
@@ -280,9 +280,9 @@ export async function updateItem(
   }
 
   const role = prev.role
-  let attributes = prev.attributes
+  let $attributes = prev.attributes
   if (data.attributes !== undefined) {
-    attributes = as<Record<string, unknown>>(itemCheckAttributes(role, data.attributes))
+    $attributes = as<Record<string, unknown>>(itemCheckAttributes(role, data.attributes))
   }
 
   const parent_changed = data.parent_id !== undefined
@@ -300,14 +300,14 @@ export async function updateItem(
     if (schemaNeedsUnityName(schema) && prev.unity_name === null) {
       throw errorsBadRequest('该 database 的 schema 要求 unity_name')
     }
-    attributes = itemBuildRowValidator(schema).parse(attributes)
+    $attributes = itemBuildRowValidator(schema).parse($attributes)
   }
 
-  let target_id = prev.target_id
+  let $target_id = prev.target_id
   if (role === 'itemlink') {
-    target_id = data.target_id ?? prev.target_id
-    if (target_id === null) {throw errorsBadRequest('itemlink 必须提供 target_id')}
-    await validateTarget(db, target_id, id)
+    $target_id = data.target_id ?? prev.target_id
+    if ($target_id === null) {throw errorsBadRequest('itemlink 必须提供 target_id')}
+    await validateTarget(db, $target_id, id)
   } else if (data.target_id !== undefined) {
     throw errorsBadRequest('只有 itemlink 允许 target_id')
   }
@@ -326,11 +326,11 @@ export async function updateItem(
       .update(items)
       .set({
         title,
-        attributes,
+        attributes: $attributes,
         tags,
         parent_id: new_parent_id,
         order_index: data.order_index ?? prev.order_index,
-        target_id,
+        target_id: $target_id,
         update_date: new Date(),
       })
       .where(eq(items.id, id))

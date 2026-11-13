@@ -1,4 +1,4 @@
-export const __RPC_ACTION_NAMES__ = [
+export const RPC_ACTION_NAMES = [
   'addItem',
   'getItem',
   'getItems',
@@ -18,11 +18,11 @@ export const __RPC_ACTION_NAMES__ = [
   'updateConfig',
 ] as const
 
-export type RpcActionName = (typeof __RPC_ACTION_NAMES__)[number]
+export type RpcActionName = (typeof RPC_ACTION_NAMES)[number]
 
-export const __THUMBNAIL_SIZES__ = [96, 384, 800, 1440] as const
+export const THUMBNAIL_SIZES = [96, 384, 800, 1440] as const
 
-export type ThumbSize = (typeof __THUMBNAIL_SIZES__)[number]
+export type ThumbSize = (typeof THUMBNAIL_SIZES)[number]
 
-export const __SYSTEM_CONFIG_UNITY_NAME__ = 'sys.config'
-export const __SYSTEM_UNITY_PREFIX__ = 'sys.'
+export const SYSTEM_CONFIG_UNITY_NAME = 'sys.config'
+export const SYSTEM_UNITY_PREFIX = 'sys.'

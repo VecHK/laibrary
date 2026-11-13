@@ -59,15 +59,15 @@ function TextBlockEditor({
   const [selected_index, setSelectedIndex] = useState(0)
   const [menu_placement, setMenuPlacement] = useState<'up' | 'down'>('down')
   const [menu_max_height, setMenuMaxHeight] = useState(320)
-  const timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const textarea_ref = useRef<HTMLTextAreaElement>(null)
-  const write_chain_ref = useRef<Promise<void>>(Promise.resolve())
-  const alive_ref = useRef(true)
-  const composing_ref = useRef(false)
-  const busy_ref = useRef(false)
-  const skip_blur_save_ref = useRef(false)
-  const was_active_ref = useRef(is_active)
-  const value_ref = useRef(item.title)
+  const $timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const $textarea_ref = useRef<HTMLTextAreaElement>(null)
+  const $write_chain_ref = useRef<Promise<void>>(Promise.resolve())
+  const $alive_ref = useRef(true)
+  const $composing_ref = useRef(false)
+  const $busy_ref = useRef(false)
+  const $skip_blur_save_ref = useRef(false)
+  const $was_active_ref = useRef(is_active)
+  const $value_ref = useRef(item.title)
 
   const commands = useMemo(
     () => slash_query === null ? [] : orderSlashCommands(filterSlashCommands(slash_query)),
@@ -75,35 +75,35 @@ function TextBlockEditor({
   )
 
   useEffect(() => {
-    alive_ref.current = true
+    $alive_ref.current = true
     return () => {
-      alive_ref.current = false
-      if (timer_ref.current !== null) {clearTimeout(timer_ref.current)}
+      $alive_ref.current = false
+      if ($timer_ref.current !== null) {clearTimeout($timer_ref.current)}
     }
   }, [])
 
   useEffect(() => {
     setValue(item.title)
-    value_ref.current = item.title
+    $value_ref.current = item.title
     setSlashQuery(null)
-    skip_blur_save_ref.current = false
+    $skip_blur_save_ref.current = false
   }, [item.id])
 
   useEffect(() => {
     if (!is_active) {
       setValue(item.title)
-      value_ref.current = item.title
+      $value_ref.current = item.title
       setSlashQuery(null)
-    } else if (!was_active_ref.current) {
+    } else if (!$was_active_ref.current) {
       // 从只读视图切换到编辑态时，父级可能刚合并/替换了 title。
       setValue(item.title)
-      value_ref.current = item.title
+      $value_ref.current = item.title
     }
-    was_active_ref.current = is_active
+    $was_active_ref.current = is_active
   }, [is_active, item.title])
 
   const resize = () => {
-    const node = textarea_ref.current
+    const node = $textarea_ref.current
     if (node !== null) {
       node.style.height = '0px'
       node.style.height = `${node.scrollHeight}px`
@@ -115,21 +115,21 @@ function TextBlockEditor({
   }, [value, is_active])
 
   useEffect(() => {
-    let settle_timer: number | null = null
+    let $_settle_timer: number | null = null
     if (is_active && focus_request !== null) {
-      const node = textarea_ref.current
+      const node = $textarea_ref.current
       if (node !== null) {
         const caret = focus_request.caret
         node.focus()
-        skip_blur_save_ref.current = false
+        $skip_blur_save_ref.current = false
         const position = caret === 'end'
                          ? node.value.length
                          : Math.max(0, Math.min(caret, node.value.length))
         node.setSelectionRange(position, position)
         resize()
         // Controlled textarea 的值更新可能发生在 focus 之后，用 macrotask 再落一次 caret。
-        settle_timer = window.setTimeout(() => {
-          if (alive_ref.current) {
+        $_settle_timer = window.setTimeout(() => {
+          if ($alive_ref.current) {
             const settled = caret === 'end'
                             ? node.value.length
                             : Math.max(0, Math.min(caret, node.value.length))
@@ -140,21 +140,21 @@ function TextBlockEditor({
       }
     }
     return () => {
-      if (settle_timer !== null) {
-        window.clearTimeout(settle_timer)
+      if ($_settle_timer !== null) {
+        window.clearTimeout($_settle_timer)
       }
     }
   }, [is_active, focus_request, item.id])
 
   const persist = (title: string): Promise<void> => {
-    const run = write_chain_ref.current.then(async () => {
+    const run = $write_chain_ref.current.then(async () => {
       await ctx.api.rpc.updateItem({ id: item.id, data: { title } })
     })
-    write_chain_ref.current = run.catch(error => {
+    $write_chain_ref.current = run.catch(error => {
       console.warn('text-block save queue', error)
     })
     run.catch(err => {
-      if (alive_ref.current) {
+      if ($alive_ref.current) {
         ctx.showError(err instanceof Error ? err.message : String(err))
       }
     })
@@ -162,44 +162,44 @@ function TextBlockEditor({
   }
 
   const cancelTimer = () => {
-    if (timer_ref.current !== null) {
-      clearTimeout(timer_ref.current)
-      timer_ref.current = null
+    if ($timer_ref.current !== null) {
+      clearTimeout($timer_ref.current)
+      $timer_ref.current = null
     }
   }
 
   const scheduleSave = (next: string) => {
     cancelTimer()
-    timer_ref.current = setTimeout(() => { void persist(next) }, 400)
+    $timer_ref.current = setTimeout(() => { void persist(next) }, 400)
   }
 
   const flushSave = () => {
     cancelTimer()
-    void persist(value_ref.current)
+    void persist($value_ref.current)
   }
 
   const clearLine = () => {
     cancelTimer()
-    value_ref.current = ''
+    $value_ref.current = ''
     setValue('')
     onTitleChange(item.id, '')
     setSlashQuery(null)
   }
 
   const pickCommand = (command: SlashCommand) => {
-    if (!busy_ref.current) {
+    if (!$busy_ref.current) {
       setSlashQuery(null)
       if (command.id === 'text') {
         clearLine()
         void persist('')
-        textarea_ref.current?.focus()
+        $textarea_ref.current?.focus()
       } else if (onSlashCommand !== undefined) {
         clearLine()
-        skip_blur_save_ref.current = true
-        busy_ref.current = true
+        $skip_blur_save_ref.current = true
+        $busy_ref.current = true
         void (async () => {
           await persist('')
-          busy_ref.current = false
+          $busy_ref.current = false
           onSlashCommand(command, item)
         })()
       }
@@ -207,21 +207,21 @@ function TextBlockEditor({
   }
 
   const handleSplit = async () => {
-    if (onSplit !== undefined && !busy_ref.current) {
-      const node = textarea_ref.current
+    if (onSplit !== undefined && !$busy_ref.current) {
+      const node = $textarea_ref.current
       if (node !== null) {
-        busy_ref.current = true
-        const { left, right } = splitTextBlock(value_ref.current, node.selectionStart, node.selectionEnd)
+        $busy_ref.current = true
+        const { left, right } = splitTextBlock($value_ref.current, node.selectionStart, node.selectionEnd)
         cancelTimer()
-        value_ref.current = left
+        $value_ref.current = left
         setValue(left)
         onTitleChange(item.id, left)
         setSlashQuery(null)
-        skip_blur_save_ref.current = true
+        $skip_blur_save_ref.current = true
         try {
           await onSplit(item, left, right)
         } finally {
-          busy_ref.current = false
+          $busy_ref.current = false
         }
       }
     }
@@ -278,7 +278,7 @@ function TextBlockEditor({
     <div className={root_class}>
       {prefix}
       <textarea
-        ref={textarea_ref}
+        ref={$textarea_ref}
         className="text-block-textarea"
         value={value}
         placeholder="按 / 插入内容"
@@ -290,14 +290,14 @@ function TextBlockEditor({
           const list_shortcut = detectListShortcut(next, item.role)
           if (heading_shortcut !== null && onConvertRole !== undefined) {
             cancelTimer()
-            value_ref.current = heading_shortcut.title
+            $value_ref.current = heading_shortcut.title
             setValue(heading_shortcut.title)
             onTitleChange(item.id, heading_shortcut.title)
             setSlashQuery(null)
             onConvertRole(item, heading_shortcut.role, heading_shortcut.title)
           } else if (list_shortcut !== null && onConvertRole !== undefined) {
             cancelTimer()
-            value_ref.current = list_shortcut.title
+            $value_ref.current = list_shortcut.title
             setValue(list_shortcut.title)
             onTitleChange(item.id, list_shortcut.title)
             setSlashQuery(null)
@@ -310,7 +310,7 @@ function TextBlockEditor({
               : { checked: false },
             )
           } else {
-            value_ref.current = next
+            $value_ref.current = next
             setValue(next)
             onTitleChange(item.id, next)
             scheduleSave(next)
@@ -341,7 +341,7 @@ function TextBlockEditor({
               const end = node.selectionEnd
               const next = value.slice(0, start) + first + value.slice(end)
               cancelTimer()
-              value_ref.current = next
+              $value_ref.current = next
               setValue(next)
               onTitleChange(item.id, next)
               scheduleSave(next)
@@ -356,49 +356,49 @@ function TextBlockEditor({
             }
           }
         }}
-        onFocus={() => { skip_blur_save_ref.current = false }}
-        onCompositionStart={() => { composing_ref.current = true }}
-        onCompositionEnd={() => { composing_ref.current = false }}
+        onFocus={() => { $skip_blur_save_ref.current = false }}
+        onCompositionStart={() => { $composing_ref.current = true }}
+        onCompositionEnd={() => { $composing_ref.current = false }}
         onBlur={() => {
           setSlashQuery(null)
-          if (skip_blur_save_ref.current) {
-            skip_blur_save_ref.current = false
+          if ($skip_blur_save_ref.current) {
+            $skip_blur_save_ref.current = false
           } else {
             flushSave()
           }
         }}
         onKeyDown={ev => {
-          const composing = composing_ref.current || ev.nativeEvent.isComposing
+          const composing = $composing_ref.current || ev.nativeEvent.isComposing
           if (!composing) {
-            let handled = false
+            let $handled = false
             if (slash_query !== null) {
               if (ev.key === 'ArrowDown') {
                 ev.preventDefault()
                 if (commands.length !== 0) {
                   setSelectedIndex(index => (index + 1) % commands.length)
                 }
-                handled = true
+                $handled = true
               } else if (ev.key === 'ArrowUp') {
                 ev.preventDefault()
                 if (commands.length !== 0) {
                   setSelectedIndex(index => (index - 1 + commands.length) % commands.length)
                 }
-                handled = true
+                $handled = true
               } else if ((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Tab') {
                 ev.preventDefault()
                 const command = commands[selected_index]
                 if (command !== undefined) {
                   pickCommand(command)
                 }
-                handled = true
+                $handled = true
               } else if (ev.key === 'Escape') {
                 ev.preventDefault()
                 setSlashQuery(null)
-                handled = true
+                $handled = true
               }
             }
 
-            if (!handled) {
+            if (!$handled) {
               if (
                 (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') &&
                 !ev.shiftKey &&

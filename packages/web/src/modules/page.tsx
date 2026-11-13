@@ -35,14 +35,14 @@ type PageHistoryEntry = {
 }
 
 function sortChildren(items: Item[]): Item[] {
-  return [...items].sort((a, b) => (
+  return items.toSorted((a, b) => (
     a.order_index - b.order_index || a.id - b.id
   ))
 }
 
 function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [children, setChildren] = useState<Item[] | null>(null)
-  const children_ref = useRef<Item[]>([])
+  const $children_ref = useRef<Item[]>([])
   const [active_block_id, setActiveBlockId] = useState<ItemID | null>(null)
   const [focus_request, setFocusRequest] = useState<FocusRequest | null>(null)
   const [picker, setPicker] = useState(false)
@@ -50,55 +50,55 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [selected_ids, setSelectedIds] = useState<readonly ItemID[]>([])
   const [selection_anchor_id, setSelectionAnchorId] = useState<ItemID | null>(null)
   const [marquee, setMarquee] = useState<Box | null>(null)
-  const marquee_cleanup_ref = useRef<(() => void) | null>(null)
+  const $marquee_cleanup_ref = useRef<(() => void) | null>(null)
   const [undo_stack, setUndoStack] = useState<readonly PageHistoryEntry[]>([])
   const [redo_stack, setRedoStack] = useState<readonly PageHistoryEntry[]>([])
-  const page_ref = useRef<HTMLDivElement>(null)
-  const history_busy_ref = useRef(false)
-  const structural_undo_ref = useRef(false)
+  const $page_ref = useRef<HTMLDivElement>(null)
+  const $history_busy_ref = useRef(false)
+  const $structural_undo_ref = useRef(false)
   const [link_placeholder, setLinkPlaceholder] = useState<Item | null>(null)
   const [title, scheduleTitle, saveTitle] = usePageTitle(item, ctx)
-  const alive_ref = useRef(true)
-  const pending_upload_ref = useRef<{ kind: UploadKind, placeholder: Item | null } | null>(null)
-  const image_input_ref = useRef<HTMLInputElement>(null)
-  const file_input_ref = useRef<HTMLInputElement>(null)
+  const $alive_ref = useRef(true)
+  const $pending_upload_ref = useRef<{ kind: UploadKind, placeholder: Item | null } | null>(null)
+  const $image_input_ref = useRef<HTMLInputElement>(null)
+  const $file_input_ref = useRef<HTMLInputElement>(null)
 
   const syncChildren = (next: Item[]) => {
     const sorted = sortChildren(next)
-    children_ref.current = sorted
+    $children_ref.current = sorted
     setChildren(sorted)
   }
 
   const patchChild = (id: ItemID, patch: Partial<Item>) => {
-    syncChildren(children_ref.current.map(child => (
+    syncChildren($children_ref.current.map(child => (
       child.id === id ? { ...child, ...patch } : child
     )))
   }
 
   const insertChild = (child: Item) => {
-    if (children_ref.current.some(existing => existing.id === child.id)) {
+    if ($children_ref.current.some(existing => existing.id === child.id)) {
       // 已存在，不重复插入。
     } else {
-      syncChildren([...children_ref.current, child])
+      syncChildren([...$children_ref.current, child])
     }
   }
 
   const removeChild = (id: ItemID) => {
-    syncChildren(children_ref.current.filter(child => child.id !== id))
+    syncChildren($children_ref.current.filter(child => child.id !== id))
     if (active_block_id === id) {setActiveBlockId(null)}
   }
 
   const appendOrder = (): number => (
-    children_ref.current.reduce((max, child) => Math.max(max, child.order_index), 0) + 1
+    $children_ref.current.reduce((max, child) => Math.max(max, child.order_index), 0) + 1
   )
 
   const orderAfterItem = (item: Item): number => {
-    const next = children_ref.current
+    const next = $children_ref.current
       .filter(child => (
         child.order_index > item.order_index ||
         (child.order_index === item.order_index && child.id > item.id)
       ))
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id)[0]
+      .toSorted((a, b) => a.order_index - b.order_index || a.id - b.id)[0]
     return orderAfter(item.order_index, next === undefined ? null : next.order_index)
   }
 
@@ -111,18 +111,18 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   const focusPage = () => {
     window.requestAnimationFrame(() => {
-      page_ref.current?.focus({ preventScroll: true })
+      $page_ref.current?.focus({ preventScroll: true })
     })
   }
 
   const clearSelection = () => {
-    structural_undo_ref.current = false
+    $structural_undo_ref.current = false
     setSelectedIds([])
     setSelectionAnchorId(null)
   }
 
   const selectOne = (id: ItemID) => {
-    structural_undo_ref.current = false
+    $structural_undo_ref.current = false
     setActiveBlockId(null)
     setFocusRequest(null)
     setSelectedIds([id])
@@ -131,7 +131,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const selectRange = (anchor_id: ItemID, target_id: ItemID) => {
-    const list = children_ref.current
+    const list = $children_ref.current
     const anchor_index = list.findIndex(child => child.id === anchor_id)
     const target_index = list.findIndex(child => child.id === target_id)
     if (anchor_index >= 0 && target_index >= 0) {
@@ -144,10 +144,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const deleteSelected = async () => {
-    if (selected_ids.length === 0 || history_busy_ref.current) {
+    if (selected_ids.length === 0 || $history_busy_ref.current) {
       // 没有选择或已有历史操作，忽略。
     } else {
-      history_busy_ref.current = true
+      $history_busy_ref.current = true
       const ids = [...selected_ids]
       try {
         const snapshots = await ctx.api.rpc.deleteItems(ids)
@@ -162,17 +162,17 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         ctx.showError(error instanceof Error ? error.message : String(error))
         void loadChildren()
       } finally {
-        history_busy_ref.current = false
+        $history_busy_ref.current = false
       }
     }
   }
 
   const undoDelete = async () => {
     const entry = undo_stack[undo_stack.length - 1]
-    if (entry === undefined || history_busy_ref.current) {
+    if (entry === undefined || $history_busy_ref.current) {
       // 没有可撤销记录。
     } else {
-      history_busy_ref.current = true
+      $history_busy_ref.current = true
       try {
         const restored = await ctx.api.rpc.restoreItems(entry.items)
         for (const child of restored) {
@@ -187,17 +187,17 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       } catch (error) {
         ctx.showError(error instanceof Error ? error.message : String(error))
       } finally {
-        history_busy_ref.current = false
+        $history_busy_ref.current = false
       }
     }
   }
 
   const redoDelete = async () => {
     const entry = redo_stack[redo_stack.length - 1]
-    if (entry === undefined || history_busy_ref.current) {
+    if (entry === undefined || $history_busy_ref.current) {
       // 没有可重做记录。
     } else {
-      history_busy_ref.current = true
+      $history_busy_ref.current = true
       try {
         const snapshots = await ctx.api.rpc.deleteItems(entry.ids)
         for (const id of entry.ids) {
@@ -210,7 +210,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       } catch (error) {
         ctx.showError(error instanceof Error ? error.message : String(error))
       } finally {
-        history_busy_ref.current = false
+        $history_busy_ref.current = false
       }
     }
   }
@@ -218,7 +218,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const handleStructuralUndoCapture = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const modifier = event.metaKey || event.ctrlKey
     if (
-      structural_undo_ref.current &&
+      $structural_undo_ref.current &&
       event.target instanceof HTMLTextAreaElement &&
       modifier &&
       !event.shiftKey &&
@@ -226,7 +226,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     ) {
       event.preventDefault()
       event.stopPropagation()
-      structural_undo_ref.current = false
+      $structural_undo_ref.current = false
       void undoDelete()
     }
   }
@@ -262,7 +262,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const focusAdjacentBlock = (direction: 'up' | 'down', current: Item) => {
-    const list = children_ref.current
+    const list = $children_ref.current
     const index = list.findIndex(child => child.id === current.id)
     const target = direction === 'up' ? list[index - 1] : list[index + 1]
     if (target !== undefined) {
@@ -278,7 +278,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const moveSelection = (direction: 'up' | 'down', extend: boolean) => {
-    const list = children_ref.current
+    const list = $children_ref.current
     const selected_indexes = selected_ids
       .map(id => list.findIndex(child => child.id === id))
       .filter(index => index >= 0)
@@ -318,7 +318,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         sort_by: 'order_index',
         filter_rules: [{ name: 'parent', input: item.id, logic: 'and' }],
       })
-      if (alive_ref.current) {
+      if ($alive_ref.current) {
         syncChildren(list)
         const first = list[0]
         if (
@@ -336,16 +336,16 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   useEffect(() => {
-    alive_ref.current = true
+    $alive_ref.current = true
     setActiveBlockId(null)
     setFocusRequest(null)
     setSelectedIds([])
     setSelectionAnchorId(null)
     setUndoStack([])
     setRedoStack([])
-    structural_undo_ref.current = false
+    $structural_undo_ref.current = false
     void loadChildren(true, true)
-    return () => { alive_ref.current = false }
+    return () => { $alive_ref.current = false }
   }, [item.id])
   useEffect(() => {
     const idsInside = (box: Box): ItemID[] => {
@@ -385,10 +385,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         // 文章内容区、控件和修饰键拖拽都交给浏览器。
       } else {
         event.preventDefault()
-        marquee_cleanup_ref.current?.()
+        $marquee_cleanup_ref.current?.()
         const start_x = event.clientX
         const start_y = event.clientY
-        let moved = false
+        let $moved = false
         setSelectedIds([])
         setSelectionAnchorId(null)
         setMarquee(boxFromPoints(start_x, start_y, start_x, start_y))
@@ -399,7 +399,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         const update = (current_x: number, current_y: number) => {
           const box = boxFromPoints(start_x, start_y, current_x, current_y)
           if (box.width > 4 || box.height > 4) {
-            moved = true
+            $moved = true
             setMarquee(box)
             const ids = idsInside(box)
             setSelectedIds(ids)
@@ -413,7 +413,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           window.removeEventListener('blur', onBlur)
           window.removeEventListener('scroll', onScroll, true)
           document.body.classList.remove('marquee-selecting')
-          marquee_cleanup_ref.current = null
+          $marquee_cleanup_ref.current = null
           setMarquee(null)
         }
         const onPointerMove = (move_event: PointerEvent) => {
@@ -421,7 +421,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         }
         const onPointerUp = (up_event: PointerEvent) => {
           update(up_event.clientX, up_event.clientY)
-          if (!moved) {
+          if (!$moved) {
             setSelectedIds([])
             setSelectionAnchorId(null)
           }
@@ -436,7 +436,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         const onScroll = () => {
           cleanup()
         }
-        marquee_cleanup_ref.current = cleanup
+        $marquee_cleanup_ref.current = cleanup
         window.addEventListener('pointermove', onPointerMove)
         window.addEventListener('pointerup', onPointerUp)
         window.addEventListener('pointercancel', onPointerCancel)
@@ -448,7 +448,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     document.addEventListener('pointerdown', onPointerDown)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
-      marquee_cleanup_ref.current?.()
+      $marquee_cleanup_ref.current?.()
     }
   }, [item.id])
 
@@ -478,14 +478,14 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     current: Item,
     titles: readonly string[],
   ): Promise<void> => {
-    let previous = current
-    let last: Item | null = null
-    let failed = false
+    let $previous = current
+    let $last: Item | null = null
+    let $failed = false
     for (const title of titles) {
-      if (failed) {
+      if ($failed) {
         // 保持已经创建成功的 block，后续由 reload 校正。
       } else {
-        const order_index = orderAfterItem(previous)
+        const order_index = orderAfterItem($previous)
         try {
           const created = await ctx.api.rpc.addItem({
             role: 'text-block',
@@ -494,17 +494,17 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             order_index,
           })
           insertChild(created)
-          previous = created
-          last = created
+          $previous = created
+          $last = created
         } catch (err) {
-          failed = true
+          $failed = true
           ctx.showError(err instanceof Error ? err.message : String(err))
           void loadChildren()
         }
       }
     }
-    if (last !== null) {
-      focusBlock(last.id, last.title.length === 0 ? 0 : 'end')
+    if ($last !== null) {
+      focusBlock($last.id, $last.title.length === 0 ? 0 : 'end')
     }
   }
 
@@ -535,7 +535,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const handleBackspace = async (current: Item, value: string) => {
-    const list = children_ref.current
+    const list = $children_ref.current
     const index = list.findIndex(child => child.id === current.id)
     const previous = index > 0 ? list[index - 1] : undefined
 
@@ -564,7 +564,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
           removeChild(current.id)
           setUndoStack(prev => [...prev, { ids: [current.id], items: snapshots }])
           setRedoStack([])
-          structural_undo_ref.current = true
+          $structural_undo_ref.current = true
           focusBlock(previous.id, 'end')
         } catch (err) {
           ctx.showError(err instanceof Error ? err.message : String(err))
@@ -587,7 +587,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const createTextBlockAtEnd = () => {
-    const last = children_ref.current[children_ref.current.length - 1]
+    const last = $children_ref.current[$children_ref.current.length - 1]
     void createTextBlockAfter(last)
   }
 
@@ -621,13 +621,13 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const moveBlock = (source: Item, direction: 'up' | 'down') => {
-    const index = children_ref.current.findIndex(child => child.id === source.id)
+    const index = $children_ref.current.findIndex(child => child.id === source.id)
     const target_index = direction === 'up' ? index - 1 : index + 1
-    const target = children_ref.current[target_index]
+    const target = $children_ref.current[target_index]
     if (index < 0 || target === undefined) {
       // 已经在边界，菜单项应当禁用；这里只是防御。
     } else {
-      const next = children_ref.current.map((child, child_index) => {
+      const next = $children_ref.current.map((child, child_index) => {
         if (child_index === index) {
           return { ...child, order_index: target.order_index }
         } else if (child_index === target_index) {
@@ -653,10 +653,10 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     position: 'before' | 'after',
   ) => {
     setDropIndicator(null)
-    const source = children_ref.current.find(child => child.id === dragged_id)
-    const target = children_ref.current.find(child => child.id === target_id)
+    const source = $children_ref.current.find(child => child.id === dragged_id)
+    const target = $children_ref.current.find(child => child.id === target_id)
     if (source !== undefined && target !== undefined) {
-      const without = children_ref.current.filter(child => child.id !== source.id)
+      const without = $children_ref.current.filter(child => child.id !== source.id)
       const target_index = without.findIndex(child => child.id === target.id)
       if (target_index >= 0) {
         const insert_index = target_index + (position === 'after' ? 1 : 0)
@@ -665,8 +665,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         const order_index = before === undefined
                             ? (after === undefined ? appendOrder() : after.order_index - 1)
                             : (after === undefined ? before.order_index + 1 : orderAfter(before.order_index, after.order_index))
-        const next = [...without]
-        next.splice(insert_index, 0, { ...source, order_index })
+        const next = [
+          ...without.slice(0, insert_index),
+          { ...source, order_index },
+          ...without.slice(insert_index),
+        ]
         syncChildren(next)
         ctx.api.rpc.updateItem({
           id: source.id,
@@ -741,8 +744,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const openUpload = (kind: UploadKind, placeholder: Item | null) => {
-    pending_upload_ref.current = { kind, placeholder }
-    const input = kind === 'image' ? image_input_ref.current : file_input_ref.current
+    $pending_upload_ref.current = { kind, placeholder }
+    const input = kind === 'image' ? $image_input_ref.current : $file_input_ref.current
     input?.click()
   }
 
@@ -751,43 +754,43 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     placeholder: Item | null,
     files: File[],
   ) => {
-    let anchor: Item | null = placeholder
-    let first_created: Item | null = null
-    let upload_failed = false
+    let $anchor: Item | null = placeholder
+    let $first_created: Item | null = null
+    let $upload_failed = false
 
     for (const file of files) {
-      if (upload_failed) {
+      if ($upload_failed) {
         // 出错后不再继续上传，等待当前批次收尾。
       } else {
-        const order_index = anchor === null
+        const order_index = $anchor === null
                             ? appendOrder()
                             : (
-                                anchor.id === placeholder?.id
+                                $anchor.id === placeholder?.id
                                 ? placeholder.order_index
-                                : orderAfterItem(anchor)
+                                : orderAfterItem($anchor)
                               )
         try {
           const created = kind === 'image'
                           ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
                           : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
 
-          if (anchor !== null && anchor.id === placeholder?.id) {
-            await ctx.api.rpc.deleteItem({ id: anchor.id })
-            removeChild(anchor.id)
+          if ($anchor !== null && $anchor.id === placeholder?.id) {
+            await ctx.api.rpc.deleteItem({ id: $anchor.id })
+            removeChild($anchor.id)
           }
           insertChild(created)
-          if (first_created === null) {first_created = created}
-          anchor = created
+          if ($first_created === null) {$first_created = created}
+          $anchor = created
         } catch (err) {
-          upload_failed = true
+          $upload_failed = true
           ctx.showError(err instanceof Error ? err.message : String(err))
           void loadChildren()
         }
       }
     }
 
-    if (first_created !== null) {
-      await createTextBlockAfter(anchor ?? first_created)
+    if ($first_created !== null) {
+      await createTextBlockAfter($anchor ?? $first_created)
     }
   }
 
@@ -796,41 +799,41 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     target_id: ItemID | null,
     position: 'before' | 'after',
   ) => {
-    const list = children_ref.current
+    const list = $children_ref.current
     const target_index = target_id === null
                          ? -1
                          : list.findIndex(child => child.id === target_id)
     const insert_index = target_index >= 0
                          ? target_index + (position === 'after' ? 1 : 0)
                          : list.length
-    let previous = list[insert_index - 1]
+    let $previous = list[insert_index - 1]
     const next = list[insert_index]
-    let last_created: Item | undefined
-    let upload_failed = false
+    let $last_created: Item | undefined
+    let $upload_failed = false
     for (const file of files) {
-      if (upload_failed) {
+      if ($upload_failed) {
         // 出错后停止后续文件，保留已经成功的 block。
       } else {
-        const order_index = previous === undefined
+        const order_index = $previous === undefined
                             ? (next === undefined ? appendOrder() : next.order_index - 1)
-                            : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+                            : (next === undefined ? $previous.order_index + 1 : orderAfter($previous.order_index, next.order_index))
         try {
           const kind = mediaKindForFile(file)
           const created = kind === 'image'
                           ? await createImageItem({ api: ctx.api, file, parent_id: item.id, order_index })
                           : await createFileItem({ api: ctx.api, file, parent_id: item.id, order_index })
           insertChild(created)
-          previous = created
-          last_created = created
+          $previous = created
+          $last_created = created
         } catch (err) {
-          upload_failed = true
+          $upload_failed = true
           ctx.showError(err instanceof Error ? err.message : String(err))
           void loadChildren()
         }
       }
     }
-    if (last_created !== undefined) {
-      await createTextBlockAfter(last_created)
+    if ($last_created !== undefined) {
+      await createTextBlockAfter($last_created)
     }
   }
 
@@ -840,24 +843,24 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     position: 'before' | 'after',
   ): Promise<void> => {
     const blocks = splitTextBlocks(text)
-    const list = children_ref.current
+    const list = $children_ref.current
     const target_index = target_id === null
                          ? -1
                          : list.findIndex(child => child.id === target_id)
     const insert_index = target_index >= 0
                          ? target_index + (position === 'after' ? 1 : 0)
                          : list.length
-    let previous = list[insert_index - 1]
+    let $previous = list[insert_index - 1]
     const next = list[insert_index]
-    let last: Item | null = null
-    let failed = false
+    let $last: Item | null = null
+    let $failed = false
     for (const title of blocks) {
-      if (failed) {
+      if ($failed) {
         // 保持已经成功的 block，后续由 reload 校正。
       } else {
-        const order_index = previous === undefined
+        const order_index = $previous === undefined
                             ? (next === undefined ? appendOrder() : next.order_index - 1)
-                            : (next === undefined ? previous.order_index + 1 : orderAfter(previous.order_index, next.order_index))
+                            : (next === undefined ? $previous.order_index + 1 : orderAfter($previous.order_index, next.order_index))
         try {
           const created = await ctx.api.rpc.addItem({
             role: 'text-block',
@@ -866,17 +869,17 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
             order_index,
           })
           insertChild(created)
-          previous = created
-          last = created
+          $previous = created
+          $last = created
         } catch (err) {
-          failed = true
+          $failed = true
           ctx.showError(err instanceof Error ? err.message : String(err))
           void loadChildren()
         }
       }
     }
-    if (last !== null) {
-      focusBlock(last.id, last.title.length === 0 ? 0 : 'end')
+    if ($last !== null) {
+      focusBlock($last.id, $last.title.length === 0 ? 0 : 'end')
     }
   }
 
@@ -924,8 +927,8 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const handleUploadChange = (kind: UploadKind, files: File[]) => {
-    const pending = pending_upload_ref.current
-    pending_upload_ref.current = null
+    const pending = $pending_upload_ref.current
+    $pending_upload_ref.current = null
     if (files.length !== 0) {
       const placeholder = pending?.kind === kind ? pending.placeholder : null
       void insertUploadedFiles(kind, placeholder, files)
@@ -1026,7 +1029,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   return (
     <div
-      ref={page_ref}
+      ref={$page_ref}
       className="page-full"
       tabIndex={-1}
       onKeyDown={handlePageKeyDown}
@@ -1050,7 +1053,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       </div>
 
       <input
-        ref={image_input_ref}
+        ref={$image_input_ref}
         type="file"
         accept="image/*"
         multiple
@@ -1062,7 +1065,7 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         }}
       />
       <input
-        ref={file_input_ref}
+        ref={$file_input_ref}
         type="file"
         multiple
         hidden
@@ -1091,11 +1094,11 @@ function PageFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
               focus_request={focus_request?.id === child.id ? focus_request.request : null}
               onFocusHandled={() => setFocusRequest(null)}
               onActivate={() => {
-                structural_undo_ref.current = false
+                $structural_undo_ref.current = false
                 focusBlock(child.id, 'end')
               }}
               onTitleChange={(id, new_title) => {
-                structural_undo_ref.current = false
+                $structural_undo_ref.current = false
                 patchChild(id, { title: new_title })
               }}
               onSplit={handleSplit}

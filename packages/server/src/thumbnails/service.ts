@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import sharp from 'sharp'
 import type { BlobMeta, ItemID, ThumbSize } from '@laibrary/types'
-import { __THUMBNAIL_SIZES__ } from '@laibrary/types'
+import { THUMBNAIL_SIZES } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items, thumbnails } from '../db/schema'
 import { errorsNotFound, errorsPgCode, errorsStorage, errorsValidation } from '../errors'
@@ -18,30 +18,30 @@ export type CreateThumbnailServiceOptions = {
 }
 
 function isThumbSize(value: number): value is ThumbSize {
-  return __THUMBNAIL_SIZES__.some(size => size === value)
+  return THUMBNAIL_SIZES.some(size => size === value)
 }
 
 export function CreateThumbnailService({
-  db,
-  blobs,
+  db: _db,
+  blobs: _blobs,
 }: CreateThumbnailServiceOptions): ThumbnailService {
-  const __in_flight = new Map<string, Promise<BlobMeta>>()
+  const $_in_flight = new Map<string, Promise<BlobMeta>>()
 
   const getExisting = async (
     image_id: ItemID,
     size: ThumbSize,
   ): Promise<BlobMeta | null> => {
-    const rows = await db
+    const rows = await _db
       .select()
       .from(thumbnails)
       .where(and(eq(thumbnails.image_id, image_id), eq(thumbnails.size, size)))
       .limit(1)
     const row = rows[0]
-    return row === undefined ? null : blobs.requireMeta(row.blob_id)
+    return row === undefined ? null : _blobs.requireMeta(row.blob_id)
   }
 
   const generate = async (image_id: ItemID, size: ThumbSize): Promise<BlobMeta> => {
-    const image_rows = await db
+    const image_rows = await _db
       .select()
       .from(items)
       .where(eq(items.id, image_id))
@@ -54,15 +54,15 @@ export function CreateThumbnailService({
     } else if (image.blob_id === null) {
       throw errorsNotFound(`image(id=${image_id}) 缺少 blob`)
     } else {
-      const source = await blobs.getMeta(image.blob_id)
+      const source = await _blobs.getMeta(image.blob_id)
       if (source === null) {
         throw errorsNotFound(`blob(${image.blob_id}) not found`)
-      } else if (!(await blobs.exists(source.id))) {
+      } else if (!(await _blobs.exists(source.id))) {
         throw errorsNotFound(`blob(${source.id}) 文件不存在`)
       } else {
-        let output: { data: Buffer, info: { width: number, height: number } }
+        let $output: { data: Buffer, info: { width: number, height: number } }
         try {
-          output = await sharp(blobs.pathFor(source.id))
+          $output = await sharp(_blobs.pathFor(source.id))
             .rotate()
             .flatten({ background: '#FFFFFF' })
             .resize(size, size, { fit: 'inside', withoutEnlargement: true })
@@ -72,16 +72,16 @@ export function CreateThumbnailService({
           throw errorsStorage(`生成缩略图失败: image(${image_id}) size=${size}`, cause)
         }
 
-        const thumb = await blobs.putBuffer(output.data, 'image/avif')
+        const thumb = await _blobs.putBuffer($output.data, 'image/avif')
         try {
-          await db
+          await _db
             .insert(thumbnails)
             .values({
               image_id,
               size,
               blob_id: thumb.blob.id,
-              width: output.info.width,
-              height: output.info.height,
+              width: $output.info.width,
+              height: $output.info.height,
             })
             .onConflictDoNothing()
         } catch (cause) {
@@ -109,14 +109,14 @@ export function CreateThumbnailService({
         return existing
       } else {
         const key = `${image_id}:${size}`
-        const running = __in_flight.get(key)
+        const running = $_in_flight.get(key)
         if (running !== undefined) {
           return running
         } else {
           const task = generate(image_id, size).finally(() => {
-            __in_flight.delete(key)
+            $_in_flight.delete(key)
           })
-          __in_flight.set(key, task)
+          $_in_flight.set(key, task)
           return task
         }
       }

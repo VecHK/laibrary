@@ -21,43 +21,43 @@ export type CreateActionRouteOptions = {
 const MESSAGE_DONE = { message: 'done' as const }
 
 export function CreateActionRoute({
-  db,
-  blobs,
-  config_store,
+  db: _db,
+  blobs: _blobs,
+  config_store: _config_store,
 }: CreateActionRouteOptions): ActionTable {
   return {
-    addItem: form => db.transaction(tx => createItem(tx, form, blobs)),
-    getItem: ({ id }) => getItem(db, id),
-    getItems: ids => getItems(db, ids),
+    addItem: form => _db.transaction(tx => createItem(tx, form, _blobs)),
+    getItem: ({ id }) => getItem(_db, id),
+    getItems: ids => getItems(_db, ids),
     updateItem: async ({ id, data }) => {
-      await db.transaction(tx => updateItem(tx, id, data, blobs))
+      await _db.transaction(tx => updateItem(tx, id, data, _blobs))
       return MESSAGE_DONE
     },
     deleteItem: async ({ id }) => {
-      await db.transaction(tx => deleteItem(tx, id))
+      await _db.transaction(tx => deleteItem(tx, id))
       return MESSAGE_DONE
     },
-    deleteItems: ids => db.transaction(tx => deleteItems(tx, ids)),
-    restoreItems: snapshots => db.transaction(tx => restoreItems(tx, snapshots)),
-    convertTextBlock: ({ id, role, title, attributes }) => db.transaction(tx => (
+    deleteItems: ids => _db.transaction(tx => deleteItems(tx, ids)),
+    restoreItems: snapshots => _db.transaction(tx => restoreItems(tx, snapshots)),
+    convertTextBlock: ({ id, role, title, attributes }) => _db.transaction(tx => (
       convertTextBlock(tx, id, role, title, attributes)
     )),
-    listing: payload => listItems(db, payload),
-    getItemByUnityName: ({ unity_name }) => getItemByUnityName(db, unity_name),
-    newTag: ({ title, attributes }) => db.transaction(tx => newTag(tx, title, attributes)),
+    listing: payload => listItems(_db, payload),
+    getItemByUnityName: ({ unity_name }) => getItemByUnityName(_db, unity_name),
+    newTag: ({ title, attributes }) => _db.transaction(tx => newTag(tx, title, attributes)),
     updateTag: async ({ id, data }) => {
-      await db.transaction(tx => updateTag(tx, id, data))
+      await _db.transaction(tx => updateTag(tx, id, data))
       return MESSAGE_DONE
     },
     deleteTag: async ({ id }) => {
-      await db.transaction(tx => deleteTag(tx, id))
+      await _db.transaction(tx => deleteTag(tx, id))
       return MESSAGE_DONE
     },
-    searchTag: ({ name, limit }) => searchTag(db, name, limit),
-    getTagByTitle: ({ title }) => getTagByTitle(db, title),
-    getConfig: () => config_store.load(),
+    searchTag: ({ name, limit }) => searchTag(_db, name, limit),
+    getTagByTitle: ({ title }) => getTagByTitle(_db, title),
+    getConfig: () => _config_store.load(),
     updateConfig: async ({ key, value }) => {
-      await config_store.update(key, value)
+      await _config_store.update(key, value)
       return MESSAGE_DONE
     },
   }

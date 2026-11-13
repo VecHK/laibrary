@@ -108,10 +108,10 @@ async function removeIfExists(
 }
 
 export function CreateBlobStore({
-  root,
-  on_error,
+  root: _root,
+  on_error: _on_error,
 }: CreateBlobStoreOptions): BlobStore {
-  const pathFor = (id: BlobID): string => path.join(root, id.slice(0, 2), id.slice(2, 4), id)
+  const pathFor = (id: BlobID): string => path.join(_root, id.slice(0, 2), id.slice(2, 4), id)
 
   const exists = async (id: BlobID): Promise<boolean> => {
     try {
@@ -151,7 +151,7 @@ export function CreateBlobStore({
     await fs.promises.mkdir(path.dirname(final_path), { recursive: true })
 
     if (await exists(id)) {
-      await removeIfExists(temp_path, on_error)
+      await removeIfExists(temp_path, _on_error)
       return {
         id,
         size: (await fs.promises.stat(final_path)).size,
@@ -160,19 +160,19 @@ export function CreateBlobStore({
         height: metadata.height,
       }
     } else {
-      await fsyncFile(temp_path, on_error)
+      await fsyncFile(temp_path, _on_error)
       try {
         await fs.promises.rename(temp_path, final_path)
       } catch (error) {
         if (isErrno(error) && error.code === 'EXDEV') {
           await fs.promises.copyFile(temp_path, final_path)
-          await fsyncFile(final_path, on_error)
-          await removeIfExists(temp_path, on_error)
+          await fsyncFile(final_path, _on_error)
+          await removeIfExists(temp_path, _on_error)
         } else {
           throw error
         }
       }
-      await fsyncDirectory(path.dirname(final_path), on_error)
+      await fsyncDirectory(path.dirname(final_path), _on_error)
       const stat = await fs.promises.stat(final_path)
       return {
         id,
@@ -185,11 +185,11 @@ export function CreateBlobStore({
   }
 
   const init = async (): Promise<void> => {
-    await fs.promises.mkdir(root, { recursive: true })
-    const entries = await fs.promises.readdir(root, { withFileTypes: true })
+    await fs.promises.mkdir(_root, { recursive: true })
+    const entries = await fs.promises.readdir(_root, { withFileTypes: true })
     for (const entry of entries) {
       if (entry.isFile() && entry.name.startsWith('.tmp-')) {
-        await removeIfExists(path.join(root, entry.name), on_error)
+        await removeIfExists(path.join(_root, entry.name), _on_error)
       }
     }
   }
@@ -201,7 +201,7 @@ export function CreateBlobStore({
       const stored = await commitTemp(temp_path, id, metadata)
       return { ...stored, mime }
     } catch (error) {
-      await removeIfExists(temp_path, on_error)
+      await removeIfExists(temp_path, _on_error)
       if (errorsIsAppError(error)) {
         throw error
       } else {
@@ -212,14 +212,14 @@ export function CreateBlobStore({
 
   const putBuffer = async (buf: Buffer, mime: string): Promise<StoredBlob> => {
     const id = as<BlobID>(crypto.createHash('sha256').update(buf).digest('hex'))
-    const temp_path = path.join(root, `.tmp-${crypto.randomUUID()}`)
-    await fs.promises.mkdir(root, { recursive: true })
+    const temp_path = path.join(_root, `.tmp-${crypto.randomUUID()}`)
+    await fs.promises.mkdir(_root, { recursive: true })
     await fs.promises.writeFile(temp_path, buf)
 
     try {
       const final_path = pathFor(id)
       if (await exists(id)) {
-        await removeIfExists(temp_path, on_error)
+        await removeIfExists(temp_path, _on_error)
         const stat = await fs.promises.stat(final_path)
         const meta = await inspect(final_path, mime)
         return { id, size: stat.size, mime, ...meta }
@@ -231,7 +231,7 @@ export function CreateBlobStore({
         return { ...stored, mime }
       }
     } catch (error) {
-      await removeIfExists(temp_path, on_error)
+      await removeIfExists(temp_path, _on_error)
       if (errorsIsAppError(error)) {
         throw error
       } else {
@@ -241,7 +241,7 @@ export function CreateBlobStore({
   }
 
   return {
-    root,
+    root: _root,
     init,
     idFromHash: hash => as<BlobID>(hash),
     pathFor,

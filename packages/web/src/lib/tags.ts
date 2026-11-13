@@ -15,27 +15,27 @@ export type CreateTagStoreOptions = {
   rpc: RpcClient
 }
 
-export function CreateTagStore({ rpc }: CreateTagStoreOptions): TagStore {
-  let __tags: readonly Item[] = []
-  let __map = new Map<ItemID, string>()
-  let __loaded = false
+export function CreateTagStore({ rpc: _rpc }: CreateTagStoreOptions): TagStore {
+  let $_tags: readonly Item[] = []
+  let $_map = new Map<ItemID, string>()
+  let $_loaded = false
   const sig_tags_changed = Signal<void>()
 
   const load = async (): Promise<void> => {
-    const tags = await rpc.listing({
+    const tags = await _rpc.listing({
       limit: 0,
       filter_rules: [{ name: 'role', input: 'tag', logic: 'and' }],
     })
-    __tags = tags
-    __map = new Map(tags.map(tag => [tag.id, tag.title]))
-    __loaded = true
+    $_tags = tags
+    $_map = new Map(tags.map(tag => [tag.id, tag.title]))
+    $_loaded = true
     sig_tags_changed.trigger()
   }
 
   const invalidate = (): void => {
-    __loaded = false
-    __tags = []
-    __map.clear()
+    $_loaded = false
+    $_tags = []
+    $_map.clear()
     sig_tags_changed.trigger()
   }
 
@@ -43,9 +43,9 @@ export function CreateTagStore({ rpc }: CreateTagStoreOptions): TagStore {
     sig_tags_changed,
     load,
     invalidate,
-    isLoaded: () => __loaded,
-    all: () => __tags,
-    titleOf: tag_id => __map.get(tag_id) ?? null,
+    isLoaded: () => $_loaded,
+    all: () => $_tags,
+    titleOf: tag_id => $_map.get(tag_id) ?? null,
   }
 }
 

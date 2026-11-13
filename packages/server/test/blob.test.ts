@@ -12,31 +12,31 @@ import { createItem } from '../src/repo/items'
 
 const DAY = 24 * 60 * 60 * 1000
 
-let db: DB
-let blobs: BlobService
-let cleanup: () => Promise<void>
+let $_db: DB
+let $_blobs: BlobService
+let $_cleanup: () => Promise<void>
 
 beforeAll(async () => {
-  db = await prepareTestDb()
-  const prepared = await prepareTestBlobs(db)
-  blobs = prepared.blobs
-  cleanup = prepared.cleanup
+  $_db = await prepareTestDb()
+  const prepared = await prepareTestBlobs($_db)
+  $_blobs = prepared.blobs
+  $_cleanup = prepared.cleanup
 })
 
 beforeEach(async () => {
-  await truncateAll(db)
+  await truncateAll($_db)
 })
 
 afterAll(async () => {
-  await cleanup()
-  await closeDb(db)
+  await $_cleanup()
+  await closeDb($_db)
 })
 
 describe('blob store', () => {
   it('内容寻址、扇出路径、去重', async () => {
     const buf = testPng()
-    const first = await blobs.putBuffer(buf, 'image/png')
-    const second = await blobs.putBuffer(buf, 'image/png')
+    const first = await $_blobs.putBuffer(buf, 'image/png')
+    const second = await $_blobs.putBuffer(buf, 'image/png')
 
     expect(first.blob.id).toMatch(/^[0-9a-f]{64}$/)
     expect(second.blob.id).toBe(first.blob.id)
@@ -45,15 +45,15 @@ describe('blob store', () => {
     expect(first.blob.width).toBe(1)
     expect(first.blob.height).toBe(1)
 
-    const path = blobs.pathFor(first.blob.id)
+    const path = $_blobs.pathFor(first.blob.id)
     expect(path).toContain(`${first.blob.id.slice(0, 2)}/${first.blob.id.slice(2, 4)}`)
     expect((await fs.stat(path)).size).toBe(buf.length)
-    expect(await blobs.exists(first.blob.id)).toBe(true)
+    expect(await $_blobs.exists(first.blob.id)).toBe(true)
   })
 
   it('大一些的 buffer 也是同样的 hash', async () => {
-    const a = await blobs.putBuffer(Buffer.from('hello'), 'text/plain')
-    const b = await blobs.putBuffer(Buffer.from('hello'), 'text/plain')
+    const a = await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain')
+    const b = await $_blobs.putBuffer(Buffer.from('hello'), 'text/plain')
     expect(a.blob.id).toBe(b.blob.id)
     expect(a.blob.size).toBe(5)
     expect(a.blob.width).toBeNull()
@@ -62,43 +62,43 @@ describe('blob store', () => {
 
 describe('blob GC', () => {
   it('只删除无引用且超过宽限期的 blob', async () => {
-    const referenced = await blobs.putBuffer(testPng(), 'image/png')
-    const orphan = await blobs.putBuffer(Buffer.from('orphan'), 'application/pdf')
+    const referenced = await $_blobs.putBuffer(testPng(), 'image/png')
+    const orphan = await $_blobs.putBuffer(Buffer.from('orphan'), 'application/pdf')
 
-    await createItem(db, {
+    await createItem($_db, {
       role: 'image',
       title: 'image',
       blob_id: referenced.blob.id,
       attributes: { filename: 'pixel.png' },
-    }, blobs)
+    }, $_blobs)
 
     const old = new Date(Date.now() - 2 * DAY)
-    await db.update(blobs_table).set({ create_date: old }).where(eq(blobs_table.id, orphan.blob.id))
+    await $_db.update(blobs_table).set({ create_date: old }).where(eq(blobs_table.id, orphan.blob.id))
 
-    const refs = await collectReferencedBlobIds(db)
+    const refs = await collectReferencedBlobIds($_db)
     expect(refs.has(referenced.blob.id)).toBe(true)
     expect(refs.has(orphan.blob.id)).toBe(false)
 
     const result = await cleanUnreferencedBlobs({
-    db,
-    blobs,
+    db: $_db,
+    blobs: $_blobs,
     grace_ms: DAY,
     on_error: error => { console.error('test gc', error) },
   })
     expect(result.deleted).toBe(1)
-    expect(await blobs.exists(referenced.blob.id)).toBe(true)
-    expect(await blobs.exists(orphan.blob.id)).toBe(false)
+    expect(await $_blobs.exists(referenced.blob.id)).toBe(true)
+    expect(await $_blobs.exists(orphan.blob.id)).toBe(false)
   })
 
   it('宽限期内的孤儿保留', async () => {
-    const orphan = await blobs.putBuffer(Buffer.from('new orphan'), 'application/pdf')
+    const orphan = await $_blobs.putBuffer(Buffer.from('new orphan'), 'application/pdf')
     const result = await cleanUnreferencedBlobs({
-    db,
-    blobs,
+    db: $_db,
+    blobs: $_blobs,
     grace_ms: DAY,
     on_error: error => { console.error('test gc', error) },
   })
     expect(result.deleted).toBe(0)
-    expect(await blobs.exists(orphan.blob.id)).toBe(true)
+    expect(await $_blobs.exists(orphan.blob.id)).toBe(true)
   })
 })

@@ -23,7 +23,7 @@ export function ImageLightbox({
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
-  const drag_ref = useRef<{ x: number, y: number, ox: number, oy: number } | null>(null)
+  const $drag_ref = useRef<{ x: number, y: number, ox: number, oy: number } | null>(null)
   const original = item.blob === null ? null : blobUrl(ctx.api.base_url, item.blob.id)
   const thumb = item.blob === null ? null : thumbUrl(ctx.api.base_url, item.id, 384)
 
@@ -84,7 +84,7 @@ export function ImageLightbox({
         onPointerDown={event => {
           if (scale > 1 && event.button === 0 && !(event.target instanceof Element && event.target.closest('button'))) {
             event.currentTarget.setPointerCapture(event.pointerId)
-            drag_ref.current = {
+            $drag_ref.current = {
               x: event.clientX,
               y: event.clientY,
               ox: position.x,
@@ -93,7 +93,7 @@ export function ImageLightbox({
           }
         }}
         onPointerMove={event => {
-          const drag = drag_ref.current
+          const drag = $drag_ref.current
           if (drag !== null) {
             setPosition({
               x: drag.ox + event.clientX - drag.x,
@@ -102,12 +102,12 @@ export function ImageLightbox({
           }
         }}
         onPointerUp={event => {
-          if (drag_ref.current !== null) {
+          if ($drag_ref.current !== null) {
             event.currentTarget.releasePointerCapture(event.pointerId)
-            drag_ref.current = null
+            $drag_ref.current = null
           }
         }}
-        onPointerCancel={() => { drag_ref.current = null }}
+        onPointerCancel={() => { $drag_ref.current = null }}
         onClick={event => event.stopPropagation()}
       >
         {thumb !== null && !loaded && (

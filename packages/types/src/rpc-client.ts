@@ -38,11 +38,11 @@ function normalizeBaseUrl(base_url: string): string {
 }
 
 export function CreateRpcClient({
-  base_url,
-  fetcher = globalThis.fetch,
+  base_url: _base_url,
+  fetcher: _fetcher = globalThis.fetch,
 }: CreateRpcClientOptions): RpcClient {
   const request = async (action: string, payload: unknown): Promise<unknown> => {
-    const response = await fetcher(`${normalizeBaseUrl(base_url)}/action`, {
+    const response = await _fetcher(`${normalizeBaseUrl(_base_url)}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, payload }),

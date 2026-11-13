@@ -27,18 +27,18 @@ export function ItemPicker({
 
   const load = (text: string) => {
     setLoading(true)
-    const filter_rules: FilterRule[] = []
+    let $filter_rules: FilterRule[] = []
     if (text.trim().length !== 0) {
-      filter_rules.push({ name: 'title', input: text.trim(), logic: 'and' })
+      $filter_rules = [...$filter_rules, { name: 'title', input: text.trim(), logic: 'and' }]
     }
     if (roles !== undefined) {
-      filter_rules.push({ name: 'role', input: [...roles], logic: 'and' })
+      $filter_rules = [...$filter_rules, { name: 'role', input: [...roles], logic: 'and' }]
     }
     ctx.api.rpc.listing({
       limit: 50,
       sort_by: 'update_date',
       desc: true,
-      filter_rules,
+      filter_rules: $filter_rules,
     }).then(setItems).catch(error => {
       ctx.showError(error instanceof Error ? error.message : String(error))
     }).finally(() => setLoading(false))

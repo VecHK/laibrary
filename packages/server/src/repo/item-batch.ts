@@ -64,7 +64,7 @@ export async function deleteItems(
       throw errorsBadRequest(`item(${blocked.id}) 是 tag 或系统项，不能批量删除`)
     }
 
-    const depths = [...new Set(subtree.map(row => row.depth))].sort((a, b) => b - a)
+    const depths = [...new Set(subtree.map(row => row.depth))].toSorted((a, b) => b - a)
     for (const depth of depths) {
       const group = subtree.filter(row => row.depth === depth).map(row => row.id)
       await db.delete(items).where(inArray(items.id, group))
@@ -74,18 +74,18 @@ export async function deleteItems(
   }
 }
 
-function itemDepth(item: Item, by_id: ReadonlyMap<ItemID, Item>, seen: Set<ItemID>): number {
-  if (seen.has(item.id)) {
+function itemDepth(item: Item, $by_id: ReadonlyMap<ItemID, Item>, $seen: Set<ItemID>): number {
+  if ($seen.has(item.id)) {
     throw errorsConflict('恢复快照中存在父子环')
-  } else if (item.parent_id === null || !by_id.has(item.parent_id)) {
+  } else if (item.parent_id === null || !$by_id.has(item.parent_id)) {
     return 0
   } else {
-    const parent = by_id.get(item.parent_id)
+    const parent = $by_id.get(item.parent_id)
     if (parent === undefined) {
       return 0
     } else {
-      seen.add(item.id)
-      return 1 + itemDepth(parent, by_id, seen)
+      $seen.add(item.id)
+      return 1 + itemDepth(parent, $by_id, $seen)
     }
   }
 }
@@ -97,27 +97,27 @@ export async function restoreItems(
   if (snapshots.length === 0) {
     return []
   } else {
-    const by_id = new Map<ItemID, Item>()
+    const $by_id = new Map<ItemID, Item>()
     for (const snapshot of snapshots) {
-      if (by_id.has(snapshot.id)) {
+      if ($by_id.has(snapshot.id)) {
         throw errorsConflict(`恢复快照中 id 重复: ${snapshot.id}`)
       } else if (snapshot.role === 'tag' || isSystemUnityName(snapshot.unity_name)) {
         throw errorsBadRequest(`item(${snapshot.id}) 是 tag 或系统项，不能批量恢复`)
       } else {
-        by_id.set(snapshot.id, snapshot)
+        $by_id.set(snapshot.id, snapshot)
       }
     }
 
     const existing = await db
       .select({ id: items.id })
       .from(items)
-      .where(inArray(items.id, [...by_id.keys()]))
+      .where(inArray(items.id, [...$by_id.keys()]))
     if (existing.length !== 0) {
       throw errorsConflict(`恢复 ID 已被占用: ${existing.map(row => row.id).join(', ')}`)
     }
 
-    const ordered = [...snapshots].sort((left, right) => (
-      itemDepth(left, by_id, new Set()) - itemDepth(right, by_id, new Set())
+    const ordered = [...snapshots].toSorted((left, right) => (
+      itemDepth(left, $by_id, new Set()) - itemDepth(right, $by_id, new Set())
     ))
 
     for (const snapshot of ordered) {
@@ -136,6 +136,6 @@ export async function restoreItems(
       await db.update(items).set({ tags: [...snapshot.tags] }).where(eq(items.id, snapshot.id))
     }
 
-    return getItems(db, [...by_id.keys()])
+    return getItems(db, [...$by_id.keys()])
   }
 }

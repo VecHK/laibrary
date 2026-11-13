@@ -6,69 +6,69 @@ import { createItem, getItem } from '../src/repo/items'
 import { deleteItems, restoreItems } from '../src/repo/item-batch'
 import { newTag } from '../src/repo/tags'
 
-let db: DB
-let blobs: BlobService
-let cleanup: () => Promise<void>
+let $_db: DB
+let $_blobs: BlobService
+let $_cleanup: () => Promise<void>
 
 beforeAll(async () => {
-  db = await prepareTestDb()
-  const prepared = await prepareTestBlobs(db)
-  blobs = prepared.blobs
-  cleanup = prepared.cleanup
+  $_db = await prepareTestDb()
+  const prepared = await prepareTestBlobs($_db)
+  $_blobs = prepared.blobs
+  $_cleanup = prepared.cleanup
 })
 
 beforeEach(async () => {
-  await truncateAll(db)
+  await truncateAll($_db)
 })
 
 afterAll(async () => {
-  await cleanup()
-  await closeDb(db)
+  await $_cleanup()
+  await closeDb($_db)
 })
 
 describe('deleteItems / restoreItems', () => {
   it('物理删除子树并保持恢复后的 item id', async () => {
-    const page = await createItem(db, { role: 'page', title: 'page' }, blobs)
-    const first = await createItem(db, {
+    const page = await createItem($_db, { role: 'page', title: 'page' }, $_blobs)
+    const first = await createItem($_db, {
       role: 'text-block',
       title: 'one',
       parent_id: page.id,
       order_index: 1,
-    }, blobs)
-    const second = await createItem(db, {
+    }, $_blobs)
+    const second = await createItem($_db, {
       role: 'text-block',
       title: 'two',
       parent_id: page.id,
       order_index: 2,
-    }, blobs)
+    }, $_blobs)
 
-    const snapshots = await deleteItems(db, [page.id])
-    expect(snapshots.map(item => item.id).sort()).toEqual(
-      [page.id, first.id, second.id].sort(),
+    const snapshots = await deleteItems($_db, [page.id])
+    expect(snapshots.map(item => item.id).toSorted()).toEqual(
+      [page.id, first.id, second.id].toSorted(),
     )
-    await expect(getItem(db, page.id)).rejects.toThrow()
+    await expect(getItem($_db, page.id)).rejects.toThrow()
 
-    const restored = await restoreItems(db, snapshots)
-    expect(restored.map(item => item.id).sort()).toEqual(
-      [page.id, first.id, second.id].sort(),
+    const restored = await restoreItems($_db, snapshots)
+    expect(restored.map(item => item.id).toSorted()).toEqual(
+      [page.id, first.id, second.id].toSorted(),
     )
-    expect((await getItem(db, page.id)).id).toBe(page.id)
-    expect((await getItem(db, first.id)).title).toBe('one')
-    expect((await getItem(db, second.id)).title).toBe('two')
+    expect((await getItem($_db, page.id)).id).toBe(page.id)
+    expect((await getItem($_db, first.id)).title).toBe('one')
+    expect((await getItem($_db, second.id)).title).toBe('two')
   })
 
   it('恢复时保留 parent/order/blob 等字段', async () => {
-    const page = await createItem(db, { role: 'page', title: 'page' }, blobs)
-    const child = await createItem(db, {
+    const page = await createItem($_db, { role: 'page', title: 'page' }, $_blobs)
+    const child = await createItem($_db, {
       role: 'page',
       title: 'child',
       parent_id: page.id,
       order_index: 3.5,
       attributes: { icon: '📚' },
-    }, blobs)
+    }, $_blobs)
 
-    const snapshots = await deleteItems(db, [page.id])
-    const restored = await restoreItems(db, snapshots)
+    const snapshots = await deleteItems($_db, [page.id])
+    const restored = await restoreItems($_db, snapshots)
     const restored_child = restored.find(item => item.id === child.id)
     expect(restored_child?.parent_id).toBe(page.id)
     expect(restored_child?.order_index).toBe(3.5)
@@ -76,13 +76,13 @@ describe('deleteItems / restoreItems', () => {
   })
 
   it('tag 不允许进入批量删除', async () => {
-    const tag = await newTag(db, 'batch tag')
-    await expect(deleteItems(db, [tag.id])).rejects.toThrow('tag')
+    const tag = await newTag($_db, 'batch tag')
+    await expect(deleteItems($_db, [tag.id])).rejects.toThrow('tag')
   })
 
   it('恢复快照中重复 ID 会被拒绝', async () => {
-    const page = await createItem(db, { role: 'page', title: 'page' }, blobs)
-    const snapshots = await deleteItems(db, [page.id])
-    await expect(restoreItems(db, [...snapshots, ...snapshots])).rejects.toThrow('重复')
+    const page = await createItem($_db, { role: 'page', title: 'page' }, $_blobs)
+    const snapshots = await deleteItems($_db, [page.id])
+    await expect(restoreItems($_db, [...snapshots, ...snapshots])).rejects.toThrow('重复')
   })
 })

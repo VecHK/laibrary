@@ -4,7 +4,7 @@ import type {
 } from './roles'
 import { as } from './as'
 import {
-  __THUMBNAIL_SIZES__, type ThumbSize,
+  THUMBNAIL_SIZES, type ThumbSize,
 } from './constants'
 
 export const zBlobID = z
@@ -34,7 +34,7 @@ export const zTextBlockRole = z.enum([
   'text-list', 'text-todo',
 ])
 export const zThumbSize = z.custom<ThumbSize>(value => (
-  typeof value === 'number' && __THUMBNAIL_SIZES__.some(size => size === value)
+  typeof value === 'number' && THUMBNAIL_SIZES.some(size => size === value)
 ))
 
 export const zItemID = z
@@ -74,21 +74,21 @@ export const zDatabaseFieldDef = z.object({
 export const zDatabaseAttributes = z.object({
   icon: zIcon.optional(),
   schema: z.array(zDatabaseFieldDef).superRefine((fields, ctx) => {
-    const seen = new Set<string>()
-    let unity_fields = 0
+    const $seen = new Set<string>()
+    let $unity_fields = 0
     for (const field of fields) {
-      if (seen.has(field.name)) {
+      if ($seen.has(field.name)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `schema 字段名重复: ${field.name}`,
         })
       }
-      seen.add(field.name)
+      $seen.add(field.name)
       if (field.type === 'unity_name') {
-        unity_fields += 1
+        $unity_fields += 1
       }
     }
-    if (unity_fields > 1) {
+    if ($unity_fields > 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'schema 最多只能有一个 unity_name 字段',
@@ -158,15 +158,15 @@ export const zRoleAttributesSchemas: Record<Role, z.ZodType<RoleAttributes[Role]
 export function itemBuildRowValidator(
   fields: readonly DatabaseFieldDef[],
 ): z.ZodType<Record<string, unknown>> {
-  const shape: Record<string, z.ZodTypeAny> = {}
+  const $shape: Record<string, z.ZodTypeAny> = {}
   for (const field of fields) {
     if (field.type !== 'unity_name') {
-      shape[field.name] = field.type === 'string'
+      $shape[field.name] = field.type === 'string'
                           ? z.string().nullable().optional()
                           : z.number().nullable().optional()
     }
   }
-  return z.object(shape).passthrough()
+  return z.object($shape).passthrough()
 }
 
 export function itemCheckAttributes(

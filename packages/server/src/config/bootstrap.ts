@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { z } from 'zod'
 
 /** Repository root: this file lives at packages/server/src/config/bootstrap.ts */
-export const __BOOTSTRAP_REPO_ROOT__ = path.resolve(import.meta.dirname, '../../../..')
+export const BOOTSTRAP_REPO_ROOT = path.resolve(import.meta.dirname, '../../../..')
 
 export type BootstrapConfig = {
   readonly database_url: string
@@ -38,14 +38,14 @@ const zBootstrapEnv = z.object({
 
 /** Load the repository-root .env without overriding existing environment variables. */
 export function bootstrapLoadEnv(): void {
-  const env_path = path.join(__BOOTSTRAP_REPO_ROOT__, '.env')
+  const env_path = path.join(BOOTSTRAP_REPO_ROOT, '.env')
   if (existsSync(env_path)) {
     process.loadEnvFile(env_path)
   }
 }
 
 function resolveFromRoot(value: string): string {
-  return path.isAbsolute(value) ? value : path.resolve(__BOOTSTRAP_REPO_ROOT__, value)
+  return path.isAbsolute(value) ? value : path.resolve(BOOTSTRAP_REPO_ROOT, value)
 }
 
 export function bootstrapLoadConfig(

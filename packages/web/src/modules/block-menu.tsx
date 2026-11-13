@@ -52,13 +52,13 @@ export function BlockMenu({
   on_delete,
   on_close,
 }: BlockMenuProps) {
-  const root_ref = useRef<HTMLDivElement>(null)
+  const $root_ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Element && event.target.closest('.block-drag-handle') !== null) {
         // 点击把手由 PageBlock 自己处理开关，避免 pointerdown 先关再开。
-      } else if (event.target instanceof Node && root_ref.current !== null && !root_ref.current.contains(event.target)) {
+      } else if (event.target instanceof Node && $root_ref.current !== null && !$root_ref.current.contains(event.target)) {
         on_close()
       }
     }
@@ -76,7 +76,7 @@ export function BlockMenu({
   }, [on_close])
 
   return (
-    <div className="block-menu" role="menu" ref={root_ref}>
+    <div className="block-menu" role="menu" ref={$root_ref}>
       <button
         type="button"
         className="block-menu-item"

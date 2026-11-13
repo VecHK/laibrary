@@ -41,11 +41,11 @@ function rowToMeta(row: BlobRow): BlobMeta {
 }
 
 export function CreateBlobService({
-  db,
-  store,
+  db: _db,
+  store: _store,
 }: CreateBlobServiceOptions): BlobService {
   const getMeta = async (id: BlobID): Promise<BlobMeta | null> => {
-    const rows = await db
+    const rows = await _db
       .select()
       .from(blobs)
       .where(eq(blobs.id, id))
@@ -55,7 +55,7 @@ export function CreateBlobService({
   }
 
   const persist = async (stored: StoredBlob): Promise<PutBlobResult> => {
-    const existing = await db
+    const existing = await _db
       .select()
       .from(blobs)
       .where(eq(blobs.id, stored.id))
@@ -64,7 +64,7 @@ export function CreateBlobService({
     if (existing[0] !== undefined) {
       return { blob: rowToMeta(existing[0]), reused: true }
     } else {
-      await db
+      await _db
         .insert(blobs)
         .values({
           id: stored.id,
@@ -75,7 +75,7 @@ export function CreateBlobService({
         })
         .onConflictDoNothing()
 
-      const row = await db
+      const row = await _db
         .select()
         .from(blobs)
         .where(eq(blobs.id, stored.id))
@@ -98,26 +98,26 @@ export function CreateBlobService({
   }
 
   return {
-    store,
-    init: store.init,
-    putFile: async (temp_path, mime) => persist(await store.putFile(temp_path, mime)),
-    putBuffer: async (buf, mime) => persist(await store.putBuffer(buf, mime)),
+    store: _store,
+    init: _store.init,
+    putFile: async (temp_path, mime) => persist(await _store.putFile(temp_path, mime)),
+    putBuffer: async (buf, mime) => persist(await _store.putBuffer(buf, mime)),
     getMeta,
     requireMeta,
     getRow: async id => {
-      const rows = await db
+      const rows = await _db
         .select()
         .from(blobs)
         .where(eq(blobs.id, id))
         .limit(1)
       return rows[0] ?? null
     },
-    pathFor: store.pathFor,
-    exists: store.exists,
-    stat: store.stat,
+    pathFor: _store.pathFor,
+    exists: _store.exists,
+    stat: _store.stat,
     deleteBlob: async id => {
-      await db.delete(blobs).where(eq(blobs.id, id))
-      await store.delete(id)
+      await _db.delete(blobs).where(eq(blobs.id, id))
+      await _store.delete(id)
     },
   }
 }

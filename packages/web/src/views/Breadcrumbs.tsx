@@ -10,26 +10,26 @@ export function Breadcrumbs({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [ancestors, setAncestors] = useState<readonly Item[]>([])
 
   useEffect(() => {
-    let alive = true
+    let $_alive = true
     setAncestors([])
     const load = async () => {
-      const chain: Item[] = []
-      const seen = new Set<number>([item.id])
-      let parent_id = item.parent_id
-      while (parent_id !== null && !seen.has(parent_id) && chain.length < 100) {
-        seen.add(parent_id)
-        const parent = await ctx.api.rpc.getItem({ id: parent_id })
-        chain.push(parent)
-        parent_id = parent.parent_id
+      let $chain: Item[] = []
+      const $seen = new Set<number>([item.id])
+      let $parent_id = item.parent_id
+      while ($parent_id !== null && !$seen.has($parent_id) && $chain.length < 100) {
+        $seen.add($parent_id)
+        const parent = await ctx.api.rpc.getItem({ id: $parent_id })
+        $chain = [...$chain, parent]
+        $parent_id = parent.parent_id
       }
-      if (alive) {
-        setAncestors(chain.reverse())
+      if ($_alive) {
+        setAncestors($chain.toReversed())
       }
     }
     load().catch(error => {
       console.warn('breadcrumb parent load', error)
     })
-    return () => { alive = false }
+    return () => { $_alive = false }
   }, [item.id, item.parent_id, ctx.api.rpc])
 
   return (

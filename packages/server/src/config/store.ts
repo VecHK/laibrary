@@ -3,13 +3,13 @@ import type {
   ConfigEntry, ConfigSnapshot, DatabaseFieldDef, ItemID,
 } from '@laibrary/types'
 import {
-  __SYSTEM_CONFIG_UNITY_NAME__, zDatabaseAttributes, zUnityName,
+  SYSTEM_CONFIG_UNITY_NAME, zDatabaseAttributes, zUnityName,
 } from '@laibrary/types'
 import type { DB } from '../db/client'
 import { items, type ItemRow } from '../db/schema'
 import { errorsConflict, errorsNotFound, errorsPgCode, errorsValidation } from '../errors'
 import {
-  __SYSTEM_CONFIG_DEFAULTS__, __SYSTEM_CONFIG_SCHEMA__, configDefaultFor,
+  SYSTEM_CONFIG_DEFAULTS, SYSTEM_CONFIG_SCHEMA, configDefaultFor,
 } from './defaults'
 import { configDecodeValue, configEncodeValue, configTypeOf } from './values'
 
@@ -55,43 +55,43 @@ function toConfigEntry(
 }
 
 export function CreateConfigStore({
-  db,
-  on_error,
+  db: _db,
+  on_error: _on_error,
 }: CreateConfigStoreOptions): ConfigStore {
-  let __cache: ConfigSnapshot | null = null
-  let __system_database_id: ItemID | null = null
+  let $_cache: ConfigSnapshot | null = null
+  let $_system_database_id: ItemID | null = null
 
   const getSystemDatabaseId = (): ItemID => {
-    if (__system_database_id === null) {
+    if ($_system_database_id === null) {
       throw new Error('ConfigStore 尚未初始化')
     }
-    return __system_database_id
+    return $_system_database_id
   }
 
   const seedDefaults = async (): Promise<void> => {
     const database_id = getSystemDatabaseId()
-    const max_rows = await db
+    const max_rows = await _db
       .select({ value: max(items.order_index) })
       .from(items)
       .where(eq(items.parent_id, database_id))
-    let order_index = max_rows[0]?.value ?? 0
+    let $order_index = max_rows[0]?.value ?? 0
 
-    for (const def of __SYSTEM_CONFIG_DEFAULTS__) {
+    for (const def of SYSTEM_CONFIG_DEFAULTS) {
       const unity_name = zUnityName.parse(def.key)
-      const existing = await db
+      const existing = await _db
         .select({ id: items.id })
         .from(items)
         .where(eq(items.unity_name, unity_name))
         .limit(1)
       if (existing.length === 0) {
-        order_index += 1
+        $order_index += 1
         try {
-          await db.insert(items).values({
+          await _db.insert(items).values({
             role: 'page',
             unity_name,
             title: def.title,
             parent_id: database_id,
-            order_index,
+            order_index: $order_index,
             attributes: {
               value: configEncodeValue(def.type, def.value),
               type: def.type,
@@ -107,44 +107,44 @@ export function CreateConfigStore({
   }
 
   const ensure = async (): Promise<ItemID> => {
-    const existing = await db
+    const existing = await _db
       .select()
       .from(items)
       .where(and(
         eq(items.role, 'database'),
-        eq(items.unity_name, zUnityName.parse(__SYSTEM_CONFIG_UNITY_NAME__)),
+        eq(items.unity_name, zUnityName.parse(SYSTEM_CONFIG_UNITY_NAME)),
       ))
       .limit(2)
 
     if (existing.length > 1) {
-      throw errorsConflict(`系统配置数据库不唯一: ${__SYSTEM_CONFIG_UNITY_NAME__}`)
+      throw errorsConflict(`系统配置数据库不唯一: ${SYSTEM_CONFIG_UNITY_NAME}`)
     } else if (existing.length === 0) {
-      const rows = await db
+      const rows = await _db
         .insert(items)
         .values({
           role: 'database',
-          unity_name: zUnityName.parse(__SYSTEM_CONFIG_UNITY_NAME__),
+          unity_name: zUnityName.parse(SYSTEM_CONFIG_UNITY_NAME),
           title: 'System',
-          attributes: { schema: __SYSTEM_CONFIG_SCHEMA__ },
+          attributes: { schema: SYSTEM_CONFIG_SCHEMA },
         })
         .returning()
       const row = rows[0]
       if (row === undefined) {
         throw new Error('创建系统配置数据库失败')
       }
-      __system_database_id = row.id
+      $_system_database_id = row.id
     } else {
       const row = existing[0]
       if (row === undefined) {
         throw new Error('读取系统配置数据库失败')
       }
-      __system_database_id = row.id
+      $_system_database_id = row.id
       const parsed = zDatabaseAttributes.safeParse(row.attributes)
       if (!parsed.success) {
-        await db
+        await _db
           .update(items)
           .set({
-            attributes: { schema: __SYSTEM_CONFIG_SCHEMA__ },
+            attributes: { schema: SYSTEM_CONFIG_SCHEMA },
             update_date: new Date(),
           })
           .where(eq(items.id, row.id))
@@ -156,50 +156,42 @@ export function CreateConfigStore({
   }
 
   const load = async (): Promise<ConfigSnapshot> => {
-    if (__cache !== null) {
-      return __cache
+    if ($_cache !== null) {
+      return $_cache
     } else {
       await ensure()
       const database_id = getSystemDatabaseId()
-      const rows = await db
+      const rows = await _db
         .select()
         .from(items)
         .where(eq(items.parent_id, database_id))
 
-      const entries: ConfigEntry[] = []
-      const seen = new Set<string>()
-
-      for (const row of rows) {
-        const entry = toConfigEntry(row, on_error)
-        if (entry !== null) {
-          entries.push(entry)
-          seen.add(entry.key)
-        }
-      }
-
-      for (const def of __SYSTEM_CONFIG_DEFAULTS__) {
-        if (!seen.has(def.key)) {
-          entries.push({
-            key: def.key,
-            title: def.title,
-            type: def.type,
-            value: def.value,
-          })
-        }
-      }
-
-      entries.sort((a, b) => a.key.localeCompare(b.key))
+      const row_entries = rows.flatMap(row => {
+        const entry = toConfigEntry(row, _on_error)
+        return entry === null ? [] : [entry]
+      })
+      const $seen = new Set(row_entries.map(entry => entry.key))
+      const default_entries = SYSTEM_CONFIG_DEFAULTS
+        .filter(def => !$seen.has(def.key))
+        .map(def => ({
+          key: def.key,
+          title: def.title,
+          type: def.type,
+          value: def.value,
+        }))
+      const entries: readonly ConfigEntry[] = [...row_entries, ...default_entries]
+        .toSorted((a, b) => a.key.localeCompare(b.key))
       const version_entry = entries.find(entry => entry.key === 'sys.config.config_version')
       const version = typeof version_entry?.value === 'number' ? version_entry.value : 1
 
       const snapshot: ConfigSnapshot = { version, entries }
-      __cache = snapshot
+      $_cache = snapshot
       return snapshot
     }
   }
 
   const reload = async (): Promise<ConfigSnapshot> => {
-    __cache = null
+    $_cache = null
     return load()
   }
 
@@ -217,12 +209,12 @@ export function CreateConfigStore({
   }
 
   const update = async (key: string, value: unknown): Promise<void> => {
-    if (!key.startsWith(`${__SYSTEM_CONFIG_UNITY_NAME__}.`)) {
-      throw errorsValidation(`配置 key 必须以 ${__SYSTEM_CONFIG_UNITY_NAME__}. 开头`)
+    if (!key.startsWith(`${SYSTEM_CONFIG_UNITY_NAME}.`)) {
+      throw errorsValidation(`配置 key 必须以 ${SYSTEM_CONFIG_UNITY_NAME}. 开头`)
     } else {
       const unity_name = zUnityName.parse(key)
       const def = configDefaultFor(key)
-      const rows = await db
+      const rows = await _db
         .select()
         .from(items)
         .where(eq(items.unity_name, unity_name))
@@ -233,14 +225,14 @@ export function CreateConfigStore({
       } else {
         const type = def?.type ?? configTypeOf(row.attributes['type'])
         const encoded = configEncodeValue(type, value)
-        await db
+        await _db
           .update(items)
           .set({
             attributes: { ...row.attributes, value: encoded, type },
             update_date: new Date(),
           })
           .where(eq(items.id, row.id))
-        __cache = null
+        $_cache = null
       }
     }
   }
@@ -252,6 +244,6 @@ export function CreateConfigStore({
     reload,
     getValue,
     update,
-    schema: () => __SYSTEM_CONFIG_SCHEMA__,
+    schema: () => SYSTEM_CONFIG_SCHEMA,
   }
 }

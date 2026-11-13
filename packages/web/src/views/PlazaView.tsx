@@ -29,15 +29,17 @@ export function PlazaView({ ctx }: { ctx: ViewerCtx }) {
   const buildRules = (filter: Filter | undefined): FilterRule[] => {
     if (filter === undefined) {
       return []
+    } else if (filter.roles !== undefined && filter.kind !== undefined) {
+      return [
+        { name: 'role', input: filter.roles, logic: 'and' },
+        { name: 'kind', input: filter.kind, logic: 'and' },
+      ]
+    } else if (filter.roles !== undefined) {
+      return [{ name: 'role', input: filter.roles, logic: 'and' }]
+    } else if (filter.kind !== undefined) {
+      return [{ name: 'kind', input: filter.kind, logic: 'and' }]
     } else {
-      const rules: FilterRule[] = []
-      if (filter.roles !== undefined) {
-        rules.push({ name: 'role', input: filter.roles, logic: 'and' })
-      }
-      if (filter.kind !== undefined) {
-        rules.push({ name: 'kind', input: filter.kind, logic: 'and' })
-      }
-      return rules
+      return []
     }
   }
 

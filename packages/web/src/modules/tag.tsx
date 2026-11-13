@@ -13,19 +13,19 @@ function TagFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const save = () => {
     if (value.length === 0) {
       ctx.showError('tag 名不能为空')
-      return
+    } else {
+      setSaving(true)
+      ctx.api.rpc.updateTag({ id: item.id, data: { title: value } })
+        .then(async () => {
+          await ctx.tags.load()
+          ctx.refresh()
+          setSaving(false)
+        })
+        .catch(err => {
+          ctx.showError(err instanceof Error ? err.message : String(err))
+          setSaving(false)
+        })
     }
-    setSaving(true)
-    ctx.api.rpc.updateTag({ id: item.id, data: { title: value } })
-      .then(async () => {
-        await ctx.tags.load()
-        ctx.refresh()
-        setSaving(false)
-      })
-      .catch(err => {
-        ctx.showError(err instanceof Error ? err.message : String(err))
-        setSaving(false)
-      })
   }
 
   return (

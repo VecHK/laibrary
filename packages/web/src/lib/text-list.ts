@@ -16,14 +16,14 @@ export function listKindOf(item: Item): ListKind {
 }
 
 export function alphaLabel(count: number): string {
-  let remaining = Math.max(1, count)
-  let label = ''
-  while (remaining > 0) {
-    remaining -= 1
-    label = String.fromCharCode(97 + (remaining % 26)) + label
-    remaining = Math.floor(remaining / 26)
+  let $remaining = Math.max(1, count)
+  let $label = ''
+  while ($remaining > 0) {
+    $remaining -= 1
+    $label = String.fromCharCode(97 + ($remaining % 26)) + $label
+    $remaining = Math.floor($remaining / 26)
   }
-  return label
+  return $label
 }
 
 export function listMarkerFor(list: readonly Item[], index: number): string | null {
@@ -35,18 +35,18 @@ export function listMarkerFor(list: readonly Item[], index: number): string | nu
     if (kind === 'bullet') {
       return '•'
     } else {
-      let count = 1
-      let cursor = index - 1
-      while (cursor >= 0) {
-        const previous = list[cursor]
+      let $count = 1
+      let $cursor = index - 1
+      while ($cursor >= 0) {
+        const previous = list[$cursor]
         if (previous !== undefined && previous.role === 'text-list' && listKindOf(previous) === kind) {
-          count += 1
-          cursor -= 1
+          $count += 1
+          $cursor -= 1
         } else {
-          cursor = -1
+          $cursor = -1
         }
       }
-      return kind === 'number' ? `${count}.` : `${alphaLabel(count)}.`
+      return kind === 'number' ? `${$count}.` : `${alphaLabel($count)}.`
     }
   }
 }

@@ -72,7 +72,7 @@ export function SidebarItemMenu({
   on_peek: () => void
   on_remove: () => void
 }) {
-  const root_ref = useRef<HTMLDivElement>(null)
+  const $root_ref = useRef<HTMLDivElement>(null)
   const left = Math.max(8, Math.min(anchor.right + 6, window.innerWidth - 268))
   const top = Math.max(8, Math.min(anchor.bottom + 4, window.innerHeight - 390))
 
@@ -80,7 +80,7 @@ export function SidebarItemMenu({
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Element && event.target.closest('.tree-more') !== null) {
         // “···”按钮自己负责切换，避免 pointerdown 先关再开。
-      } else if (event.target instanceof Node && root_ref.current !== null && !root_ref.current.contains(event.target)) {
+      } else if (event.target instanceof Node && $root_ref.current !== null && !$root_ref.current.contains(event.target)) {
         on_close()
       }
     }
@@ -119,7 +119,7 @@ export function SidebarItemMenu({
 
   const menu = (
     <div
-      ref={root_ref}
+      ref={$root_ref}
       className="sidebar-item-menu"
       style={{ left: `${left}px`, top: `${top}px` }}
       role="menu"

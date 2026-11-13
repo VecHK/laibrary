@@ -7,13 +7,13 @@ export type ConfigDefault = {
   readonly value: unknown
 }
 
-export const __SYSTEM_CONFIG_SCHEMA__: readonly DatabaseFieldDef[] = [
+export const SYSTEM_CONFIG_SCHEMA: readonly DatabaseFieldDef[] = [
   { name: 'unity_name', type: 'unity_name' },
   { name: 'value', type: 'string' },
   { name: 'type', type: 'string' },
 ] as const
 
-export const __SYSTEM_CONFIG_DEFAULTS__: readonly ConfigDefault[] = [
+export const SYSTEM_CONFIG_DEFAULTS: readonly ConfigDefault[] = [
   {
     key: 'sys.config.gc_grace_hours',
     title: 'GC 宽限期（小时）',
@@ -47,5 +47,5 @@ export const __SYSTEM_CONFIG_DEFAULTS__: readonly ConfigDefault[] = [
 ] as const
 
 export function configDefaultFor(key: string): ConfigDefault | undefined {
-  return __SYSTEM_CONFIG_DEFAULTS__.find(item => item.key === key)
+  return SYSTEM_CONFIG_DEFAULTS.find(item => item.key === key)
 }

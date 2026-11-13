@@ -15,15 +15,15 @@ import type { BootstrapConfig } from '../src/config/bootstrap'
 import type { ThumbnailService } from '../src/thumbnails/service'
 import { CreateThumbnailService } from '../src/thumbnails/service'
 
-let db: DB
-let blobs: BlobService
-let config_service: ConfigStore
-let thumbnails: ThumbnailService
-let app: Awaited<ReturnType<typeof CreateApi>>
-let tmp_dir: string
-let cleanup_blobs: () => Promise<void>
-let server: ReturnType<typeof serve>
-let base_url = ''
+let $_db: DB
+let $_blobs: BlobService
+let $_config_service: ConfigStore
+let $_thumbnails: ThumbnailService
+let $_app: Awaited<ReturnType<typeof CreateApi>>
+let $_tmp_dir: string
+let $_cleanup_blobs: () => Promise<void>
+let $_server: ReturnType<typeof serve>
+let $_base_url = ''
 
 type ApiResult<T> = {
   readonly status: number
@@ -39,7 +39,7 @@ async function readJson<T>(res: Response): Promise<T> {
 }
 
 async function action<T = unknown>(name: string, payload: unknown): Promise<ApiResult<T>> {
-  const res = await app.request('/action', {
+  const res = await $_app.request('/action', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action: name, payload }),
@@ -50,55 +50,61 @@ async function action<T = unknown>(name: string, payload: unknown): Promise<ApiR
 async function upload(filename: string): Promise<ApiResult<UploadBody>> {
   const form_data = new FormData()
   form_data.append('file', new File([testPng()], filename, { type: 'image/png' }))
-  const res = await fetch(`${base_url}/blob`, { method: 'POST', body: form_data })
+  const res = await fetch(`${$_base_url}/blob`, { method: 'POST', body: form_data })
   return { status: res.status, body: await readJson<UploadBody>(res), headers: res.headers }
 }
 
 beforeAll(async () => {
-  db = await prepareTestDb()
-  const prepared = await prepareTestBlobs(db)
-  blobs = prepared.blobs
-  cleanup_blobs = prepared.cleanup
-  config_service = CreateConfigStore({ db, on_error: error => console.error('test config', error) })
-  await config_service.ensure()
-  await config_service.reload()
-  thumbnails = CreateThumbnailService({ db, blobs })
+  $_db = await prepareTestDb()
+  const prepared = await prepareTestBlobs($_db)
+  $_blobs = prepared.blobs
+  $_cleanup_blobs = prepared.cleanup
+  $_config_service = CreateConfigStore({ db: $_db, on_error: error => console.error('test config', error) })
+  await $_config_service.ensure()
+  await $_config_service.reload()
+  $_thumbnails = CreateThumbnailService({ db: $_db, blobs: $_blobs })
 
-  tmp_dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laibrary-api-'))
+  $_tmp_dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laibrary-api-'))
   const config: BootstrapConfig = {
     database_url: 'unused',
     http_api_port: 0,
     host: '127.0.0.1',
-    storage_path: tmp_dir,
-    blob_path: path.join(tmp_dir, 'blobs'),
-    upload_temp_path: path.join(tmp_dir, 'uploadtemp'),
+    storage_path: $_tmp_dir,
+    blob_path: path.join($_tmp_dir, 'blobs'),
+    upload_temp_path: path.join($_tmp_dir, 'uploadtemp'),
     log_level: 'error',
     migrate_on_start: false,
   }
-  app = await CreateApi({ config, db, blobs, config_store: config_service, thumbnails })
+  $_app = await CreateApi({
+    config,
+    db: $_db,
+    blobs: $_blobs,
+    config_store: $_config_service,
+    thumbnails: $_thumbnails,
+  })
 
   // 上传依赖 Node 适配器的 c.env.incoming，用真实 server 覆盖该路径
   await new Promise<void>(resolve => {
-    server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' }, info => {
-      base_url = `http://127.0.0.1:${info.port}`
+    $_server = serve({ fetch: $_app.fetch, port: 0, hostname: '127.0.0.1' }, info => {
+      $_base_url = `http://127.0.0.1:${info.port}`
       resolve()
     })
   })
 })
 
 beforeEach(async () => {
-  await truncateAll(db)
-  await config_service.ensure()
-  await config_service.reload()
+  await truncateAll($_db)
+  await $_config_service.ensure()
+  await $_config_service.reload()
 })
 
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
-    server.close(err => (err === undefined ? resolve() : reject(err)))
+    $_server.close(err => (err === undefined ? resolve() : reject(err)))
   })
-  await cleanup_blobs()
-  await fs.rm(tmp_dir, { recursive: true, force: true })
-  await closeDb(db)
+  await $_cleanup_blobs()
+  await fs.rm($_tmp_dir, { recursive: true, force: true })
+  await closeDb($_db)
 })
 
 describe('RPC API', () => {
@@ -143,7 +149,7 @@ describe('RPC API', () => {
   })
 
   it('malformed JSON 与错误方法', async () => {
-    const malformed = await app.request('/action', {
+    const malformed = await $_app.request('/action', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{',
@@ -151,11 +157,11 @@ describe('RPC API', () => {
     expect(malformed.status).toBe(400)
     expect((await readJson<ErrorBody>(malformed)).code).toBe('BAD_REQUEST')
 
-    const wrong_method = await app.request('/action')
+    const wrong_method = await $_app.request('/action')
     expect(wrong_method.status).toBe(405)
     expect(wrong_method.headers.get('allow')).toContain('POST')
 
-    const too_large = await app.request('/action', {
+    const too_large = await $_app.request('/action', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'noop', payload: 'x'.repeat(5 * 1024 * 1024) }),
@@ -163,7 +169,7 @@ describe('RPC API', () => {
     expect(too_large.status).toBe(413)
     expect((await readJson<ErrorBody>(too_large)).code).toBe('PAYLOAD_TOO_LARGE')
 
-    const with_origin = await app.request('/action', {
+    const with_origin = await $_app.request('/action', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -173,7 +179,7 @@ describe('RPC API', () => {
     })
     expect(with_origin.headers.get('access-control-allow-origin')).not.toBeNull()
 
-    const blob_wrong_method = await app.request(`/blob/${'a'.repeat(64)}`, { method: 'PUT' })
+    const blob_wrong_method = await $_app.request(`/blob/${'a'.repeat(64)}`, { method: 'PUT' })
     expect(blob_wrong_method.status).toBe(405)
   })
 
@@ -212,19 +218,19 @@ describe('RPC API', () => {
     expect(upload2.body.reused).toBe(true)
 
     const blob_id = upload1.body.blob.id
-    const read = await app.request(`/blob/${blob_id}`)
+    const read = await $_app.request(`/blob/${blob_id}`)
     expect(read.status).toBe(200)
     expect(read.headers.get('content-type')).toContain('image/png')
     expect(read.headers.get('etag')).toBe(`"${blob_id}"`)
 
-    const range = await app.request(`/blob/${blob_id}`, {
+    const range = await $_app.request(`/blob/${blob_id}`, {
       headers: { Range: 'bytes=0-3' },
     })
     expect(range.status).toBe(206)
     expect(range.headers.get('content-range')).toBe(`bytes 0-3/${upload1.body.blob.size}`)
     expect((await range.arrayBuffer()).byteLength).toBe(4)
 
-    const head = await app.request(`/blob/${blob_id}`, { method: 'HEAD' })
+    const head = await $_app.request(`/blob/${blob_id}`, { method: 'HEAD' })
     expect(head.status).toBe(200)
     expect(head.headers.get('content-length')).toBe(String(upload1.body.blob.size))
 
@@ -237,22 +243,22 @@ describe('RPC API', () => {
     expect(image.status).toBe(200)
     expect(image.body.blob?.id).toBe(blob_id)
 
-    const thumb = await app.request(`/thumb/${image.body.id}?size=384`)
+    const thumb = await $_app.request(`/thumb/${image.body.id}?size=384`)
     expect(thumb.status).toBe(200)
     expect(thumb.headers.get('content-type')).toContain('image/avif')
 
-    const bad_thumb = await app.request(`/thumb/${image.body.id}?size=123`)
+    const bad_thumb = await $_app.request(`/thumb/${image.body.id}?size=123`)
     expect(bad_thumb.status).toBe(400)
   })
 
   it('blob upload 缺少文件时为 400', async () => {
-    const missing = await fetch(`${base_url}/blob`, { method: 'POST', body: new FormData() })
+    const missing = await fetch(`${$_base_url}/blob`, { method: 'POST', body: new FormData() })
     expect(missing.status).toBe(400)
     expect((await readJson<ErrorBody>(missing)).code).toBe('BAD_REQUEST')
   })
 
   it('坏 multipart 与非法 blob id 都是 4xx', async () => {
-    const malformed = await fetch(`${base_url}/blob`, {
+    const malformed = await fetch(`${$_base_url}/blob`, {
       method: 'POST',
       headers: { 'content-type': 'multipart/form-data' },
       body: 'not-a-multipart-body',
@@ -260,7 +266,7 @@ describe('RPC API', () => {
     expect(malformed.status).toBe(400)
     expect((await readJson<ErrorBody>(malformed)).code).toBe('BAD_REQUEST')
 
-    const bad_id = await app.request('/blob/not-a-blob-id')
+    const bad_id = await $_app.request('/blob/not-a-blob-id')
     expect(bad_id.status).toBe(400)
     expect((await readJson<ErrorBody>(bad_id)).code).toBe('VALIDATION')
   })
@@ -274,7 +280,7 @@ describe('RPC API', () => {
 
     const form_data = new FormData()
     form_data.append('file', new File([testPng()], 'too-big.png', { type: 'image/png' }))
-    const res = await fetch(`${base_url}/blob`, { method: 'POST', body: form_data })
+    const res = await fetch(`${$_base_url}/blob`, { method: 'POST', body: form_data })
     expect(res.status).toBe(413)
     expect((await readJson<ErrorBody>(res)).code).toBe('PAYLOAD_TOO_LARGE')
   })

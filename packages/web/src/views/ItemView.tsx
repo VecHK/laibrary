@@ -19,12 +19,12 @@ function TagBar({
     } else {
       void (async () => {
         try {
-          let tag = await ctx.api.rpc.getTagByTitle({ title: trimmed })
-          if (tag === null) {
-            tag = await ctx.api.rpc.newTag({ title: trimmed })
+          let $tag = await ctx.api.rpc.getTagByTitle({ title: trimmed })
+          if ($tag === null) {
+            $tag = await ctx.api.rpc.newTag({ title: trimmed })
             await ctx.tags.load()
           }
-          const next_tags = [...new Set([...item.tags, tag.id])]
+          const next_tags = [...new Set([...item.tags, $tag.id])]
           await ctx.api.rpc.updateItem({
             id: item.id,
             data: { tags: next_tags },
@@ -94,22 +94,22 @@ export function ItemView({
   const [not_found, setNotFound] = useState(false)
 
   useEffect(() => {
-    let alive = true
+    let $_alive = true
     setNotFound(false)
     setItem(prev => prev?.id === item_id ? prev : null)
     ctx.api.rpc.getItem({ id: item_id }).then(next => {
-      if (alive) {
+      if ($_alive) {
         setItem(next)
       }
     }).catch(err => {
-      if (!alive) {
+      if (!$_alive) {
         return
       } else {
         setNotFound(true)
         ctx.showError(err instanceof Error ? err.message : String(err))
       }
     })
-    return () => { alive = false }
+    return () => { $_alive = false }
   }, [item_id, refresh_key])
 
   const content = not_found ? (

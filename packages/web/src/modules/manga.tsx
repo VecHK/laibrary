@@ -90,9 +90,9 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const [loaded_srcs, setLoadedSrcs] = useState<Record<number, string>>({})
   const [current_index, setCurrentIndex] = useState(0)
   const [resize_tick, setResizeTick] = useState(0)
-  const container_ref = useRef<HTMLDivElement>(null)
-  const loaded_ref = useRef(new Set<number>())
-  const file_input_ref = useRef<HTMLInputElement>(null)
+  const $container_ref = useRef<HTMLDivElement>(null)
+  const $loaded_ref = useRef(new Set<number>())
+  const $file_input_ref = useRef<HTMLInputElement>(null)
 
   const loadPages = () => {
     ctx.api.rpc.listing({
@@ -110,7 +110,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         height: child.blob?.height ?? 0,
         order_index: child.order_index,
       })))
-      loaded_ref.current.clear()
+      $loaded_ref.current.clear()
       setLoadedSrcs({})
     }).catch(err => ctx.showError(err instanceof Error ? err.message : String(err)))
   }
@@ -121,15 +121,15 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     const explicit = explicitDirectionOf(item)
     if (explicit !== null) {
       setDirection(explicit)
-      return
+    } else {
+      setDirection('rtl')
+      ctx.api.rpc.getConfig().then(snapshot => {
+        const entry = snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')
+        if (entry?.value === 'ltr' || entry?.value === 'rtl') {
+          setDirection(entry.value)
+        }
+      }).catch(error => { console.warn('manga config fallback', error) })
     }
-    setDirection('rtl')
-    ctx.api.rpc.getConfig().then(snapshot => {
-      const entry = snapshot.entries.find(e => e.key === 'sys.config.manga_default_direction')
-      if (entry?.value === 'ltr' || entry?.value === 'rtl') {
-        setDirection(entry.value)
-      }
-    }).catch(error => { console.warn('manga config fallback', error) })
   }, [item.id, item.attributes])
 
   useEffect(() => {
@@ -144,34 +144,34 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   }
 
   const updateVisibility = () => {
-    const container = container_ref.current
+    const container = $container_ref.current
     if (container !== null && pages !== null) {
       const rect = container.getBoundingClientRect()
       const over = rect.width * 2
       const imgs = container.querySelectorAll<HTMLImageElement>('img.manga-page')
-      let changed = false
+      let $changed = false
       const new_srcs = { ...loaded_srcs }
       imgs.forEach(img => {
         const page_id = Number(img.dataset['pageId'])
-        if (!loaded_ref.current.has(page_id)) {
+        if (!$loaded_ref.current.has(page_id)) {
           const ir = img.getBoundingClientRect()
           if (ir.right > rect.left - over && ir.left < rect.right + over) {
             const page = pages.find(p => p.id === page_id)
             if (page !== undefined) {
-              loaded_ref.current.add(page_id)
+              $loaded_ref.current.add(page_id)
               new_srcs[page_id] = page.src
-              changed = true
+              $changed = true
             }
           }
         }
       })
-      if (changed) {setLoadedSrcs(new_srcs)}
+      if ($changed) {setLoadedSrcs(new_srcs)}
     }
   }
 
   useEffect(() => {
     if (pages !== null) {
-      const container = container_ref.current
+      const container = $container_ref.current
       if (container !== null) {
         const index = Math.min(readProgress(item), Math.max(0, pages.length - 1))
         const target = container.querySelector<HTMLImageElement>(`img[data-page-id="${pages[index]?.id}"]`)
@@ -187,7 +187,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      const container = container_ref.current
+      const container = $container_ref.current
       if (container !== null) {
         const step = window.innerWidth * 0.9
         if (ev.key === 'ArrowRight') {
@@ -242,11 +242,11 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     <div className="manga-reader-wrap">
       <div className="manga-toolbar">
         <span className="manga-title">{item.title}</span>
-        <button className="button" onClick={() => file_input_ref.current?.click()}>
+        <button className="button" onClick={() => $file_input_ref.current?.click()}>
           ＋ 添加页
         </button>
         <input
-          ref={file_input_ref}
+          ref={$file_input_ref}
           type="file"
           accept="image/*"
           multiple
@@ -273,27 +273,27 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
       </div>
       <div
         className="manga-reader"
-        ref={container_ref}
+        ref={$container_ref}
         onScroll={ev => {
           updateVisibility()
           if (pages !== null && pages.length !== 0) {
             const container = ev.currentTarget
             const mid = container.scrollLeft + container.clientWidth / 2
-            let best = 0
-            let best_dist = Infinity
+            let $best = 0
+            let $best_dist = Infinity
             pages.forEach((page, index) => {
               const img = container.querySelector<HTMLImageElement>(`img[data-page-id="${page.id}"]`)
               if (img !== null) {
                 const center = img.offsetLeft + img.clientWidth / 2
                 const dist = Math.abs(center - mid)
-                if (dist < best_dist) {
-                  best_dist = dist
-                  best = index
+                if (dist < $best_dist) {
+                  $best_dist = dist
+                  $best = index
                 }
               }
             })
-            setCurrentIndex(best)
-            writeProgress(item, best)
+            setCurrentIndex($best)
+            writeProgress(item, $best)
           }
         }}
         style={{ flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }}
@@ -303,7 +303,7 @@ function MangaReader({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
         ) : pages.length === 0 ? (
           <div className="manga-empty">
             <div>还没有页面</div>
-            <button className="button" onClick={() => file_input_ref.current?.click()}>
+            <button className="button" onClick={() => $file_input_ref.current?.click()}>
               添加第一页
             </button>
           </div>

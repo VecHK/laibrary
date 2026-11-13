@@ -14,11 +14,11 @@ function InlineItemLink({
   const [title, setTitle] = useState<string | null>(null)
 
   useEffect(() => {
-    let alive = true
+    let $_alive = true
     ctx.api.rpc.getItem({ id: target_id })
-      .then(item => { if (alive) { setTitle(item.title) } })
-      .catch(() => { if (alive) { setTitle(null) } })
-    return () => { alive = false }
+      .then(item => { if ($_alive) { setTitle(item.title) } })
+      .catch(() => { if ($_alive) { setTitle(null) } })
+    return () => { $_alive = false }
   }, [target_id, ctx.api.rpc])
 
   return (

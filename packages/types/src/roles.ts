@@ -66,7 +66,7 @@ export interface TextTodoAttributes extends Readonly<Record<string, unknown>> {
   readonly checked?: boolean | undefined
 }
 
-export const __TEXT_BLOCK_ROLES__ = [
+export const TEXT_BLOCK_ROLES = [
   'text-block',
   'text-heading-1',
   'text-heading-2',

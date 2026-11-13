@@ -16,7 +16,7 @@ export type SlashCommand = {
   suffix?: string | undefined
 }
 
-export const __SLASH_COMMANDS__: readonly SlashCommand[] = [
+export const SLASH_COMMANDS: readonly SlashCommand[] = [
   {
     id: 'text',
     label: '文本',
@@ -152,7 +152,7 @@ export type SlashCommandGroup = {
   readonly commands: readonly SlashCommand[]
 }
 
-const __SLASH_GROUPS__: readonly { id: SlashGroupId, label: string }[] = [
+const SLASH_GROUPS: readonly { id: SlashGroupId, label: string }[] = [
   { id: 'suggested', label: '建议' },
   { id: 'basic', label: '基础块' },
 ]
@@ -162,7 +162,7 @@ export function orderSlashCommands(commands: readonly SlashCommand[]): readonly 
 }
 
 export function groupSlashCommands(commands: readonly SlashCommand[]): readonly SlashCommandGroup[] {
-  return __SLASH_GROUPS__.map(group => ({
+  return SLASH_GROUPS.map(group => ({
     ...group,
     commands: commands.filter(command => command.group === group.id),
   })).filter(group => group.commands.length !== 0)
@@ -171,9 +171,9 @@ export function groupSlashCommands(commands: readonly SlashCommand[]): readonly 
 export function filterSlashCommands(query: string): readonly SlashCommand[] {
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) {
-    return __SLASH_COMMANDS__
+    return SLASH_COMMANDS
   } else {
-    return __SLASH_COMMANDS__.filter(command => (
+    return SLASH_COMMANDS.filter(command => (
       command.label.toLowerCase().includes(needle) ||
       command.role.toLowerCase().includes(needle) ||
       command.aliases.some(alias => alias.includes(needle)) ||
@@ -229,20 +229,20 @@ export function detectHeadingShortcut(
 
 export function splitTextBlocks(text: string): readonly string[] {
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
-  const blocks: string[] = []
-  let blank_run = 0
+  let $blocks: string[] = []
+  let $blank_run = 0
   for (const line of lines) {
     if (line.trim().length === 0) {
-      blank_run += 1
+      $blank_run += 1
     } else {
-      if (blocks.length !== 0 && blank_run >= 2) {
-        blocks.push('')
+      if ($blocks.length !== 0 && $blank_run >= 2) {
+        $blocks = [...$blocks, '']
       }
-      blocks.push(line)
-      blank_run = 0
+      $blocks = [...$blocks, line]
+      $blank_run = 0
     }
   }
-  return blocks
+  return $blocks
 }
 
 

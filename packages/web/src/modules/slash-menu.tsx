@@ -117,11 +117,11 @@ export function SlashMenu({
   onSelectIndex: (index: number) => void
   onPick: (command: SlashCommand) => void
 }) {
-  const list_ref = useRef<HTMLDivElement>(null)
+  const $list_ref = useRef<HTMLDivElement>(null)
   const groups = groupSlashCommands(commands)
 
   useEffect(() => {
-    const selected = list_ref.current?.querySelector<HTMLElement>(
+    const selected = $list_ref.current?.querySelector<HTMLElement>(
       `[data-command-index="${selected_index}"]`,
     )
     selected?.scrollIntoView({ block: 'nearest' })
@@ -141,7 +141,7 @@ export function SlashMenu({
       </div>
       <div
         className="slash-menu-scroll"
-        ref={list_ref}
+        ref={$list_ref}
         style={{ maxHeight: `${Math.max(120, max_height - 76)}px` }}
       >
         {groups.length === 0 ? (

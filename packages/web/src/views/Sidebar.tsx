@@ -10,8 +10,8 @@ import { treeCanAddInside } from '../lib/sidebar-tree'
 import { MoveToDialog } from './MoveToDialog'
 import { SidebarItemMenu } from './SidebarItemMenu'
 
-const __TREE_ROLES__ = ['page', 'database', 'itemlink'] as const
-const __TREE_PAGE_SIZE__ = 200
+const TREE_ROLES = ['page', 'database', 'itemlink'] as const
+const TREE_PAGE_SIZE = 200
 
 type MenuAnchor = {
   left: number
@@ -57,37 +57,37 @@ export function Sidebar({
   const [rename_value, setRenameValue] = useState('')
   const [move_item, setMoveItem] = useState<Item | null>(null)
   const [creating_id, setCreatingId] = useState<ItemID | null>(null)
-  const alive_ref = useRef(true)
-  const loading_ref = useRef<ReadonlySet<ItemID>>(new Set())
-  const expanded_ref = useRef<ReadonlySet<ItemID>>(new Set())
-  const children_ref = useRef<Record<string, Item[]>>({})
-  const targets_ref = useRef<Record<string, Item>>({})
-  const target_loading_ref = useRef<Set<ItemID>>(new Set())
-  const rename_cancel_ref = useRef(false)
+  const $alive_ref = useRef(true)
+  const $loading_ref = useRef<ReadonlySet<ItemID>>(new Set())
+  const $expanded_ref = useRef<ReadonlySet<ItemID>>(new Set())
+  const $children_ref = useRef<Record<string, Item[]>>({})
+  const $targets_ref = useRef<Record<string, Item>>({})
+  const $target_loading_ref = useRef<Set<ItemID>>(new Set())
+  const $rename_cancel_ref = useRef(false)
 
   useEffect(() => {
-    expanded_ref.current = expanded
+    $expanded_ref.current = expanded
   }, [expanded])
 
   useEffect(() => {
-    children_ref.current = children
+    $children_ref.current = children
   }, [children])
 
   useEffect(() => {
-    targets_ref.current = targets
+    $targets_ref.current = targets
   }, [targets])
 
   const loadRoots = useCallback(async () => {
     try {
       const list = await ctx.api.rpc.listing({
-        limit: __TREE_PAGE_SIZE__,
+        limit: TREE_PAGE_SIZE,
         sort_by: 'order_index',
         filter_rules: [
           { name: 'parent', input: null, logic: 'and' },
-          { name: 'role', input: [...__TREE_ROLES__], logic: 'and' },
+          { name: 'role', input: [...TREE_ROLES], logic: 'and' },
         ],
       })
-      if (alive_ref.current) {
+      if ($alive_ref.current) {
         setRoots(list.filter(isTreeItem))
       }
     } catch (error) {
@@ -96,54 +96,54 @@ export function Sidebar({
   }, [ctx.api.rpc, ctx.showError])
 
   const loadChildren = useCallback(async (parent_id: ItemID) => {
-    if (loading_ref.current.has(parent_id)) {
+    if ($loading_ref.current.has(parent_id)) {
       // 同一 parent 已有请求，去重。
     } else {
-      const next_loading = new Set(loading_ref.current)
-      next_loading.add(parent_id)
-      loading_ref.current = next_loading
-      setLoading(next_loading)
+      const $next_loading = new Set($loading_ref.current)
+      $next_loading.add(parent_id)
+      $loading_ref.current = $next_loading
+      setLoading($next_loading)
       try {
         const list = await ctx.api.rpc.listing({
-          limit: __TREE_PAGE_SIZE__,
+          limit: TREE_PAGE_SIZE,
           sort_by: 'order_index',
           filter_rules: [
             { name: 'parent', input: parent_id, logic: 'and' },
-            { name: 'role', input: [...__TREE_ROLES__], logic: 'and' },
+            { name: 'role', input: [...TREE_ROLES], logic: 'and' },
           ],
         })
-        if (alive_ref.current) {
+        if ($alive_ref.current) {
           const next_children = {
-            ...children_ref.current,
+            ...$children_ref.current,
             [String(parent_id)]: list.filter(isTreeItem),
           }
-          children_ref.current = next_children
+          $children_ref.current = next_children
           setChildren(next_children)
         }
       } catch (error) {
         ctx.showError(error instanceof Error ? error.message : String(error))
       } finally {
-        const done_loading = new Set(loading_ref.current)
-        done_loading.delete(parent_id)
-        loading_ref.current = done_loading
-        if (alive_ref.current) {
-          setLoading(done_loading)
+        const $done_loading = new Set($loading_ref.current)
+        $done_loading.delete(parent_id)
+        $loading_ref.current = $done_loading
+        if ($alive_ref.current) {
+          setLoading($done_loading)
         }
       }
     }
   }, [ctx.api.rpc, ctx.showError])
 
   useEffect(() => {
-    alive_ref.current = true
-    targets_ref.current = {}
-    target_loading_ref.current.clear()
+    $alive_ref.current = true
+    $targets_ref.current = {}
+    $target_loading_ref.current.clear()
     setTargets({})
     void loadRoots()
-    for (const parent_id of expanded_ref.current) {
+    for (const parent_id of $expanded_ref.current) {
       void loadChildren(parent_id)
     }
     return () => {
-      alive_ref.current = false
+      $alive_ref.current = false
     }
   }, [refresh_key, loadRoots, loadChildren])
 
@@ -153,16 +153,16 @@ export function Sidebar({
       const target_id = itemlink.target_id
       if (target_id !== null) {
         const key = String(target_id)
-        if (targets_ref.current[key] === undefined && !target_loading_ref.current.has(target_id)) {
-          target_loading_ref.current.add(target_id)
+        if ($targets_ref.current[key] === undefined && !$target_loading_ref.current.has(target_id)) {
+          $target_loading_ref.current.add(target_id)
           void ctx.api.rpc.getItem({ id: target_id })
             .then(target => {
-              if (alive_ref.current) {
+              if ($alive_ref.current) {
                 const next_targets = {
-                  ...targets_ref.current,
+                  ...$targets_ref.current,
                   [key]: target,
                 }
-                targets_ref.current = next_targets
+                $targets_ref.current = next_targets
                 setTargets(next_targets)
               }
             })
@@ -170,7 +170,7 @@ export function Sidebar({
               // target 不存在时只是不显示 +，点击 itemlink 时再报错。
             })
             .finally(() => {
-              target_loading_ref.current.delete(target_id)
+              $target_loading_ref.current.delete(target_id)
             })
         }
       }
@@ -178,17 +178,17 @@ export function Sidebar({
   }, [roots, children, ctx.api.rpc])
 
   const togglePage = (page_id: ItemID) => {
-    const next = new Set(expanded_ref.current)
-    if (next.has(page_id)) {
-      next.delete(page_id)
+    const $next = new Set($expanded_ref.current)
+    if ($next.has(page_id)) {
+      $next.delete(page_id)
     } else {
-      next.add(page_id)
-      if (children_ref.current[String(page_id)] === undefined) {
+      $next.add(page_id)
+      if ($children_ref.current[String(page_id)] === undefined) {
         void loadChildren(page_id)
       }
     }
-    expanded_ref.current = next
-    setExpanded(next)
+    $expanded_ref.current = $next
+    setExpanded($next)
   }
 
   const rowActive = (item: Item): boolean => (
@@ -246,24 +246,24 @@ export function Sidebar({
     const attributes = zDatabaseAttributes.safeParse(database.attributes)
     const fields = attributes.success ? attributes.data.schema : []
     const unity_field = fields.find(field => field.type === 'unity_name')
-    let unity_name: string | undefined
-    let proceed = true
+    let $unity_name: string | undefined
+    let $proceed = true
     if (unity_field !== undefined) {
       const value = window.prompt(`请输入 ${unity_field.name}（全局唯一）`)
       if (value === null || value.trim().length === 0) {
-        proceed = false
+        $proceed = false
       } else {
-        unity_name = value.trim()
+        $unity_name = value.trim()
       }
     }
-    if (proceed) {
+    if ($proceed) {
       const order_index = await lastOrderFor(database.id)
       await ctx.api.rpc.addItem({
         role: 'page',
         title: '',
         parent_id: database.id,
         order_index,
-        ...(unity_name === undefined ? {} : { unity_name }),
+        ...($unity_name === undefined ? {} : { unity_name: $unity_name }),
       })
       ctx.refresh()
       ctx.navigate(database.id)
@@ -278,7 +278,7 @@ export function Sidebar({
           if (item.role === 'database') {
             await createDatabaseRow(item)
           } else if (item.role === 'itemlink') {
-            const target = item.target_id === null ? undefined : targets_ref.current[String(item.target_id)]
+            const target = item.target_id === null ? undefined : $targets_ref.current[String(item.target_id)]
             if (target?.role === 'page') {
               await createChildPage(target.id)
             }
@@ -295,7 +295,7 @@ export function Sidebar({
   }
 
   const startRename = (item: Item) => {
-    rename_cancel_ref.current = false
+    $rename_cancel_ref.current = false
     setRenamingId(item.id)
     setRenameValue(item.title)
   }
@@ -440,8 +440,8 @@ export function Sidebar({
               onClick={ev => ev.stopPropagation()}
               onChange={ev => setRenameValue(ev.target.value)}
               onBlur={() => {
-                if (rename_cancel_ref.current) {
-                  rename_cancel_ref.current = false
+                if ($rename_cancel_ref.current) {
+                  $rename_cancel_ref.current = false
                   setRenamingId(null)
                 } else {
                   void commitRename(item, rename_value)
@@ -453,7 +453,7 @@ export function Sidebar({
                   ev.currentTarget.blur()
                 } else if (ev.key === 'Escape') {
                   ev.preventDefault()
-                  rename_cancel_ref.current = true
+                  $rename_cancel_ref.current = true
                   ev.currentTarget.blur()
                 }
               }}

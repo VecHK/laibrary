@@ -52,14 +52,7 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     setSort(prev => orderCycleSortState(prev, field.name, sort_type))
   }
 
-  const addRow = () => {
-    const unity_field = fields.find(field => field.type === 'unity_name')
-    let unity_name: string | undefined
-    if (unity_field !== undefined) {
-      const value = window.prompt(`请输入 ${unity_field.name}（全局唯一）`)
-      if (value === null || value.trim().length === 0) {return}
-      unity_name = value.trim()
-    }
+  const submitRow = (unity_name: string | undefined) => {
     ctx.api.rpc.addItem({
       role: 'page',
       title: '',
@@ -70,19 +63,34 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
     })
   }
 
+  const addRow = () => {
+    const unity_field = fields.find(field => field.type === 'unity_name')
+    if (unity_field === undefined) {
+      submitRow(undefined)
+    } else {
+      const value = window.prompt(`请输入 ${unity_field.name}（全局唯一）`)
+      if (value === null || value.trim().length === 0) {
+        // 用户取消或留空：不创建行。
+      } else {
+        submitRow(value.trim())
+      }
+    }
+  }
+
   const addField = () => {
     const name = window.prompt('字段名')
-    if (!name || name.trim().length === 0) {
-      return
+    if (name === null || name.trim().length === 0) {
+      // 用户取消或留空：不添加字段。
+    } else {
+      const type = window.confirm('类型: 确定 = number, 取消 = string') ? 'number' : 'string'
+      const new_fields = [...fields, { name: name.trim(), type }]
+      ctx.api.rpc.updateItem({
+        id: item.id,
+        data: { attributes: zDatabaseAttributes.parse({ ...item.attributes, schema: new_fields }) },
+      }).then(() => refresh()).catch(err => {
+        ctx.showError(err instanceof Error ? err.message : String(err))
+      })
     }
-    const type = window.confirm('类型: 确定 = number, 取消 = string') ? 'number' : 'string'
-    const new_fields = [...fields, { name: name.trim(), type }]
-    ctx.api.rpc.updateItem({
-      id: item.id,
-      data: { attributes: zDatabaseAttributes.parse({ ...item.attributes, schema: new_fields }) },
-    }).then(() => refresh()).catch(err => {
-      ctx.showError(err instanceof Error ? err.message : String(err))
-    })
   }
 
   const removeField = (field_name: string) => {
@@ -112,15 +120,13 @@ function DatabaseFull({ item, ctx }: { item: Item; ctx: ViewerCtx }) {
   const commitCell = (row: Item, field: DatabaseFieldDef, raw: string) => {
     if (field.type === 'unity_name') {
       ctx.showError('unity_name 创建后不可修改')
-      return
-    }
-    if (field.type === 'number') {
+    } else if (field.type === 'number') {
       const num = Number(raw)
       if (raw.trim().length !== 0 && Number.isNaN(num)) {
         ctx.showError(`字段[${field.name}]需要数字`)
-        return
+      } else {
+        updateRowAttributes(row, { [field.name]: raw.trim().length === 0 ? null : num })
       }
-      updateRowAttributes(row, { [field.name]: raw.trim().length === 0 ? null : num })
     } else {
       updateRowAttributes(row, { [field.name]: raw })
     }

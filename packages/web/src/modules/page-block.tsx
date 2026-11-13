@@ -43,7 +43,7 @@ export function PageBlock({
   onAddAfter: () => void
 }) {
   const [menu_open, setMenuOpen] = useState(false)
-  const drag_started_ref = useRef(false)
+  const $drag_started_ref = useRef(false)
 
   return (
     <div
@@ -64,7 +64,7 @@ export function PageBlock({
           } else if (target instanceof Element && target.closest('button, input, textarea, a, .image-resizer, .image-toolbar, .block-caption, .image-caption-wrap') !== null) {
             ev.preventDefault()
           } else {
-            drag_started_ref.current = true
+            $drag_started_ref.current = true
             ev.dataTransfer.setData('text/laibrary-block', String(item.id))
             ev.dataTransfer.effectAllowed = 'move'
           }
@@ -95,7 +95,7 @@ export function PageBlock({
       }}
       onDragEnd={() => {
         window.setTimeout(() => {
-          drag_started_ref.current = false
+          $drag_started_ref.current = false
         }, 0)
         onDragEndBlock()
       }}
@@ -137,20 +137,20 @@ export function PageBlock({
           tabIndex={0}
           draggable
           onDragStart={ev => {
-            drag_started_ref.current = true
+            $drag_started_ref.current = true
             ev.dataTransfer.setData('text/laibrary-block', String(item.id))
             ev.dataTransfer.effectAllowed = 'move'
           }}
           onDragEnd={() => {
             window.setTimeout(() => {
-              drag_started_ref.current = false
+              $drag_started_ref.current = false
             }, 0)
             onDragEndBlock()
           }}
           onClick={ev => {
             ev.stopPropagation()
             onSelect()
-            if (!drag_started_ref.current) {
+            if (!$drag_started_ref.current) {
               setMenuOpen(value => !value)
             }
           }}
