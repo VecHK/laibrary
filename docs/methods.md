@@ -59,7 +59,7 @@
 - 分支必须用 `{}` 包裹，哪怕只有一行。树的每一支都是可见的块。
 - **树有几层，代码就有几层**：`else if` 只用于同一父节点下的兄弟分支；跨层必须用嵌套块。用 `else if` 把子判断压平，等于抹掉信息。代价是这一条会和“把嵌套的 `if` 合并成 `else if`”的 lint 规则冲突——如果项目有这条规则，关掉它。
 - 嵌套深到 `}` 对不上号时，**拆函数**（新函数名就是那一层的标签），而不是用 early return 或 `else if` 把树压平。4 级是提醒信号，不是硬门槛；判断标准是"这一层还能不能一眼看出来"。
-- 三元只用于简单选值，不嵌套；多行时按 1.1 对齐 `?` / `:`；`&&` / `||` 不用于控制流（条件执行、副作用），`??` 只用于默认值。
+- 三元只用于简单选值，不嵌套；多行时按 1.1 对齐 `?` / `:`；条件必须是 boolean（见 1.2）；`&&` / `||` 不用于控制流（条件执行、副作用），`??` 只用于默认值。
 
 ```ts
 // ❌ 树被剪断：读者要脑补 else
@@ -128,6 +128,48 @@ const end = (start_raw === '' || end_raw === '')
 - 条件、`?` 分支、`:` 分支各占一行；每个分支单独一行。
 - 短到一行能读清的三元可以一行；一旦多行，就按这个格式。
 - 不嵌套三元；需要嵌套时改 `if / else` 或抽函数。
+
+**JSX 例外**：JSX 条件渲染保持下面的结构，不强制拆成三行；`? (` 和 `) : (` 是 JSX 分支结构，不是选值三元，不要为了套 1.1 把它改成三行。
+
+```tsx
+{ctx === null ? (
+  <ConnectScreen onConnected={connect} />
+) : (
+  <MainLayout
+    route={route}
+    ctx={ctx}
+    refresh_key={refresh_key}
+    sidebar_key={sidebar_key}
+  />
+)}
+```
+
+条件仍然必须是 boolean（见 1.2）。
+
+### 1.2 条件必须是 boolean，不做隐式转换
+
+`if` / `while` / `do...while` / 三元 / `for` 的 test 条件必须是 `boolean`；不要依赖 truthiness。`if (value)`、`if (items.length)`、`value ? ...` 都不允许；写显式比较或谓词。
+
+```ts
+// ❌ 隐式转换
+if (items.length) { ... }
+if (value) { ... }
+const label = value ? 'x' : 'y'
+
+// ✅ 条件本身就是 boolean
+if (items.length > 0) { ... }
+if (value !== null) { ... }
+const label = value !== null ? 'x' : 'y'
+
+// ✅ 本来就是 boolean
+if (is_ready) { ... }
+if (isBlobID(value)) { ... }
+```
+
+- 字符串：`str !== ''`；对象/可能空：`value !== null`；`Map.get`：`!== undefined`；数组/长度：`length > 0`；数字：`!== 0`（如果 0 是"空"）。
+- `if (a && b)` 只有在 `a`、`b` 都是 boolean 时才可以；如果它们是值，先比较再 `&&`。
+- 不要用 `!!value` / `Boolean(value)` 绕过；它们仍然把"什么算真"藏起来。
+- JSX 条件渲染的 `cond` 也必须是 boolean（1.1 只是排版例外，不是类型例外）。
 
 ---
 
@@ -1120,7 +1162,8 @@ type Result<T, E> =
 - [ ] **查过术语表吗？** 命名/类型与 `glossary.md` 一致吗？有没有把 `Item` 这类领域术语用在通用工具函数上？
 - [ ] **树完整吗？** 有没有 early return 剪断分支、有没有该补的 `else`？
 - [ ] **`else if` 和 `else { if }` 分清了吗？** 同级兄弟才用 `else if`，跨层用嵌套。
-- [ ] **多行三元对齐了吗？** `?` / `:` 与条件第一个字符平齐，而不是固定缩进/跟在条件后面？
+- [ ] **多行三元对齐了吗？** `?` / `:` 与条件第一个字符平齐，而不是固定缩进/跟在条件后面？（JSX 条件渲染的 `? (` / `) : (` 是例外）
+- [ ] **条件都是 boolean 吗？** 有没有 `if (items.length)`、`if (value)`、`value ? ...` 这类 truthiness？改成显式比较/谓词。
 - [ ] **有类吗？有 this 吗？** 除了错误类型，新代码都应该没有。
 - [ ] **箭头函数用对地方了吗？** 回调/函数值用箭头；模块级/导出/多行具名函数考虑 `function xxx() {}`；有没有 `const foo = () =>` 只是套壳？
 - [ ] **有 getter/setter/Proxy 吗？** 属性访问里有没有藏计算/校验/副作用？有没有 `Object.defineProperty` 的访问器？
@@ -1184,6 +1227,7 @@ type Result<T, E> =
 | `if (x) return` 后接逻辑 | 完整 `if / else`，或抽函数 | 第一节 |
 | `else if` 压平子层 | `else { if }` 嵌套，或抽命名函数 | 第一节 |
 | 多行三元按固定缩进 | `?` / `:` 与条件第一个字符对齐（见 1.1） | 1.1 |
+| `if (items.length)` / `value ? ...` | `if (items.length > 0)` / `value !== null ? ...`；条件必须是 boolean | 1.2 |
 | 循环里 `break` / `continue` | `find` / 抽查找函数 / `if` 包裹 | 第四节 |
 | `catch { return null }` / `return []` | 包装 + cause / 判别后处理 / Result | 9.1 |
 | `catch (e) { log(e); throw e }` | 删掉 log，让兜底记一次 | 9.2 |
